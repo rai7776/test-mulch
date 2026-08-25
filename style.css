@@ -1,0 +1,1125 @@
+/* --- 基本設定 --- */
+:root { 
+    --primary: #8b572a; 
+    --bg: #fdfaf5; 
+    --text: #333; 
+    --reader-font-size: 18px;
+    --reader-line-height: 1.8;
+}
+
+* { box-sizing: border-box; } 
+
+body {
+    margin: 0;
+    font-family: -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* スマホズーム対策 */
+input, textarea, select { font-size: 16px !important; }
+
+/* ヘッダー */
+.app-header { 
+    height: auto;
+    min-height: 50px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 10px 15px; 
+    padding-top: max(10px, env(safe-area-inset-top)); 
+    background: white; 
+    border-bottom: 1px solid #ddd; 
+    z-index: 1000; 
+    position: relative;
+}
+#app-title { font-size: 18px; margin: 0; }
+#article-meta { display: flex; align-items: center; gap: 10px; font-size: 0.8em; }
+
+/* メインエリア */
+#main-reader {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#reader-wrapper {
+    flex: 1;
+    min-height: 0;
+}
+#text-display {
+    flex: 1; overflow-y: auto;
+    min-height: 0;
+    width: 100%; 
+    max-width: 800px; 
+    margin: 0 auto; 
+    padding: 20px 15px 140px; 
+    font-size: var(--reader-font-size); 
+    line-height: var(--reader-line-height);
+    word-break: break-word;
+    user-select: text;
+    -webkit-user-select: text;
+}
+#text-display.is-scroll-locked {
+    overflow-y: hidden;
+    touch-action: none;
+}
+#text-display * {
+    user-select: text;
+    -webkit-user-select: text;
+}
+#text-display p { margin-bottom: 1.3em; }
+
+/* 本文検索バー */
+#reader-search-bar {
+    flex-shrink: 0;
+    padding: 7px 12px 6px;
+    background: white;
+    border-bottom: 1px solid #ddd;
+}
+.reader-search-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+#reader-search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 9px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fafafa;
+}
+#search-count {
+    min-width: 48px;
+    text-align: center;
+    color: #666;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+#search-prev-btn, #search-next-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: white;
+    color: var(--primary);
+    cursor: pointer;
+}
+#search-prev-btn:disabled, #search-next-btn:disabled {
+    color: #bbb;
+    background: #f5f5f5;
+    cursor: default;
+}
+.reader-search-options {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    max-width: 800px;
+    margin: 4px auto 0;
+    color: #666;
+    font-size: 0.78em;
+}
+.reader-search-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+/* 章ナビゲーション。複数章の記事だけをJavaScriptから表示する。 */
+.chapter-navigation {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 4px 12px;
+    background: white;
+    border-bottom: 1px solid #eee;
+}
+.chapter-navigation > button,
+#chapter-title-btn {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: white;
+    color: var(--primary);
+    cursor: pointer;
+}
+.chapter-navigation > button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 1.15em;
+}
+.chapter-navigation > button:disabled {
+    color: #bbb;
+    background: #f5f5f5;
+    cursor: default;
+}
+.chapter-picker {
+    position: relative;
+    min-width: 0;
+    max-width: min(620px, 70vw);
+}
+#chapter-title-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    min-height: 30px;
+    padding: 4px 10px;
+    color: var(--text);
+    font-size: 0.9em;
+}
+#chapter-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.chapter-title-chevron {
+    color: #777;
+    font-size: 0.75em;
+}
+.chapter-dropdown {
+    position: absolute;
+    z-index: 1200;
+    top: calc(100% + 4px);
+    left: 50%;
+    display: none;
+    width: max-content;
+    min-width: 190px;
+    max-width: min(420px, 82vw);
+    max-height: min(300px, 45vh);
+    overflow-y: auto;
+    transform: translateX(-50%);
+    padding: 4px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+}
+.chapter-dropdown.is-open { display: block; }
+.chapter-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+.chapter-option:hover,
+.chapter-option.is-current { background: #f3ece4; }
+.chapter-option.is-current { color: var(--primary); font-weight: 600; }
+.chapter-option-check { flex-shrink: 0; color: var(--primary); }
+
+/* ★進捗ステータスバー */
+#reading-status-bar {
+    background: white; border-top: 1px solid #ddd;
+    display: flex; flex-direction: column; gap: 7px;
+    padding: 9px 15px max(8px, env(safe-area-inset-bottom));
+    font-size: 0.85em; color: #666; flex-shrink: 0;
+}
+.reading-status-main {
+    width: 100%; display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 10px;
+}
+.status-info { min-width: 0; display: grid; gap: 4px; }
+.status-line { white-space: nowrap; }
+.status-label { display: inline-block; width: 3.2em; color: var(--primary); font-weight: 600; }
+#bookmark-list { display: flex; gap: 8px; overflow-x: auto; width: 100%; padding-bottom: 3px; }
+#bookmark-btn { flex: 0 0 auto; background: var(--primary); color: white; border: none; border-radius: 4px; padding: 5px 12px; cursor: pointer; }
+
+/* ハイライト */
+.note-highlight { border-bottom: 2px dashed #f39c12; background: rgba(243, 156, 18, 0.1); cursor: pointer; user-select: text; -webkit-user-select: text; }
+.word-highlight { background-color: #b0e8f7; cursor: pointer; border-radius: 2px; user-select: text; -webkit-user-select: text; } /* ★単語用マーカー */
+.search-match { background: #ffeb3b; color: black; border-bottom: 2px solid #f57f17; user-select: text; -webkit-user-select: text; }
+.current-search-match { outline: 2px solid #e67e22; outline-offset: 1px; }
+.text-highlight { background: #669a2b; font-weight: bold; } /* 検索ヒット用 */
+
+/* サイドパネル (幅調整: 35%程度) */
+.panel { 
+    position: fixed; background: white; z-index: 1500; 
+    transition: transform 0.3s ease; display: flex; flex-direction: column; 
+    box-shadow: 0 0 20px rgba(0,0,0,0.1); 
+}
+@media (max-width: 767px) {
+    .panel { bottom: 0; left: 0; width: 100%; height: 80%; border-radius: 20px 20px 0 0; transform: translateY(100%); }
+    .chapter-navigation { gap: 5px; padding-left: 8px; padding-right: 8px; }
+    .chapter-picker { max-width: calc(100vw - 90px); flex: 1; }
+    #chapter-title-btn { font-size: 0.82em; }
+    #reading-status-bar { padding-right: 10px; padding-left: 10px; }
+    .reading-status-main { align-items: flex-start; }
+    #reading-status-bar .status-info { font-size: 0.92em; }
+    .status-line { white-space: normal; }
+    #bookmark-btn { white-space: nowrap; padding: 4px 7px !important; font-size: 12px; }
+}
+@media (min-width: 768px) { .panel { top: 0; right: 0; width: 380px; height: 100%; transform: translateX(100%); } }
+.panel.is-open { transform: translate(0, 0) !important; }
+
+/* タブ・コントロール */
+.tabs { display: flex; background: #f5f5f5; border-bottom: 1px solid #eee; }
+.tab-btn { flex: 1; padding: 12px; border: none; background: none; cursor: pointer; color: #666; }
+.tab-btn.active { background: white; font-weight: bold; border-top: 3px solid var(--primary); color: var(--text); }
+.panel-controls { padding: 10px; border-bottom: 1px solid #eee; background: #fafafa; }
+
+/* ★リストのコンパクト化 */
+.scroll-area { flex: 1; overflow-y: auto; padding: 10px; }
+.note-card { margin-bottom: 8px; border: 1px solid #eee; border-radius: 8px; background: white; padding: 10px; }
+.compact-card { font-size: 0.95em; padding: 8px 10px; } /* さらに小さく */
+
+.word-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.word-left { display: flex; align-items: center; gap: 6px; flex: 1.2; overflow: hidden; }
+.word-text { font-weight: bold; }
+.meaning-right { color: var(--primary); text-align: right; flex: 1; font-weight: bold; font-size: 0.95em; }
+.memo-row { font-size: 0.8em; color: #777; margin-top: 4px; padding-left: 20px; }
+
+/* ノートカードの改善 */
+.note-block-card { 
+    margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; 
+    background: white; padding: 12px; 
+}
+.block-english { font-size: 0.95em; line-height: 1.4; white-space: pre-wrap; }
+.note-divider { border: none; border-top: 1px dashed #eee; margin: 8px 0; }
+.block-memo { color: var(--primary); font-size: 0.9em; white-space: pre-wrap; }
+.block-extra { margin-top: 8px; font-size: 0.85em; color: #555; background: #f9f9f9; padding: 6px; border-radius: 4px; white-space: pre-wrap; }
+
+/* アクションボタン */
+.action-group, .note-footer { display: flex; gap: 5px; justify-content: flex-end; margin-top: 8px; }
+.action-group button, .note-footer button { 
+    padding: 4px 10px; 
+    font-size: 11px;   
+    border: 1px solid #ddd; 
+    border-radius: 5px; 
+    background: white; 
+    cursor: pointer; 
+}
+
+/* 統合モーダル */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; z-index: 3000; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal-content { background: white; padding: 20px; border-radius: 12px; width: 95%; max-width: 450px; max-height: 90vh; overflow-y: auto; }
+.unified-modal-content { width: min(92vw, 520px); max-width: 520px; max-height: 78vh; padding: 14px 16px; }
+.unified-modal-content h2 { margin-bottom: 10px !important; font-size: 1.2em; }
+.unified-modal-content .modal-type-switch { margin-bottom: 9px; }
+.unified-modal-content .type-radio span { padding: 6px; }
+.unified-modal-content label { margin-top: 7px; }
+.unified-modal-content input,
+.unified-modal-content textarea { padding: 8px 9px; }
+.unified-modal-content .modal-actions { margin-top: 12px; }
+.unified-modal-content .btn-save { padding: 8px 16px; }
+
+/* モーダル内のタブ切り替え */
+.modal-type-switch { display: flex; background: #eee; padding: 4px; border-radius: 8px; margin-bottom: 15px; }
+.type-radio { flex: 1; text-align: center; cursor: pointer; position: relative; }
+.type-radio input { position: absolute; opacity: 0; }
+.type-radio span { display: block; padding: 8px; border-radius: 6px; color: #666; font-weight: bold; }
+.type-radio input:checked + span { background: white; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+/* モーダル内のフォーム */
+.modal-content label { display: block; font-size: 0.85em; font-weight: bold; color: #555; margin-bottom: 4px; margin-top: 10px; }
+.modal-content input, .modal-content textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.btn-save { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; }
+
+/* その他 */
+.fab-btn { position: fixed; right: 20px; border: none; color: white; border-radius: 50%; z-index: 1200; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+#add-btn { bottom: 95px; width: 55px; height: 55px; background: #74a1ad; font-size: 24px; }
+#fab-toggle { bottom: 25px; width: 65px; height: 65px; background: var(--primary); font-size: 28px; }
+
+/* 隠しクラス (暗記モード) */
+.anki-mask-both .word-text, .anki-mask-both .meaning-right { visibility: hidden; }
+.anki-mask-word .word-text { visibility: hidden; }
+.anki-mask-meaning .meaning-right { visibility: hidden; }
+.revealed .word-text, .revealed .meaning-right { visibility: visible !important; }
+.flash-card { background-color: #fff3cd !important; transition: background-color 0.5s; }
+
+/* --- 記事登録・ファイルアップロード --- */
+.input-card { 
+    width: 92%; max-width: 800px; margin: 20px auto; padding: 20px; 
+    background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    max-height: 85vh; overflow-y: auto;
+}
+
+/* ファイルアップロードゾーン */
+.file-upload-zone {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 15px;
+    background: #fafafa;
+}
+.file-label {
+    display: block;
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--primary);
+}
+.file-label input { display: none; }
+.file-import-message {
+    min-height: 1.2em;
+    margin: -5px 0 12px;
+    color: #666;
+    font-size: 0.85em;
+}
+.file-import-message.is-error { color: #a33; }
+
+.full-width-form { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.full-width-form input, .full-width-form textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: #fafafa; }
+.full-width-form textarea { height: 35vh; min-height: 200px; resize: none; }
+.input-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+
+/* --- Import Review (保存前のchapter確認・修正) --- */
+.import-review-card {
+    width: 96%;
+    max-width: 1180px;
+    flex: 1;
+    min-height: 0;
+    margin: 14px auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.import-review-header,
+.import-review-title-row,
+.import-review-search-bar,
+.import-review-editor-heading,
+.import-review-chapter-actions,
+.import-review-editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.import-review-header { justify-content: space-between; flex-shrink: 0; }
+.import-review-header h2 { margin: 0 0 3px; font-size: 1.15em; }
+.import-review-header .file-import-message { white-space: pre-line; }
+.import-review-action-feedback { display: none; }
+.import-review-source { color: #777; font-size: 0.8em; text-align: right; overflow-wrap: anywhere; }
+.import-review-title-row label { flex-shrink: 0; font-weight: 600; }
+.import-review-title-row input,
+.import-review-search-bar input,
+.import-review-search-bar select,
+.import-review-editor-heading + input,
+.import-review-editor textarea {
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    background: #fafafa;
+}
+.import-review-title-row input { flex: 1; min-width: 0; padding: 9px 10px; }
+.import-review-search-bar {
+    flex-wrap: wrap;
+    padding: 8px;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.import-review-search-bar > input { flex: 1; min-width: 160px; padding: 7px 9px; }
+.import-review-search-bar select { max-width: 180px; padding: 7px 6px; }
+#import-review-search-count { min-width: 48px; text-align: center; color: #666; white-space: nowrap; }
+#import-review-search-prev,
+#import-review-search-next {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: white;
+    color: var(--primary);
+    cursor: pointer;
+}
+#import-review-search-prev:disabled,
+#import-review-search-next:disabled {
+    color: #bbb;
+    background: #f5f5f5;
+    cursor: default;
+}
+.import-review-aa { display: inline-flex; align-items: center; gap: 3px; color: #666; white-space: nowrap; font-size: 0.85em; }
+.import-review-layout {
+    display: grid;
+    grid-template-columns: minmax(190px, 260px) minmax(0, 1fr);
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+}
+.import-review-chapters,
+.import-review-editor {
+    min-height: 0;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 10px;
+}
+.import-review-chapters { display: flex; flex-direction: column; background: #fcfcfc; }
+.import-review-chapters h3 { margin: 0 0 8px; font-size: 0.95em; color: var(--primary); }
+.mobile-chapter-navigation,
+.mobile-chapter-list-toggle { display: none; }
+.import-review-chapter-list { flex: 1; min-height: 80px; overflow-y: auto; padding-right: 2px; }
+.import-review-chapter-option {
+    display: block;
+    width: 100%;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.import-review-chapter-option:hover,
+.import-review-chapter-option.is-current { background: #f3ece4; }
+.import-review-chapter-option.is-current { color: var(--primary); font-weight: 600; }
+.import-review-chapter-actions { flex-wrap: wrap; margin-top: 9px; }
+.import-review-chapter-actions button,
+.import-review-editor-actions button,
+.btn-danger {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: white;
+    color: var(--text);
+    cursor: pointer;
+}
+.import-review-editor { display: flex; flex-direction: column; gap: 8px; }
+.import-review-editor-heading { justify-content: space-between; flex-shrink: 0; }
+.import-review-editor-heading span { font-weight: 600; color: var(--primary); }
+.import-review-editor-heading + input { width: 100%; padding: 8px 9px; flex-shrink: 0; }
+.import-review-editor textarea {
+    width: 100%;
+    flex: 1;
+    min-height: 180px;
+    padding: 10px;
+    resize: vertical;
+    line-height: 1.55;
+    font-family: inherit;
+}
+.import-review-editor-actions { flex-wrap: wrap; flex-shrink: 0; }
+.import-review-editor-actions button { font-size: 0.82em; }
+.btn-danger { color: #a33; border-color: #d9bcbc; }
+.import-review-actions { flex-shrink: 0; margin-top: 0; }
+
+@media (max-width: 700px) {
+    .import-review-card { width: 100%; height: 100%; max-height: none; margin: 0; padding: 10px; border-radius: 0; }
+    .import-review-header { align-items: flex-start; }
+    .import-review-source { max-width: 48%; }
+    .import-review-title-row { align-items: flex-start; flex-direction: column; gap: 4px; }
+    .import-review-title-row input { width: 100%; }
+    .import-review-search-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; }
+    .import-review-search-bar > span[aria-hidden="true"] { display: none; }
+    .import-review-search-bar > input { order: initial; grid-column: 1; min-width: 0; width: 100%; padding: 7px 8px; }
+    .import-review-search-bar #import-review-search-count { order: initial; grid-column: 2; }
+    .import-review-search-bar #import-review-search-prev,
+    .import-review-search-bar #import-review-search-next { order: initial; }
+    .import-review-search-bar select { order: initial; grid-column: 1 / span 2; max-width: none; width: 100%; }
+    .import-review-aa { order: initial; grid-column: 3 / span 2; justify-self: end; }
+    .import-review-layout { grid-template-columns: 1fr; grid-template-rows: min-content minmax(0, 1fr); gap: 8px; }
+    .import-review-chapters { min-height: 0; padding: 7px 8px; }
+    .mobile-chapter-navigation { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; gap: 5px; }
+    .mobile-chapter-navigation button,
+    .mobile-chapter-list-toggle { min-height: 32px; border: 1px solid #ddd; border-radius: 5px; background: white; color: var(--text); }
+    #import-review-mobile-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--primary); font-weight: 600; }
+    .mobile-chapter-list-toggle { display: block; width: 100%; margin-top: 6px; text-align: left; padding: 0 9px; }
+    .import-review-chapters.is-mobile-collapsed h3,
+    .import-review-chapters.is-mobile-collapsed .import-review-chapter-list,
+    .import-review-chapters.is-mobile-collapsed .import-review-chapter-actions { display: none; }
+    .import-review-chapters:not(.is-mobile-collapsed) .mobile-chapter-list-toggle { margin-bottom: 7px; }
+    .import-review-editor { gap: 7px; }
+    .import-review-editor textarea { min-height: 42vh; flex: 1 1 42vh; resize: vertical; }
+    .import-review-editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .import-review-editor-actions .primary-editor-action { grid-column: span 2; }
+    .import-review-editor-actions button { min-height: 34px; font-size: 0.78em; }
+    .import-review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .import-review-actions button { min-height: 38px; }
+}
+
+/* 本棚エリア全体の設定 */
+#library-section {
+    flex: 1; /* 親要素（main-reader）の余白を埋める */
+    overflow-y: auto; /* 縦スクロールを許可 */
+    -webkit-overflow-scrolling: touch; /* スマホで滑らかに */
+    padding-bottom: 100px; /* 下のボタン（FAB）に被らないための余白 */
+}
+
+/* 本棚のヘッダーを固定したい場合はこれ（任意） */
+.library-header {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+    padding: 15px;
+}
+.library-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+.library-actions input {
+    flex: 1 1 220px;
+    min-width: 150px;
+}
+.library-search-control {
+    display: flex;
+    align-items: center;
+    flex: 1 1 260px;
+    min-width: 190px;
+}
+.library-search-control input {
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 auto;
+}
+#global-search-clear-btn {
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0 8px;
+    border: 1px solid #ddd;
+    border-left: 0;
+    border-radius: 0 6px 6px 0;
+    background: white;
+    color: #76695d;
+    font-size: 1.1em;
+}
+#global-search-input {
+    border-radius: 6px 0 0 6px;
+}
+.library-search-options {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+    font-size: 0.8em;
+    white-space: nowrap;
+}
+.library-search-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+
+/* --- ライブラリ・カードデザイン (画像1枚目の再現) --- */
+.library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px;
+    padding: 15px;
+}
+
+
+.item-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    border-top: 6px solid #ccc; /* デフォルト色 */
+    display: flex;
+    flex-direction: column;
+    min-height: 130px;
+    transition: transform 0.2s;
+}
+
+.item-card:active { transform: scale(0.98); }
+
+/* フォルダと記事の色分け */
+.folder-icon { border-top-color: #f39c12; } /* オレンジ */
+.article-icon { border-top-color: #3498db; } /* ブルー */
+
+.item-card h3 {
+    margin: 10px 0;
+    font-size: 1.1em;
+    color: #333;
+    word-break: break-all;
+    font-weight: 800;
+}
+
+.card-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.small-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    background: #fdfdfd;
+    cursor: pointer;
+    font-weight: bold;
+}
+.small-btn.del { color: #e74c3c; background: #fff5f5; }
+.small-btn.move { color: #3498db; background: #f5faff; }
+
+/* --- 検索スニペットとハイライト (画像3枚目の再現) --- */
+/* --- 検索結果のデザイン・ジャンプ機能用 --- */
+
+/* スニペット全体 */
+.search-snippets {
+    margin-top: 10px;
+    font-size: 0.85em;
+    text-align: left;
+    background: #f9f9f9;
+    padding: 2px 0; /* 上下の余白調整 */
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+/* 個別のヒット行（クリック可能） */
+.match-row {
+    padding: 6px 10px;
+    cursor: pointer; /* 指アイコンにする */
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.match-row:last-child {
+    border-bottom: none;
+}
+
+.match-row:hover {
+    background-color: #e3f2fd; /* ホバー時に薄い青 */
+}
+
+/* ラベルのデザイン */
+.match-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    color: white;
+    margin-right: 8px;
+    font-weight: bold;
+    flex-shrink: 0; /* 縮まないように固定 */
+    vertical-align: middle;
+}
+
+/* ラベルの色分け */
+.title-tag { background-color: #3498db; }   /* 青：タイトル */
+.content-tag { background-color: #95a5a6; } /* 灰：本文 */
+.word-tag { background-color: #e67e22; }    /* 橙：単語 */
+.note-tag { background-color: #27ae60; }    /* 緑：ノート */
+
+.match-text {
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* 検索語句のハイライト（文字自体の装飾） */
+.search-highlight {
+    background-color: #fff176;
+    color: #000;
+    font-weight: bold;
+    border-radius: 2px;
+    padding: 0 2px;
+
+}
+
+/* --- Global Vocabulary --- */
+#vocabulary-section {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 100px;
+}
+.vocabulary-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 15px;
+    background: var(--bg);
+    border-bottom: 1px solid #eee;
+}
+.vocabulary-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.vocabulary-title-row h2 {
+    margin: 0;
+    font-size: 1.35em;
+}
+.vocabulary-count {
+    color: #666;
+    font-size: 0.85em;
+}
+.vocabulary-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 1000px;
+    margin: 12px auto 0;
+}
+.vocabulary-controls input[type="search"] {
+    flex: 1 1 240px;
+    min-width: 150px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+.vocabulary-controls select {
+    min-width: 110px;
+    max-width: 190px;
+    padding: 7px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+.vocabulary-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+    color: #666;
+    font-size: 0.85em;
+}
+.global-vocabulary-list {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 15px;
+}
+.global-vocabulary-card {
+    margin: 0;
+    cursor: pointer;
+    transition: box-shadow 0.15s, background-color 0.15s;
+}
+.global-vocabulary-card:hover {
+    box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+}
+.global-vocabulary-card.memorized-item {
+    background: #fafafa;
+}
+.global-vocabulary-summary {
+    min-height: 38px;
+}
+.global-vocabulary-summary input[type="checkbox"] {
+    flex-shrink: 0;
+}
+.global-vocabulary-details {
+    margin-top: 10px;
+    padding: 10px 4px 0 26px;
+    border-top: 1px dashed #ddd;
+    font-size: 0.88em;
+}
+.global-vocabulary-detail-row {
+    display: flex;
+    gap: 8px;
+    margin: 5px 0;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.global-vocabulary-detail-label {
+    min-width: 56px;
+    color: #777;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+.global-vocabulary-detail-value {
+    color: #333;
+}
+.global-vocabulary-context {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+}
+.global-vocabulary-context-toggle {
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 1px solid #d9cbbd;
+    border-radius: 6px;
+    background: #fffaf4;
+    color: var(--primary);
+    cursor: pointer;
+}
+.global-vocabulary-context-open {
+    margin-top: 6px;
+}
+.global-vocabulary-context-panel {
+    margin-top: 7px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #faf7f2;
+    color: #444;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.global-vocabulary-context-meaning {
+    margin-top: 7px;
+    color: #76695d;
+    font-size: 0.88em;
+}
+.global-vocabulary-context-highlight {
+    padding: 0 2px;
+    border-radius: 3px;
+    background: #ffe08a;
+    color: #3f2b15;
+}
+.global-vocabulary-context-mask,
+.global-vocabulary-context-answer {
+    display: inline-block;
+    min-width: 1.8em;
+    padding: 0 3px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.global-vocabulary-context-mask {
+    background: #d8d2ca;
+    color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.global-vocabulary-context-answer {
+    background: #ffe08a;
+    color: #3f2b15;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.global-vocabulary-context-mask:focus-visible,
+.global-vocabulary-context-answer:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+}
+.global-vocabulary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+.global-vocabulary-empty {
+    padding: 30px 15px;
+    color: #777;
+    text-align: center;
+}
+.global-vocabulary-statistics,
+.article-vocabulary-statistics,
+.word-statistics-summary {
+    color: #76695d;
+    font-size: 0.82em;
+    margin: 6px 0;
+}
+.global-vocabulary-group {
+    border-left: 3px solid #ba8b5b;
+}
+.global-vocabulary-group-count {
+    font-size: 0.8em;
+    color: #76695d;
+}
+.global-vocabulary-group-actions {
+    margin: 4px 0 8px;
+}
+.global-vocabulary-group-entries {
+    display: grid;
+    gap: 7px;
+    padding: 8px 0 0 10px;
+}
+.global-vocabulary-group-entries .global-vocabulary-card {
+    background: #fffdf9;
+}
+.temporary-reader-anchor {
+    outline: 2px solid rgba(119, 176, 194, 0.75);
+    background: rgba(199, 234, 243, 0.38);
+    border-radius: 4px;
+}
+.temporary-reader-highlight {
+    background: #ffdc77 !important;
+    box-shadow: 0 0 0 2px rgba(219, 156, 30, 0.38);
+}
+#reader-search-scope {
+    min-width: 100px;
+}
+#search-clear-btn {
+    min-width: 30px;
+    padding: 4px 8px;
+    color: #76695d;
+    font-size: 1.1em;
+    line-height: 1;
+}
+.word-statistics-modal {
+    max-width: 560px;
+}
+.word-statistics-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+}
+.word-statistics-list {
+    max-height: min(55vh, 480px);
+    overflow-y: auto;
+    display: grid;
+    gap: 5px;
+}
+.word-frequency-row {
+    width: 100%;
+    text-align: left;
+    background: #fff;
+    border: 1px solid #e8ded2;
+    border-radius: 5px;
+    padding: 8px 10px;
+    color: #3d352e;
+}
+.word-frequency-row:hover {
+    background: #f7f0e8;
+}
+.backup-restore-modal { max-width: 480px; }
+.backup-restore-modal h2 { margin: 0 0 10px; }
+.backup-restore-file,
+.backup-restore-date { margin: 4px 0; color: #666; overflow-wrap: anywhere; }
+.backup-restore-counts { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px; margin: 16px 0; }
+.backup-restore-counts div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; background: #faf8f5; border-radius: 6px; }
+.backup-restore-counts dt { color: #76695d; }
+.backup-restore-counts dd { margin: 0; font-weight: 600; }
+.backup-restore-warning { padding: 10px; border: 1px solid #e6c8a9; border-radius: 7px; background: #fff8ef; color: #794b22; line-height: 1.5; }
+.backup-restore-status { min-height: 1.4em; margin: 8px 0 0; color: var(--primary); }
+.backup-restore-status.is-error { color: #a33; }
+
+.panel-header { display: flex; align-items: center; border-bottom: 1px solid #eee; background: #fafafa; }
+.panel-header .tabs { flex: 1; }
+.panel-expand-btn,
+.panel-header .close-btn { flex: 0 0 auto; min-width: 34px; min-height: 34px; border: 0; background: transparent; color: #76695d; font-size: 1.05em; }
+
+@media (max-width: 700px) {
+    .import-review-card { padding: 7px; }
+    .import-review-header { min-height: 26px; }
+    .import-review-header h2 { font-size: 1em; margin: 0; }
+    .import-review-header .file-import-message,
+    .import-review-source { display: none; }
+    .import-review-action-feedback.is-visible { display: inline-block; margin-left: 8px; color: var(--primary); font-size: 0.78em; }
+    .import-review-title-row { display: block; margin: 0; }
+    .import-review-title-row label { display: none; }
+    .import-review-title-row input { padding: 6px 8px; height: 32px; box-sizing: border-box; }
+    .import-review-search-toggle,
+    .import-review-search-options-toggle { display: none; }
+    .import-review-search-bar:not(.is-mobile-open) { display: flex; width: 34px; padding: 0; border: 0; background: transparent; }
+    .import-review-search-bar:not(.is-mobile-open) > :not(.import-review-search-toggle) { display: none !important; }
+    .import-review-search-bar:not(.is-mobile-open) .import-review-search-toggle { display: block; width: 34px; height: 32px; padding: 0; border: 1px solid #ddd; border-radius: 5px; background: white; }
+    .import-review-search-bar.is-mobile-open { display: grid; grid-template-columns: 30px minmax(0, 1fr) 36px 30px 30px 30px; gap: 4px; padding: 5px; }
+    .import-review-search-bar.is-mobile-open > span[aria-hidden="true"] { display: none; }
+    .import-review-search-bar.is-mobile-open .import-review-search-toggle { display: block; grid-column: 1; grid-row: 1; width: 30px; height: 30px; padding: 0; border: 1px solid #ddd; border-radius: 5px; background: white; }
+    .import-review-search-bar.is-mobile-open > input { grid-column: 2; grid-row: 1; min-width: 0; padding: 5px 6px; }
+    .import-review-search-bar.is-mobile-open #import-review-search-count { grid-column: 3; grid-row: 1; min-width: 0; font-size: 0.8em; }
+    .import-review-search-bar.is-mobile-open #import-review-search-prev { grid-column: 4; grid-row: 1; }
+    .import-review-search-bar.is-mobile-open #import-review-search-next { grid-column: 5; grid-row: 1; }
+    .import-review-search-bar.is-mobile-open .import-review-search-options-toggle { display: block; grid-column: 6; grid-row: 1; width: 30px; height: 30px; padding: 0; border: 1px solid #ddd; border-radius: 5px; background: white; }
+    .import-review-search-bar.is-mobile-open select,
+    .import-review-search-bar.is-mobile-open .import-review-aa { display: none; }
+    .import-review-search-bar.is-mobile-open.is-mobile-options-open select { display: block; grid-column: 1 / span 4; grid-row: 2; width: 100%; }
+    .import-review-search-bar.is-mobile-open.is-mobile-options-open .import-review-aa { display: inline-flex; grid-column: 5 / span 2; grid-row: 2; align-items: center; justify-self: end; }
+    .import-review-editor-heading { justify-content: flex-end; min-height: 26px; }
+    .import-review-editor-heading span { display: none; }
+    .import-review-editor-heading .btn-danger { padding: 4px 7px; font-size: 0.78em; }
+    .import-review-layout { flex: 1; }
+    .import-review-chapters:not(.is-mobile-collapsed) {
+        max-height: min(48dvh, 400px);
+        overflow: hidden;
+    }
+    .import-review-chapters:not(.is-mobile-collapsed) .import-review-chapter-list {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+    }
+    .import-review-editor textarea { min-height: 0; flex: 1 1 auto; }
+    .import-review-actions { position: sticky; bottom: 0; padding-top: 5px; background: white; }
+    .import-review-editor-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .import-review-editor-actions .primary-editor-action { grid-column: auto; }
+    .import-review-editor-actions button { white-space: nowrap; }
+    .import-review-chapter-actions-menu { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; border: 1px solid #e7ded5; border-radius: 6px; background: #faf8f5; }
+    .import-review-chapter-actions-menu[hidden] { display: none; }
+    .import-review-chapter-actions-menu button { min-height: 34px; }
+    .import-review-chapter-actions-menu .btn-danger { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+    .library-search-control,
+    .library-search-options { flex-basis: 100%; }
+    .library-search-options { width: 100%; justify-content: flex-start; }
+    .panel { height: 52vh; height: 52dvh; border-radius: 16px 16px 0 0; transition: transform 0.3s ease, height 0.22s ease; }
+    .panel.is-expanded { height: 85vh; height: 85dvh; }
+    .panel::before { content: ''; width: 42px; height: 4px; border-radius: 999px; background: #d4ccc4; margin: 6px auto 1px; flex: 0 0 auto; }
+    .panel-header { min-height: 35px; }
+    .panel-header .tab-btn { padding: 7px 8px; font-size: 0.9em; }
+    .panel-expand-btn,
+    .panel-header .close-btn { min-width: 30px; min-height: 32px; padding: 0; }
+    .panel-controls { padding: 6px 8px; }
+    .panel-controls > div { margin-bottom: 0 !important; }
+    .panel-controls input { min-height: 30px; padding: 5px 7px; }
+    .article-vocabulary-statistics { margin: 3px 8px; font-size: 0.76em; }
+    #side-panel .control-row { display: flex; align-items: center; padding: 3px 8px; margin: 0 !important; }
+    #side-panel .anki-settings-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    #side-panel .anki-toggle { font-size: 0.84em; }
+    #side-panel .mini-select { max-width: 116px; }
+    #side-panel .scroll-area { padding: 6px 8px; }
+    .unified-modal-content { max-height: 68vh; }
+    #search-clear-btn,
+    #search-prev-btn,
+    #search-next-btn { min-width: 40px; min-height: 40px; padding: 0 7px; }
+}
+@media (max-width: 767px) {
+    #unified-modal-overlay { align-items: flex-end; padding: 0 12px 9vh; box-sizing: border-box; }
+    .unified-modal-content { width: 100%; max-height: 68vh; padding: 13px 14px; border-radius: 12px; }
+    .unified-modal-content textarea { max-height: 18vh; }
+    .unified-modal-content .modal-actions { position: sticky; bottom: -13px; margin: 10px -14px -13px; padding: 9px 14px; background: white; border-top: 1px solid #eee; }
+}
+@media (max-width: 767px) {
+    .vocabulary-header { padding: 10px; }
+    .vocabulary-title-row { align-items: flex-start; }
+    .vocabulary-title-row h2 { font-size: 1.15em; }
+    .vocabulary-controls { margin-top: 9px; gap: 6px; }
+    .vocabulary-controls input[type="search"] { flex-basis: 100%; }
+    .vocabulary-controls select { flex: 1 1 125px; max-width: none; }
+    .global-vocabulary-list { padding: 10px; }
+    .global-vocabulary-details { padding-left: 4px; }
+    .global-vocabulary-detail-row { display: block; }
+    .global-vocabulary-detail-label { display: block; }
+    .word-statistics-modal { width: calc(100% - 24px); }
+}
+

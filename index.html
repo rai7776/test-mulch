@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>英読 - Smart Reader</title>
+    <link rel="stylesheet" href="style.css?v=1.4">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <button id="back-to-library" onclick="showLibrary()" style="display:none;">📖 本棚</button>
+            <h1 id="app-title">英読</h1>
+        </div>
+        <div id="article-meta" style="display:none;">
+            <button onclick="editCurrentArticle()" class="small-edit-btn">編集</button>
+            <button onclick="showGlobalVocabulary()" class="small-edit-btn">Vocabulary</button>
+            <button onclick="openWordStatistics()" class="small-edit-btn">📊 統計</button>
+            <a id="display-url" href="#" target="_blank">🔗 元記事</a>
+        </div>
+    </header>
+
+    <main id="main-reader">
+        <div id="library-section">
+            <div class="library-header">
+                <div id="breadcrumbs" class="breadcrumbs"></div>
+                <div class="library-actions">
+                    <button class="btn-sub" onclick="showGlobalVocabulary()">Vocabulary</button>
+                    <div class="library-search-control">
+                        <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
+                        <button type="button" id="global-search-clear-btn" onclick="clearGlobalSearch()" aria-label="検索をクリア">×</button>
+                    </div>
+                    <div class="library-search-options" aria-label="Library検索オプション">
+                        <label><input type="checkbox" id="global-search-whole-word" onchange="performGlobalSearch()"> 単語一致</label>
+                        <label><input type="checkbox" id="global-search-case-sensitive" onchange="performGlobalSearch()"> Aa</label>
+                    </div>
+                    <button class="btn-sub" onclick="createNewFolder()">＋ フォルダ</button>
+                    <button class="start-btn" onclick="showInputArea()">＋ 記事作成</button>
+                    <button class="btn-sub" onclick="exportSmartReaderBackup()">バックアップ</button>
+                    <button class="btn-sub" onclick="openSmartReaderRestore()">復元</button>
+                    <input type="file" id="backup-file-input" accept="application/json,.json" onchange="handleSmartReaderRestore(event)" style="display:none;">
+                </div>
+            </div>
+            <div id="library-list" class="library-grid"></div>
+        </div>
+
+        <div id="vocabulary-section" style="display:none;">
+            <div class="vocabulary-header">
+                <div class="vocabulary-title-row">
+                    <button class="btn-sub" onclick="showLibrary()">📚 Library</button>
+                    <div>
+                        <h2>Global Vocabulary</h2>
+                        <span id="global-vocab-count" class="vocabulary-count">0 words</span>
+                    </div>
+                </div>
+                <div id="global-vocab-statistics" class="vocabulary-statistics" aria-live="polite"></div>
+                <div class="vocabulary-controls">
+                    <input type="search" id="global-vocab-search" placeholder="単語・意味・メモ・出典を検索" oninput="updateGlobalVocabulary('query', this.value)">
+                    <label class="vocabulary-check"><input type="checkbox" id="global-vocab-exact" onchange="updateGlobalVocabulary('exact', this.checked)"> 完全一致</label>
+                    <select id="global-vocab-status" onchange="updateGlobalVocabulary('status', this.value)" aria-label="暗記状態">
+                        <option value="all">すべて</option>
+                        <option value="unmemorized">未暗記</option>
+                        <option value="memorized">暗記済み</option>
+                    </select>
+                    <select id="global-vocab-source" onchange="updateGlobalVocabulary('sourceId', this.value)" aria-label="出典"></select>
+                    <select id="global-vocab-chapter" onchange="updateGlobalVocabulary('chapterId', this.value)" aria-label="章" style="display:none;"></select>
+                    <select id="global-vocab-sort" onchange="updateGlobalVocabulary('sort', this.value)" aria-label="並び順">
+                        <option value="newest">新しい順</option>
+                        <option value="oldest">古い順</option>
+                        <option value="az">A → Z</option>
+                        <option value="za">Z → A</option>
+                    </select>
+                    <label class="vocabulary-check"><input type="checkbox" id="global-vocab-grouped" onchange="toggleGlobalVocabularyGrouping()"> 重複をまとめる</label>
+                    <label class="vocabulary-check"><input type="checkbox" id="global-vocab-anki" onchange="toggleGlobalAnkiMode()"> 暗記モード</label>
+                    <select id="global-vocab-anki-target" onchange="updateGlobalAnkiTarget(this.value)" aria-label="暗記モード対象">
+                        <option value="both">単語と意味を隠す</option>
+                        <option value="word">単語を隠す</option>
+                        <option value="meaning">意味を隠す</option>
+                    </select>
+                    <button class="btn-export" onclick="exportGlobalVocabularyCSV()">全単語をCSV出力</button>
+                </div>
+            </div>
+            <div id="global-vocabulary-list" class="global-vocabulary-list"></div>
+        </div>
+
+        <div id="input-area" class="input-card" style="display:none;">
+            <h2 id="input-title-label">記事を登録</h2>
+            <div class="file-upload-zone">
+                <label for="file-input" class="file-label">
+                    <span id="file-label-text">📄 EPUB / PDF / HTML / TXT ファイルを読み込む</span>
+                    <input type="file" id="file-input" accept=".epub,.pdf,.html,.htm,.txt" onchange="handleFileUpload(event)">
+                </label>
+            </div>
+            <div id="file-import-message" class="file-import-message" role="status" aria-live="polite"></div>
+            <div class="full-width-form">
+                <input type="text" id="text-title" placeholder="タイトルの名前">
+                <input type="url" id="text-url" placeholder="出典URL（https://...）">
+                <textarea id="text-input" placeholder="本文を入力..."></textarea>
+            </div>
+            <div class="input-actions">
+                <button onclick="showLibrary()" class="btn-cancel">キャンセル</button>
+                <button onclick="saveNewArticle()" class="start-btn">保存して読む</button>
+            </div>
+        </div>
+
+        <div id="import-review-area" class="import-review-card" style="display:none;">
+            <div class="import-review-header">
+                <div>
+                    <h2 id="chapter-editor-heading">Import Review</h2>
+                    <div id="import-review-status" class="file-import-message" role="status" aria-live="polite"></div>
+                    <div id="import-review-action-feedback" class="import-review-action-feedback" role="status" aria-live="polite"></div>
+                </div>
+                <span id="import-review-source" class="import-review-source"></span>
+            </div>
+
+            <div class="import-review-title-row">
+                <label for="import-review-title">Title:</label>
+                <input type="text" id="import-review-title" placeholder="タイトル">
+            </div>
+
+            <div class="import-review-search-bar">
+                <button type="button" id="import-review-search-toggle" class="import-review-search-toggle" onclick="toggleImportReviewSearch()" aria-label="本文検索を開く" aria-expanded="false">🔍</button>
+                <span aria-hidden="true">🔍</span>
+                <input type="text" id="import-review-search-input" placeholder="章・本文を検索..." enterkeyhint="search">
+                <select id="import-review-search-scope" aria-label="検索範囲">
+                    <option value="current">現在のchapter</option>
+                    <option value="all">インポート文書全体</option>
+                </select>
+                <span id="import-review-search-count" aria-live="polite">0 / 0</span>
+                <button type="button" id="import-review-search-prev" aria-label="前の検索結果">↑</button>
+                <button type="button" id="import-review-search-next" aria-label="次の検索結果">↓</button>
+                <button type="button" id="import-review-search-options-toggle" class="import-review-search-options-toggle" onclick="toggleImportReviewSearchOptions()" aria-label="検索オプション">⋯</button>
+                <label class="import-review-aa"><input type="checkbox" id="import-review-search-case-sensitive"> Aa</label>
+            </div>
+
+            <div class="import-review-layout">
+                <aside class="import-review-chapters is-mobile-collapsed">
+                    <div class="mobile-chapter-navigation" aria-label="chapter移動">
+                        <button type="button" onclick="moveImportReviewChapter(-1)" aria-label="前の章">‹</button>
+                        <button type="button" id="import-review-mobile-current" onclick="toggleImportReviewChapterList()">Chapter 1 / 1</button>
+                        <button type="button" onclick="moveImportReviewChapter(1)" aria-label="次の章">›</button>
+                    </div>
+                    <button type="button" id="import-review-chapter-list-toggle" class="mobile-chapter-list-toggle" onclick="toggleImportReviewChapterList()" aria-expanded="false">章一覧</button>
+                    <h3>Chapters</h3>
+                    <div id="import-review-chapter-list" class="import-review-chapter-list"></div>
+                    <div class="import-review-chapter-actions">
+                        <button type="button" onclick="addImportReviewChapter()">＋追加</button>
+                        <button type="button" onclick="moveImportReviewChapter(-1)">↑上へ</button>
+                        <button type="button" onclick="moveImportReviewChapter(1)">↓下へ</button>
+                    </div>
+                </aside>
+
+                <section class="import-review-editor">
+                    <div class="import-review-editor-heading">
+                        <span id="import-review-current-label">Chapter 1</span>
+                    </div>
+                    <input type="text" id="import-review-chapter-title" placeholder="Chapter title">
+                    <textarea id="import-review-chapter-content" placeholder="chapter本文"></textarea>
+                    <div class="import-review-editor-actions">
+                        <button type="button" class="primary-editor-action" onclick="splitImportReviewChapter()">✂ 分割</button>
+                        <button type="button" id="import-review-format-actions-toggle" class="primary-editor-action" onclick="toggleImportReviewFormatActions()" aria-expanded="false">🧹 整形</button>
+                        <button type="button" id="import-review-chapter-actions-toggle" class="secondary-editor-action" onclick="toggleImportReviewChapterActions()" aria-expanded="false">⋯ 章操作</button>
+                        <div id="import-review-format-actions-menu" class="import-review-chapter-actions-menu" hidden>
+                            <button type="button" onclick="hideImportReviewFormatActions(); joinImportReviewWrappedLines()">折り返し改行を結合</button>
+                            <button type="button" onclick="hideImportReviewFormatActions(); normalizeImportReviewParagraphSpacing()">段落間隔を整理</button>
+                        </div>
+                        <div id="import-review-chapter-actions-menu" class="import-review-chapter-actions-menu" hidden>
+                            <button type="button" onclick="hideImportReviewChapterActions(); mergeImportReviewChapter(-1)">前の章と結合</button>
+                            <button type="button" onclick="hideImportReviewChapterActions(); mergeImportReviewChapter(1)">次の章と結合</button>
+                            <button type="button" class="btn-danger" onclick="hideImportReviewChapterActions(); deleteImportReviewChapter()">章を削除</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="input-actions import-review-actions">
+                <button type="button" id="chapter-editor-cancel" onclick="cancelChapterEditor()" class="btn-cancel">キャンセル</button>
+                <button type="button" id="chapter-editor-save" onclick="saveChapterEditor()" class="start-btn">保存して読む</button>
+            </div>
+        </div>
+
+        <div id="reader-wrapper" style="display:none; flex:1; min-height:0; flex-direction:column;">
+            <div id="reader-search-bar">
+                <div class="reader-search-main">
+                    <input type="text" id="reader-search-input" placeholder="本文内を検索..." enterkeyhint="search" oninput="searchInText()" onfocus="handleReaderSearchFocus(event)" onkeydown="handleReaderSearchKeydown(event)">
+                    <button type="button" id="search-clear-btn" onclick="clearReaderSearch()" aria-label="検索をクリア">×</button>
+                    <span id="search-count" aria-live="polite">0 / 0</span>
+                    <button type="button" id="search-prev-btn" onclick="previousSearchResult()" aria-label="前の検索結果">↑</button>
+                    <button type="button" id="search-next-btn" onclick="nextSearchResult()" aria-label="次の検索結果">↓</button>
+                </div>
+                <div class="reader-search-options">
+                    <select id="reader-search-scope" onchange="changeReaderSearchScope(this.value)" aria-label="検索範囲">
+                        <option value="chapter">現在の章</option>
+                        <option value="book">書籍全体</option>
+                    </select>
+                    <label><input type="checkbox" id="search-whole-word" onchange="searchInText()"> 単語一致</label>
+                    <label><input type="checkbox" id="search-case-sensitive" onchange="searchInText()"> Aa</label>
+                </div>
+            </div>
+
+            <div id="chapter-navigation" class="chapter-navigation" style="display:none;">
+                <button id="chapter-prev-btn" type="button" onclick="goToPreviousChapter()" aria-label="前の章へ">‹</button>
+                <div class="chapter-picker">
+                    <button id="chapter-title-btn" type="button" onclick="toggleChapterDropdown(event)" aria-haspopup="listbox" aria-expanded="false">
+                        <span id="chapter-title">本文</span><span class="chapter-title-chevron" aria-hidden="true">▼</span>
+                    </button>
+                    <div id="chapter-dropdown" class="chapter-dropdown" role="listbox"></div>
+                </div>
+                <button id="chapter-next-btn" type="button" onclick="goToNextChapter()" aria-label="次の章へ">›</button>
+            </div>
+
+            <div id="text-display" onclick="handleReaderClick(event)"></div>
+
+        <div id="reading-status-bar">
+            <div class="reading-status-main">
+                <div class="status-info" aria-live="polite">
+                    <div id="chapter-status-line" class="status-line">
+                        <span id="chapter-status-label" class="status-label" style="display:none;">この章</span>
+                        <span id="word-count">0 words</span> |
+                        <span id="char-count">0文字</span> |
+                        <span id="read-progress">0%</span>
+                    </div>
+                    <div id="book-status-line" class="status-line" style="display:none;">
+                        <span class="status-label">全体</span>
+                        <span id="book-word-count">0 words</span> |
+                        <span id="book-char-count">0文字</span> |
+                        <span id="book-read-progress">0%</span>
+                    </div>
+                </div>
+                <button id="bookmark-btn" onclick="addBookmark()">🔖 しおりを追加</button>
+            </div>
+            <div id="bookmark-list"></div>
+        </div>
+        </div>
+
+    </main>
+
+    <aside id="side-panel" class="panel">
+        <div class="panel-header">
+            <nav class="tabs">
+                <button class="tab-btn active" onclick="switchTab('words')">単語</button>
+                <button class="tab-btn" onclick="switchTab('notes')">ノート</button>
+                <button class="tab-btn" onclick="switchTab('settings')">⚙️</button>
+            </nav>
+            <button type="button" id="panel-expand-btn" class="panel-expand-btn" onclick="toggleMobilePanelSize()" aria-label="単語帳を拡大" aria-pressed="false">⤢</button>
+            <button class="close-btn" onclick="togglePanel()">✕</button>
+        </div>
+        
+        <div id="anki-wrapper" class="panel-controls">
+            <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                <input type="text" id="list-search" placeholder="リスト内検索..." oninput="handleListSearch()" style="margin-bottom:0; flex:1;">
+                <button onclick="exportToCSV()" class="btn-export">⬇️</button>
+            </div>
+        </div>
+        <div id="article-vocabulary-statistics" class="article-vocabulary-statistics" aria-live="polite"></div>
+
+        <div class="control-row">
+                <div class="anki-settings-group">
+                    <label class="anki-toggle">
+                        <input type="checkbox" id="anki-mode-check" onchange="toggleAnkiMode()"> 
+                        <span>暗記モード</span>
+                    </label>
+                    <select id="anki-target-select" onchange="toggleAnkiMode()" class="mini-select">
+                        <option value="both">両方隠す</option>
+                        <option value="word">単語を隠す</option>
+                        <option value="meaning">意味を隠す</option>
+                    </select>
+                </div>
+            </div>
+            <div class="control-row" style="margin-top:8px;">
+                <label class="anki-toggle">
+                    <input type="checkbox" id="hide-memorized-check" onchange="renderList('words')"> 
+                    <span style="font-size:0.9em; color:#666;">覚えた単語（✅）を隠す</span>
+                </label>
+            </div>
+        </div>
+        <div id="panel-content" class="scroll-area"></div>
+   
+    </aside>
+
+    <button id="add-btn" class="fab-btn" onclick="openUnifiedModal()">＋</button>
+    <button id="fab-toggle" class="fab-btn" onclick="togglePanel()">📋</button>
+
+    <div id="unified-modal-overlay" class="modal-overlay">
+        <div class="modal-content unified-modal-content">
+            <h2 style="text-align:center; margin-top:0;">追加・編集</h2>
+            
+            <div class="modal-type-switch">
+                <label class="type-radio">
+                    <input type="radio" name="modal-type" value="word" checked onchange="switchModalType('word')">
+                    <span>単語</span>
+                </label>
+                <label class="type-radio">
+                    <input type="radio" name="modal-type" value="note" onchange="switchModalType('note')">
+                    <span>ノート</span>
+                </label>
+            </div>
+
+            <form onsubmit="handleUnifiedSave(event)">
+                <div id="form-word-section">
+                    <label>単語 / フレーズ</label>
+                    <input type="text" id="input-word-text" required>
+                    <label>意味</label>
+                    <input type="text" id="input-word-meaning" required>
+                    <label>メモ (任意)</label>
+                    <textarea id="input-word-memo" rows="2"></textarea>
+                    <label>Context / 例文 (任意)</label>
+                    <textarea id="input-word-context" rows="3" placeholder="本文から自動取得されます。自由に編集できます。"></textarea>
+                </div>
+
+                <div id="form-note-section" style="display:none;">
+                    <label>対象の英文 (原文)</label>
+                    <textarea id="input-note-eng" rows="3" required></textarea>
+                    <label>和訳・意味</label>
+                    <textarea id="input-note-trans" rows="3"></textarea>
+                    <label>解説・解釈 (文法など)</label> <textarea id="input-note-extra" rows="3"></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal()">中止</button>
+                    <button type="submit" class="btn-save">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="move-modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <h3>移動先を選択</h3>
+            <p id="move-target-name" style="color:#666; font-size:0.9em;"></p>
+            <select id="move-select" class="full-width-select"></select>
+            <div class="modal-actions">
+                <button type="button" onclick="document.getElementById('move-modal-overlay').classList.remove('show')">中止</button>
+                <button type="button" onclick="submitMove()" class="btn-save">移動</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="word-statistics-overlay" class="modal-overlay">
+        <div class="modal-content word-statistics-modal">
+            <div class="word-statistics-header">
+                <h2>Word Statistics</h2>
+                <button type="button" class="close-btn" onclick="closeWordStatistics()">✕</button>
+            </div>
+            <label class="vocabulary-check"><input type="checkbox" id="frequency-exclude-common" onchange="renderWordStatistics()"> 一般語を除外</label>
+            <p id="word-statistics-summary" class="word-statistics-summary"></p>
+            <div id="word-statistics-list" class="word-statistics-list"></div>
+        </div>
+    </div>
+
+    <div id="backup-restore-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="backup-restore-title">
+        <div class="modal-content backup-restore-modal">
+            <h2 id="backup-restore-title">バックアップから復元</h2>
+            <p id="backup-restore-file" class="backup-restore-file"></p>
+            <p id="backup-restore-date" class="backup-restore-date"></p>
+            <dl class="backup-restore-counts">
+                <div><dt>記事</dt><dd id="backup-count-articles">0</dd></div>
+                <div><dt>フォルダ</dt><dd id="backup-count-folders">0</dd></div>
+                <div><dt>章</dt><dd id="backup-count-chapters">0</dd></div>
+                <div><dt>単語</dt><dd id="backup-count-words">0</dd></div>
+                <div><dt>ノート</dt><dd id="backup-count-notes">0</dd></div>
+                <div><dt>しおり</dt><dd id="backup-count-bookmarks">0</dd></div>
+            </dl>
+            <p class="backup-restore-warning">現在のSmart Readerデータを、バックアップに含まれるデータで置き換えます。対象外のLocalForageデータは保持され、復元前のデータも自動的にJSONで保存されます。</p>
+            <p id="backup-restore-status" class="backup-restore-status" role="status" aria-live="polite"></p>
+            <div class="modal-actions">
+                <button type="button" id="backup-restore-cancel" onclick="closeSmartReaderRestorePreview()">キャンセル</button>
+                <button type="button" id="backup-restore-confirm" class="btn-save" onclick="confirmSmartReaderRestore()">復元する</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/localforage/dist/localforage.min.js"></script>
+    <script src="importers.js?v=1.1"></script>
+    <script src="app.js?v=4.0"></script>
+</body>
+</html>
