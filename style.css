@@ -323,9 +323,42 @@ input, textarea, select { font-size: 16px !important; }
 .unified-modal-content .type-radio span { padding: 6px; }
 .unified-modal-content label { margin-top: 7px; }
 .unified-modal-content input,
-.unified-modal-content textarea { padding: 8px 9px; }
+.unified-modal-content textarea,
+.unified-modal-content select { padding: 8px 9px; }
 .unified-modal-content .modal-actions { margin-top: 12px; }
 .unified-modal-content .btn-save { padding: 8px 16px; }
+.chapter-mode-option { display: flex !important; align-items: center; gap: 7px; margin-top: 10px !important; font-weight: normal !important; }
+.chapter-mode-option input { width: auto !important; }
+.question-marker,
+.problem-highlight { display: inline; margin: 0 2px; border-bottom: 2px solid #c28b37; border-radius: 4px; background: #fff4d6; color: #704f1c; cursor: pointer; line-height: 1.45; user-select: text; -webkit-user-select: text; }
+.problem-marker-badge { display: inline-flex; align-items: center; justify-content: center; width: 1.45em; min-width: 1.45em; height: 1.45em; margin: 0 3px 0 0; padding: 0; border: 1px solid #c28b37; border-radius: 50%; background: #fff; color: #704f1c; font-size: .8em; font-weight: 700; line-height: 1; cursor: pointer; vertical-align: middle; }
+.question-marker:focus-visible,
+.problem-highlight:focus-visible,
+.problem-marker-badge:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.question-card-selected { margin-bottom: 8px; color: #76695d; font-size: .9em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.question-card-question { margin-bottom: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.question-card-meta { display: flex; flex-wrap: wrap; gap: 5px 9px; margin-bottom: 8px; color: #76695d; font-size: .78em; }
+.question-card-meta span { padding: 2px 6px; border-radius: 10px; background: #f5eee6; }
+.question-card-reveal { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 8px; }
+.question-card-reveal button { min-height: 34px; padding: 6px 11px; cursor: pointer; }
+.question-card-hidden { padding: 7px 9px; border-radius: 6px; background: #faf7f2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.question-card-attempt { margin-top: 14px; padding-top: 11px; border-top: 1px solid #eee5dc; }
+.question-card-attempt label { display: block; margin-bottom: 4px; color: #76695d; font-size: .85em; font-weight: 700; }
+.question-card-attempt textarea { width: 100%; min-height: 42px; box-sizing: border-box; resize: vertical; padding: 7px 8px; border: 1px solid #ddd; border-radius: 6px; background: #fff; }
+.question-card-attempt-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+.question-card-attempt-actions button,
+.question-card-history-summary button { min-height: 32px; padding: 5px 9px; cursor: pointer; }
+.question-card-history-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 11px; color: #76695d; font-size: .8em; }
+.question-card-history-list { margin-top: 6px; padding: 7px 9px; border-radius: 6px; background: #faf7f2; font-size: .84em; }
+.question-card-history-item { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid #eee5dc; }
+.question-card-history-item:last-child { border-bottom: 0; }
+.question-card-history-empty { color: #888; }
+.question-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.question-card-actions button { min-height: 32px; padding: 5px 10px; cursor: pointer; }
+.question-form-options { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 8px 10px; }
+.question-form-options label { margin-top: 7px; }
+.question-form-options .question-review-option { display: flex; align-items: center; gap: 5px; padding-bottom: 8px; font-weight: normal; }
+.question-form-options .question-review-option input { width: auto; }
 
 /* モーダル内のタブ切り替え */
 .modal-type-switch { display: flex; background: #eee; padding: 4px; border-radius: 8px; margin-bottom: 15px; }
@@ -836,6 +869,25 @@ input, textarea, select { font-size: 16px !important; }
 .global-vocabulary-summary {
     min-height: 38px;
 }
+.global-vocabulary-card-metadata {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+    max-width: 42%;
+    min-width: 0;
+}
+.global-vocabulary-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #eef2f7;
+    color: #596575;
+    font-size: 0.72em;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
 .global-vocabulary-summary input[type="checkbox"] {
     flex-shrink: 0;
 }
@@ -962,6 +1014,94 @@ input, textarea, select { font-size: 16px !important; }
 .global-vocabulary-group-entries .global-vocabulary-card {
     background: #fffdf9;
 }
+.problems-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 15px;
+    background: var(--bg);
+    border-bottom: 1px solid #eee;
+}
+.problems-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.problems-navigation { display: flex; flex-wrap: wrap; gap: 6px; }
+.problems-title-row h2 { margin: 0; font-size: 1.35em; }
+.problems-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 1000px;
+    margin: 12px auto 0;
+}
+.problems-controls input[type="search"] {
+    flex: 1 1 260px;
+    min-width: 170px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+.problems-controls select {
+    min-width: 125px;
+    max-width: 210px;
+    padding: 7px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+#problems-section {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 100px;
+}
+.global-problems-list {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 15px;
+    box-sizing: border-box;
+}
+.global-problem-card {
+    padding: 12px 14px;
+    border: 1px solid #e8ded2;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: box-shadow .15s, background-color .15s;
+}
+.global-problem-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.1); }
+.global-problem-card.is-expanded { background: #fffdf9; }
+.global-problem-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 8px; }
+.global-problem-chip { padding: 2px 7px; border-radius: 12px; background: #f1e8de; color: #76695d; font-size: .78em; }
+.global-problem-review { margin-left: auto; padding: 3px 7px; border: 0; border-radius: 5px; background: transparent; color: #9a6b24; cursor: pointer; font-size: .8em; }
+.global-problem-selected,
+.global-problem-question { white-space: pre-wrap; overflow-wrap: anywhere; }
+.global-problem-selected { color: #76695d; font-size: .9em; }
+.global-problem-question { margin-top: 5px; color: #302a25; font-size: 1em; font-weight: 600; }
+.global-problem-source { margin-top: 8px; color: #76695d; font-size: .78em; overflow-wrap: anywhere; }
+.global-problem-progress { margin-top: 7px; color: #555; font-size: .82em; }
+.global-problem-expand-toggle { margin-top: 8px; padding: 4px 8px; border: 1px solid #d9cbbd; border-radius: 5px; background: #fffaf4; color: var(--primary); cursor: pointer; }
+.global-problem-details { margin-top: 10px; padding: 9px 3px 0; border-top: 1px dashed #ddd; font-size: .88em; }
+.global-problem-detail-row { display: flex; gap: 8px; margin: 5px 0; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.global-problem-detail-label { min-width: 64px; color: #777; font-weight: 700; flex-shrink: 0; }
+.global-problem-detail-value { color: #333; }
+.global-problem-reveal-group { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 9px; }
+.global-problem-reveal-group button { min-height: 32px; padding: 5px 10px; border: 1px solid #d9cbbd; border-radius: 6px; background: #fffaf4; color: var(--primary); cursor: pointer; }
+.global-problem-hidden-value { padding: 7px 9px; border-radius: 6px; background: #faf7f2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.global-problem-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 11px; }
+.global-problem-history { display: grid; gap: 5px; margin-top: 7px; padding: 7px 9px; border-radius: 6px; background: #faf7f2; }
+.global-problem-history-item { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding: 4px 0; border-bottom: 1px solid #eee5dc; white-space: pre-wrap; overflow-wrap: anywhere; }
+.global-problem-history-item:last-child { border-bottom: 0; }
+.global-problems-empty { padding: 30px 15px; color: #777; text-align: center; }
 .temporary-reader-anchor {
     outline: 2px solid rgba(119, 176, 194, 0.75);
     background: rgba(199, 234, 243, 0.38);
@@ -1086,7 +1226,7 @@ input, textarea, select { font-size: 16px !important; }
     .panel.is-expanded { height: 85vh; height: 85dvh; }
     .panel::before { content: ''; width: 42px; height: 4px; border-radius: 999px; background: #d4ccc4; margin: 6px auto 1px; flex: 0 0 auto; }
     .panel-header { min-height: 35px; }
-    .panel-header .tab-btn { padding: 7px 8px; font-size: 0.9em; }
+    .panel-header .tab-btn { padding: 7px 4px; font-size: 0.84em; }
     .panel-expand-btn,
     .panel-header .close-btn { min-width: 30px; min-height: 32px; padding: 0; }
     .panel-controls { padding: 6px 8px; }
@@ -1117,9 +1257,22 @@ input, textarea, select { font-size: 16px !important; }
     .vocabulary-controls input[type="search"] { flex-basis: 100%; }
     .vocabulary-controls select { flex: 1 1 125px; max-width: none; }
     .global-vocabulary-list { padding: 10px; }
+    .global-vocabulary-card-metadata { max-width: 58%; }
     .global-vocabulary-details { padding-left: 4px; }
     .global-vocabulary-detail-row { display: block; }
     .global-vocabulary-detail-label { display: block; }
+    .problems-header { padding: 10px; }
+    .problems-title-row { align-items: flex-start; gap: 8px; }
+    .problems-title-row h2 { font-size: 1.15em; }
+    .problems-navigation { flex-direction: column; flex: 0 0 auto; }
+    .problems-controls { margin-top: 8px; gap: 6px; }
+    .problems-controls input[type="search"] { flex-basis: 100%; min-width: 0; }
+    .problems-controls select { flex: 1 1 135px; max-width: none; min-width: 0; }
+    .global-problems-list { padding: 10px; }
+    .global-problem-card { padding: 10px; }
+    .global-problem-detail-row { display: block; }
+    .global-problem-detail-label { display: block; }
+    .global-problem-history-item { display: block; }
     .word-statistics-modal { width: calc(100% - 24px); }
 }
 

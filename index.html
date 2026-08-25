@@ -16,7 +16,8 @@
         </div>
         <div id="article-meta" style="display:none;">
             <button onclick="editCurrentArticle()" class="small-edit-btn">編集</button>
-            <button onclick="showGlobalVocabulary()" class="small-edit-btn">Vocabulary</button>
+            <button onclick="showCurrentArticleVocabulary()" class="small-edit-btn">この資料の単語</button>
+            <button onclick="showGlobalProblems()" class="small-edit-btn">Problems</button>
             <button onclick="openWordStatistics()" class="small-edit-btn">📊 統計</button>
             <a id="display-url" href="#" target="_blank">🔗 元記事</a>
         </div>
@@ -28,6 +29,7 @@
                 <div id="breadcrumbs" class="breadcrumbs"></div>
                 <div class="library-actions">
                     <button class="btn-sub" onclick="showGlobalVocabulary()">Vocabulary</button>
+                    <button class="btn-sub" onclick="showGlobalProblems()">Problems</button>
                     <div class="library-search-control">
                         <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
                         <button type="button" id="global-search-clear-btn" onclick="clearGlobalSearch()" aria-label="検索をクリア">×</button>
@@ -49,21 +51,24 @@
         <div id="vocabulary-section" style="display:none;">
             <div class="vocabulary-header">
                 <div class="vocabulary-title-row">
+                    <button class="btn-sub" onclick="showGlobalProblems()">Problems</button>
                     <button class="btn-sub" onclick="showLibrary()">📚 Library</button>
                     <div>
-                        <h2>Global Vocabulary</h2>
+                        <h2 id="global-vocab-title">Global Vocabulary</h2>
                         <span id="global-vocab-count" class="vocabulary-count">0 words</span>
                     </div>
                 </div>
                 <div id="global-vocab-statistics" class="vocabulary-statistics" aria-live="polite"></div>
                 <div class="vocabulary-controls">
-                    <input type="search" id="global-vocab-search" placeholder="単語・意味・メモ・出典を検索" oninput="updateGlobalVocabulary('query', this.value)">
+                    <input type="search" id="global-vocab-search" placeholder="単語・本文での表現・意味・タグ・出典を検索" oninput="updateGlobalVocabulary('query', this.value)">
                     <label class="vocabulary-check"><input type="checkbox" id="global-vocab-exact" onchange="updateGlobalVocabulary('exact', this.checked)"> 完全一致</label>
                     <select id="global-vocab-status" onchange="updateGlobalVocabulary('status', this.value)" aria-label="暗記状態">
                         <option value="all">すべて</option>
                         <option value="unmemorized">未暗記</option>
                         <option value="memorized">暗記済み</option>
                     </select>
+                    <select id="global-vocab-tag" onchange="updateGlobalVocabulary('tag', this.value)" aria-label="タグ"></select>
+                    <select id="global-vocab-part-of-speech" onchange="updateGlobalVocabulary('partOfSpeech', this.value)" aria-label="品詞"></select>
                     <select id="global-vocab-source" onchange="updateGlobalVocabulary('sourceId', this.value)" aria-label="出典"></select>
                     <select id="global-vocab-chapter" onchange="updateGlobalVocabulary('chapterId', this.value)" aria-label="章" style="display:none;"></select>
                     <select id="global-vocab-sort" onchange="updateGlobalVocabulary('sort', this.value)" aria-label="並び順">
@@ -85,6 +90,67 @@
             <div id="global-vocabulary-list" class="global-vocabulary-list"></div>
         </div>
 
+        <div id="problems-section" style="display:none;">
+            <div class="problems-header">
+                <div class="problems-title-row">
+                    <div class="problems-navigation">
+                        <button class="btn-sub" onclick="showLibrary()">📚 Library</button>
+                        <button class="btn-sub" onclick="showGlobalVocabulary()">Vocabulary</button>
+                    </div>
+                    <div>
+                        <h2>Global Problems</h2>
+                        <span id="global-problems-count" class="vocabulary-count">0 problems</span>
+                    </div>
+                </div>
+                <div id="global-problems-statistics" class="vocabulary-statistics" aria-live="polite"></div>
+                <div class="problems-controls">
+                    <input type="search" id="global-problems-search" placeholder="問題・回答・タグ・出典を検索" oninput="updateGlobalProblems('query', this.value)">
+                    <select id="global-problems-status" onchange="updateGlobalProblems('status', this.value)" aria-label="問題ステータス">
+                        <option value="all">すべて</option>
+                        <option value="unattempted">未挑戦</option>
+                        <option value="answered">回答済み</option>
+                        <option value="latestCorrect">最新：正解</option>
+                        <option value="latestIncorrect">最新：不正解</option>
+                        <option value="everIncorrect">一度でも不正解</option>
+                        <option value="needsReview">要復習</option>
+                    </select>
+                    <select id="global-problems-type" onchange="updateGlobalProblems('questionType', this.value)" aria-label="問題種類">
+                        <option value="all">すべての種類</option>
+                        <option value="blank">空欄補充</option>
+                        <option value="choice">選択問題</option>
+                        <option value="vocabulary">語彙</option>
+                        <option value="grammar">文法</option>
+                        <option value="translation">翻訳</option>
+                        <option value="reading">内容理解</option>
+                        <option value="free">自由記述</option>
+                        <option value="sorting">整序</option>
+                        <option value="true/false">正誤</option>
+                        <option value="other">その他</option>
+                    </select>
+                    <select id="global-problems-tag" onchange="updateGlobalProblems('tag', this.value)" aria-label="タグ"></select>
+                    <select id="global-problems-source" onchange="updateGlobalProblems('sourceId', this.value)" aria-label="出典"></select>
+                    <select id="global-problems-chapter" onchange="updateGlobalProblems('chapterId', this.value)" aria-label="章"></select>
+                    <select id="global-problems-difficulty" onchange="updateGlobalProblems('difficulty', this.value)" aria-label="難易度">
+                        <option value="all">すべての難易度</option>
+                        <option value="unset">未設定</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                    <select id="global-problems-sort" onchange="updateGlobalProblems('sort', this.value)" aria-label="並び順">
+                        <option value="newest">新しい問題順</option>
+                        <option value="oldest">古い問題順</option>
+                        <option value="recentAnswered">最近回答した順</option>
+                        <option value="mostIncorrect">間違い回数が多い順</option>
+                        <option value="lowestAccuracy">正答率が低い順</option>
+                    </select>
+                </div>
+            </div>
+            <div id="global-problems-list" class="global-problems-list"></div>
+        </div>
+
         <div id="input-area" class="input-card" style="display:none;">
             <h2 id="input-title-label">記事を登録</h2>
             <div class="file-upload-zone">
@@ -98,6 +164,11 @@
                 <input type="text" id="text-title" placeholder="タイトルの名前">
                 <input type="url" id="text-url" placeholder="出典URL（https://...）">
                 <textarea id="text-input" placeholder="本文を入力..."></textarea>
+                <label class="chapter-mode-option" for="manual-chapter-mode">
+                    <input type="checkbox" id="manual-chapter-mode">
+                    章モードで作成
+                </label>
+                <button type="button" id="convert-to-chapter-btn" class="small-btn" onclick="convertCurrentArticleToChapterMode()" style="display:none;">章モードに変換して編集</button>
             </div>
             <div class="input-actions">
                 <button onclick="showLibrary()" class="btn-cancel">キャンセル</button>
@@ -211,7 +282,7 @@
                 <button id="chapter-next-btn" type="button" onclick="goToNextChapter()" aria-label="次の章へ">›</button>
             </div>
 
-            <div id="text-display" onclick="handleReaderClick(event)"></div>
+            <div id="text-display" onclick="handleReaderClick(event)" onkeydown="handleReaderKeydown(event)"></div>
 
         <div id="reading-status-bar">
             <div class="reading-status-main">
@@ -239,21 +310,23 @@
 
     <aside id="side-panel" class="panel">
         <div class="panel-header">
-            <nav class="tabs">
-                <button class="tab-btn active" onclick="switchTab('words')">単語</button>
-                <button class="tab-btn" onclick="switchTab('notes')">ノート</button>
-                <button class="tab-btn" onclick="switchTab('settings')">⚙️</button>
+            <nav id="panel-tabs" class="tabs">
+                <button class="tab-btn active" data-tab="words" onclick="switchTab('words')">単語</button>
+                <button class="tab-btn" data-tab="notes" onclick="switchTab('notes')">ノート</button>
+                <button class="tab-btn" data-tab="questions" onclick="switchTab('questions')">問題</button>
+                <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️</button>
             </nav>
             <button type="button" id="panel-expand-btn" class="panel-expand-btn" onclick="toggleMobilePanelSize()" aria-label="単語帳を拡大" aria-pressed="false">⤢</button>
             <button class="close-btn" onclick="togglePanel()">✕</button>
         </div>
-        
-        <div id="anki-wrapper" class="panel-controls">
+
+        <div id="list-search-controls" class="panel-controls">
             <div style="display: flex; gap: 5px; margin-bottom: 8px;">
                 <input type="text" id="list-search" placeholder="リスト内検索..." oninput="handleListSearch()" style="margin-bottom:0; flex:1;">
                 <button onclick="exportToCSV()" class="btn-export">⬇️</button>
             </div>
         </div>
+        <div id="vocabulary-controls">
         <div id="article-vocabulary-statistics" class="article-vocabulary-statistics" aria-live="polite"></div>
 
         <div class="control-row">
@@ -276,8 +349,9 @@
                 </label>
             </div>
         </div>
+        </div>
         <div id="panel-content" class="scroll-area"></div>
-   
+
     </aside>
 
     <button id="add-btn" class="fab-btn" onclick="openUnifiedModal()">＋</button>
@@ -296,12 +370,32 @@
                     <input type="radio" name="modal-type" value="note" onchange="switchModalType('note')">
                     <span>ノート</span>
                 </label>
+                <label class="type-radio">
+                    <input type="radio" name="modal-type" value="question" onchange="switchModalType('question')">
+                    <span>問題</span>
+                </label>
             </div>
 
             <form onsubmit="handleUnifiedSave(event)">
                 <div id="form-word-section">
                     <label>単語 / フレーズ</label>
                     <input type="text" id="input-word-text" required>
+                    <label for="input-word-surface-text">本文での表現（surfaceText）</label>
+                    <input type="text" id="input-word-surface-text" placeholder="本文中に実際に出現した表現">
+                    <label for="input-word-part-of-speech">品詞</label>
+                    <select id="input-word-part-of-speech" class="full-width-select">
+                        <option value="">未設定</option>
+                        <option value="noun">名詞</option>
+                        <option value="verb">動詞</option>
+                        <option value="adjective">形容詞</option>
+                        <option value="adverb">副詞</option>
+                        <option value="phrase">句・フレーズ</option>
+                        <option value="preposition">前置詞</option>
+                        <option value="conjunction">接続詞</option>
+                        <option value="other">その他</option>
+                    </select>
+                    <label for="input-word-tags">タグ（カンマ区切り）</label>
+                    <input type="text" id="input-word-tags" placeholder="英語, 語彙, 苦手">
                     <label>意味</label>
                     <input type="text" id="input-word-meaning" required>
                     <label>メモ (任意)</label>
@@ -316,6 +410,46 @@
                     <label>和訳・意味</label>
                     <textarea id="input-note-trans" rows="3"></textarea>
                     <label>解説・解釈 (文法など)</label> <textarea id="input-note-extra" rows="3"></textarea>
+                </div>
+
+                <div id="form-question-section" style="display:none;">
+                    <label>選択したテキスト</label>
+                    <textarea id="input-question-selected-text" rows="2" readonly aria-label="選択したテキスト"></textarea>
+                    <label>問題</label>
+                    <textarea id="input-question-question" rows="3" required></textarea>
+                    <label>回答</label>
+                    <textarea id="input-question-answer" rows="3"></textarea>
+                    <label>解説</label>
+                    <textarea id="input-question-explanation" rows="3"></textarea>
+                    <label>メモ</label>
+                    <textarea id="input-question-memo" rows="2"></textarea>
+                    <label for="input-question-type">問題種類</label>
+                    <select id="input-question-type" class="full-width-select">
+                        <option value="blank">空欄補充</option>
+                        <option value="choice">選択問題</option>
+                        <option value="vocabulary">語彙</option>
+                        <option value="grammar">文法</option>
+                        <option value="translation">翻訳</option>
+                        <option value="reading">内容一致</option>
+                        <option value="free">自由記述</option>
+                        <option value="sorting">整序</option>
+                        <option value="true/false">正誤</option>
+                        <option value="other" selected>その他</option>
+                    </select>
+                    <label for="input-question-tags">タグ（カンマ区切り）</label>
+                    <input type="text" id="input-question-tags" placeholder="語彙, 動詞, 苦手">
+                    <div class="question-form-options">
+                        <label for="input-question-difficulty">難易度</label>
+                        <select id="input-question-difficulty" class="full-width-select">
+                            <option value="">未設定</option>
+                            <option value="1">1（易しい）</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5（難しい）</option>
+                        </select>
+                        <label class="question-review-option" for="input-question-needs-review"><input type="checkbox" id="input-question-needs-review"> 要復習</label>
+                    </div>
                 </div>
 
                 <div class="modal-actions">
@@ -362,6 +496,7 @@
                 <div><dt>単語</dt><dd id="backup-count-words">0</dd></div>
                 <div><dt>ノート</dt><dd id="backup-count-notes">0</dd></div>
                 <div><dt>しおり</dt><dd id="backup-count-bookmarks">0</dd></div>
+                <div><dt>問題</dt><dd id="backup-count-questions">0</dd></div>
             </dl>
             <p class="backup-restore-warning">現在のSmart Readerデータを、バックアップに含まれるデータで置き換えます。対象外のLocalForageデータは保持され、復元前のデータも自動的にJSONで保存されます。</p>
             <p id="backup-restore-status" class="backup-restore-status" role="status" aria-live="polite"></p>
