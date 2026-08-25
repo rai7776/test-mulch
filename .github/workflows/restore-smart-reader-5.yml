@@ -1,0 +1,80 @@
+name: Restore Smart Reader 5 base
+
+on:
+  push:
+    branches:
+      - fix/restore-smart-reader-5-v2
+    paths:
+      - .github/workflows/restore-smart-reader-5.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/restore-smart-reader-5-v2
+
+      - name: Restore exact Smart Reader 5 files
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="https://raw.githubusercontent.com/itigopafhe/smart-reader/a840f1d01ccb0825a947f137d90397b80b444391"
+          curl -fsSL "$SRC/app.js" -o app.js
+          curl -fsSL "$SRC/style.css" -o style.css
+          curl -fsSL "$SRC/index.html" -o index.html
+          curl -fsSL "$SRC/importers.js" -o importers.js
+
+          test "$(git hash-object app.js)" = "18edad58f4d83d9dda9dfef550b58c40dbffb674"
+          test "$(git hash-object style.css)" = "344bd2da1bdbd645922addcdb1c3aec6c081e8ea"
+          test "$(git hash-object index.html)" = "c159972d8a92ac8e0450c5df5d19c90efde59ca4"
+          test "$(git hash-object importers.js)" = "b93a8307c9bf63079a0776be70e100d815793e20"
+
+      - name: Add Global Vocabulary multi-source picker
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          needle = '    <script src="app.js?v=4.0"></script>\n'
+          addon = '    <script src="global-vocab-multiselect.js?v=1.0"></script>\n'
+          if needle not in text:
+              raise SystemExit('app.js script tag not found')
+          if 'global-vocab-multiselect.js' not in text:
+              text = text.replace(needle, needle + addon, 1)
+          p.write_text(text, encoding='utf-8', newline='')
+          PY
+          test "$(git hash-object index.html)" = "d4921202da9068315e7febe0b44a956680855b46"
+
+      - name: Validate integrated build
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node --check importers.js
+          node --check global-vocab-multiselect.js
+          grep -q 'id="global-vocab-source"' index.html
+          grep -q 'id="global-vocab-chapter"' index.html
+          grep -q 'function renderGlobalVocabularyControls' app.js
+          grep -q 'function getFilteredGlobalVocabulary' app.js
+          grep -q 'function updateGlobalVocabulary' app.js
+          grep -q 'function renderGlobalVocabulary' app.js
+
+      - name: Commit restored runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js style.css index.html importers.js
+          if git diff --cached --quiet; then
+            echo "No runtime changes to commit."
+            exit 0
+          fi
+          git commit -m "Restore Smart Reader 5 base with multi-source picker"
+          git push origin HEAD:fix/restore-smart-reader-5-v2
