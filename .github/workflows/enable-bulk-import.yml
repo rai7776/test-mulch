@@ -1,0 +1,51 @@
+name: Enable bulk import
+
+on:
+  push:
+    branches:
+      - feature/bulk-ai-import
+    paths:
+      - .github/workflows/enable-bulk-import.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bulk-ai-import
+      - name: Load bulk import script
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          needle = '    <script src="global-vocab-multiselect.js?v=1.0"></script>'
+          line = '    <script src="bulk-import.js?v=1.0"></script>'
+          if line not in s:
+              if needle not in s:
+                  raise SystemExit('global vocabulary script marker not found')
+              s = s.replace(needle, needle + '\n' + line, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Validate bulk import
+        run: |
+          node --check bulk-import.js
+          grep -q 'Smart Reader Bulk Import v1' bulk-import.js
+          grep -q '出力サンプル' bulk-import.js
+          grep -q 'bulk-import.js?v=1.0' index.html
+          test "$(grep -c 'bulk-import.js?v=1.0' index.html)" -eq 1
+      - name: Commit integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then
+            echo 'No integration change needed'
+          else
+            git commit -m 'Load AI bulk import'
+            git push origin HEAD:feature/bulk-ai-import
+          fi
