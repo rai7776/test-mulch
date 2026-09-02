@@ -1,0 +1,54 @@
+name: Test bulk import
+
+on:
+  push:
+    branches:
+      - feature/bulk-ai-import
+    paths:
+      - .github/workflows/test-bulk-import.yml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bulk-ai-import
+      - name: Syntax check
+        run: node --check bulk-import.js
+      - name: Unit test parser and AI prompt
+        run: |
+          cat > /tmp/test-bulk.js <<'NODE'
+          const fs=require('fs'), vm=require('vm');
+          let src=fs.readFileSync('bulk-import.js','utf8');
+          src=src.replace(/if \(document\.readyState === 'loading'\)[\s\S]*?window\.buildSmartReaderBulkAiPrompt = buildAiPrompt;\n\}\)\(\);\s*$/,
+            `globalThis.__bulkTest={parseBulkPayload,buildReviewItems,buildAiPrompt,normalizeQuestion};\n})();`);
+          if (!src.includes('__bulkTest')) throw new Error('test hook injection failed');
+          const ctx={
+            console,
+            document:{addEventListener(){},getElementById(){return null}},
+            window:{},
+            currentArticle:{name:'Article',chapters:[{id:'c1',title:'C1',content:'Target text'}],words:[{word:'derive',meaning:'old',chapterId:'c1'}],notes:[],questions:[]},
+            currentChapterId:'c1',
+            getActiveChapterIdForItem(){return 'c1'},
+            getArticleChapters(a){return a.chapters}
+          };
+          vm.createContext(ctx); vm.runInContext(src,ctx);
+          const t=ctx.__bulkTest;
+          const assert=(c,m)=>{if(!c)throw new Error(m); console.log('PASS',m)};
+          const obj={format:'smart-reader-bulk',version:1,words:[{word:'derive',meaning:'由来する',partOfSpeech:'verb'},{word:'retain',meaning:'保持する'}],notes:[{originalText:'Given that A',translation:'Aを考えると'}],questions:[{question:'Q?','answer':'A',questionType:'grammar',difficulty:3}]};
+          const p=t.parseBulkPayload('説明\n```json\n'+JSON.stringify(obj)+'\n```\n終わり');
+          assert(p.words.length===2,'fenced JSON parsing');
+          const review=t.buildReviewItems(p);
+          assert(review.items.length===4,'mixed words notes questions');
+          assert(review.items[0].duplicateIndex===0,'duplicate detection');
+          const tsv=t.parseBulkPayload('retain\t保持する\tverb\t重要,語彙');
+          assert(tsv.words[0].tags.length===2,'TSV fallback');
+          const prompt=t.buildAiPrompt();
+          assert(prompt.includes('Smart Reader Bulk Import v1'),'prompt format name');
+          assert(prompt.includes('"format": "smart-reader-bulk"'),'prompt sample JSON');
+          assert(prompt.includes('Target text'),'prompt current chapter text');
+          assert(!prompt.includes('articleId":'),'prompt excludes internal ids');
+          assert(t.normalizeQuestion({question:'x',answer:'y',questionType:'bad',difficulty:9}).questionType==='other','question normalization');
+          NODE
+          node /tmp/test-bulk.js
