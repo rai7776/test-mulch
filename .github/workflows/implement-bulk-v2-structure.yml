@@ -1,0 +1,31 @@
+name: Implement bulk v2 structure
+
+on:
+  push:
+    branches:
+      - feature/bulk-v2-structure
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch bulk import v2
+        run: python .github/scripts/patch-bulk-v2-structure.py
+      - name: Validate JavaScript
+        run: node --check bulk-import.js
+      - name: Run bulk v2 tests
+        run: node .github/scripts/test-bulk-v2-structure.js
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bulk-import.js index.html
+          if git diff --cached --quiet; then
+            echo "No implementation changes"
+            exit 0
+          fi
+          git commit -m "Add Smart Reader bulk v2 structure data"
+          git push
