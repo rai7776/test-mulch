@@ -4126,7 +4126,9 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
             return;
         }
         if (forceExpanded) return;
-        globalVocabularyState.expandedKey = globalVocabularyState.expandedKey === entry.key ? null : entry.key;
+        const opening = globalVocabularyState.expandedKey !== entry.key;
+        globalVocabularyState.expandedKey = opening ? entry.key : null;
+        if (opening) globalVocabularyState.contextCollapsedKeys.delete(entryKey);
         renderGlobalVocabulary();
     });
 
@@ -4158,12 +4160,6 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
         partOfSpeech.textContent = getVocabularyPartOfSpeechLabel(entry.partOfSpeech);
         metadata.appendChild(partOfSpeech);
     }
-    (entry.tags || []).forEach(tag => {
-        const tagElement = document.createElement('span');
-        tagElement.className = 'global-vocabulary-chip';
-        tagElement.textContent = tag;
-        metadata.appendChild(tagElement);
-    });
     left.append(check, speaker, word, metadata);
     const meaning = document.createElement('div');
     meaning.className = 'meaning-right';
@@ -4175,6 +4171,7 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
     if (isExpanded) {
         const details = document.createElement('div');
         details.className = 'global-vocabulary-details';
+        appendGlobalVocabularyContext(details, entry);
         addGlobalVocabularyDetail(details, '出典', entry.articleTitle);
         if (entry.chapterTitle) addGlobalVocabularyDetail(details, '章', entry.chapterTitle);
         if (entry.surfaceText && entry.surfaceText !== entry.wordText) addGlobalVocabularyDetail(details, '本文での表現', entry.surfaceText);
@@ -4182,7 +4179,6 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
         if (entry.tags.length) addGlobalVocabularyDetail(details, 'タグ', entry.tags.join(', '));
         if (entry.memo) addGlobalVocabularyDetail(details, 'Memo', entry.memo);
         if (entry.contextMeaning) addGlobalVocabularyDetail(details, 'Context訳', entry.contextMeaning);
-        appendGlobalVocabularyContext(details, entry);
         if (entry.createdAt) addGlobalVocabularyDetail(details, '登録日', formatGlobalVocabularyDate(entry.createdAt));
 
         const actions = document.createElement('div');
@@ -4234,16 +4230,6 @@ function createGlobalVocabularyGroupCard(group) {
     const meaningLabel = meanings.length <= 1 ? (meanings[0] || '') : `${meanings.length} meanings`;
     label.textContent = `${meaningLabel} · × ${group.entries.length} · ${memorized}/${group.entries.length} 暗記済み`;
     summary.append(word, label);
-    const groupTags = Array.from(new Set(group.entries.flatMap(entry => entry.tags || [])));
-    const groupMetadata = document.createElement('span');
-    groupMetadata.className = 'global-vocabulary-card-metadata';
-    groupTags.forEach(tag => {
-        const tagElement = document.createElement('span');
-        tagElement.className = 'global-vocabulary-chip';
-        tagElement.textContent = tag;
-        groupMetadata.appendChild(tagElement);
-    });
-    if (groupMetadata.childElementCount) summary.appendChild(groupMetadata);
     summary.addEventListener('click', () => {
         globalVocabularyState.expandedKey = expanded ? null : `group:${group.key}`;
         renderGlobalVocabulary();
