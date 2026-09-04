@@ -1,0 +1,55 @@
+name: Fix note structure baseline
+on:
+  push:
+    branches:
+      - feature/note-structure-baseline-fix
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch baseline styles
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('note-structure-ui.js')
+          s = p.read_text(encoding='utf-8')
+          old = """            .note-structure-sentence { min-width: min-content; font-size: .98rem; line-height: 2.15; color: #20252b; white-space: pre-wrap; overflow-wrap: anywhere; }\n            .syntax-annotation { position: relative; }\n            .syntax-core { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1.15; margin: 0 1px; }\n            .syntax-core-text { display: inline; }\n            .syntax-core-label { margin-top: 3px; font-size: .66rem; line-height: 1; font-weight: 800; color: #59636e; letter-spacing: .03em; }\n"""
+          new = """            .note-structure-sentence { min-width: min-content; font-size: .98rem; line-height: 2.3; color: #20252b; white-space: pre-wrap; overflow-wrap: anywhere; padding-bottom: .55em; }\n            .syntax-annotation { position: relative; }\n            .syntax-core { display: inline-block; max-width: 100%; position: relative; vertical-align: baseline; line-height: inherit; margin: 0; }\n            .syntax-core-text { display: inline; }\n            .syntax-core-label { position: absolute; left: 50%; top: calc(100% + .08em); transform: translateX(-50%); margin: 0; font-size: .66rem; line-height: 1; font-weight: 800; color: #59636e; letter-spacing: .03em; white-space: nowrap; pointer-events: none; }\n"""
+          assert old in s, 'baseline style block not found'
+          s = s.replace(old, new, 1)
+          old_mobile = "                .note-structure-sentence { font-size: .94rem; line-height: 2.25; }"
+          new_mobile = "                .note-structure-sentence { font-size: .94rem; line-height: 2.35; }"
+          assert old_mobile in s, 'mobile sentence style not found'
+          s = s.replace(old_mobile, new_mobile, 1)
+          p.write_text(s, encoding='utf-8')
+
+          index = Path('index.html')
+          h = index.read_text(encoding='utf-8')
+          old_script = '    <script src="note-structure-ui.js?v=1.0"></script>'
+          new_script = '    <script src="note-structure-ui.js?v=1.1"></script>'
+          assert old_script in h, 'note structure script marker missing'
+          h = h.replace(old_script, new_script, 1)
+          index.write_text(h, encoding='utf-8')
+      - name: Check JavaScript syntax
+        run: node --check note-structure-ui.js
+      - name: Verify baseline implementation
+        run: |
+          grep -q 'display: inline-block; max-width: 100%; position: relative; vertical-align: baseline' note-structure-ui.js
+          grep -q 'position: absolute; left: 50%; top: calc(100% + .08em)' note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=1.1' index.html
+          if grep -q 'syntax-core { display: inline-flex' note-structure-ui.js; then
+            echo 'old inline-flex core style still present'
+            exit 1
+          fi
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add note-structure-ui.js index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Align note structure text baseline"
+            git push
+          fi
