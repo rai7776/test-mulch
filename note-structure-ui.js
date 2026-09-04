@@ -264,11 +264,11 @@
             .note-structure-box[open] > summary::before { transform: rotate(90deg); }
             .note-structure-box > summary > span:first-child { margin-right: auto; }
             .note-structure-body { border-top: 1px solid #e8ebef; padding: 13px 11px 12px; overflow-x: auto; }
-            .note-structure-sentence { min-width: min-content; font-size: .98rem; line-height: 2.15; color: #20252b; white-space: pre-wrap; overflow-wrap: anywhere; }
+            .note-structure-sentence { min-width: min-content; font-size: .98rem; line-height: 2.3; color: #20252b; white-space: pre-wrap; overflow-wrap: anywhere; padding-bottom: .55em; }
             .syntax-annotation { position: relative; }
-            .syntax-core { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1.15; margin: 0 1px; }
+            .syntax-core { display: inline-block; max-width: 100%; position: relative; vertical-align: baseline; line-height: inherit; margin: 0; }
             .syntax-core-text { display: inline; }
-            .syntax-core-label { margin-top: 3px; font-size: .66rem; line-height: 1; font-weight: 800; color: #59636e; letter-spacing: .03em; }
+            .syntax-core-label { position: absolute; left: 50%; top: calc(100% + .08em); transform: translateX(-50%); margin: 0; font-size: .66rem; line-height: 1; font-weight: 800; color: #59636e; letter-spacing: .03em; white-space: nowrap; pointer-events: none; }
             .syntax-modifier { display: inline; position: relative; padding: 0 .08em; }
             .syntax-modifier::before, .syntax-modifier::after { font-weight: 700; color: #69737e; }
             .syntax-modifier.notation-angle::before { content: '《'; }
@@ -285,7 +285,7 @@
             .note-structure-sample-card { margin: 0 8px 8px; box-shadow: none; }
             @media (max-width: 600px) {
                 .note-structure-body { padding: 12px 9px; }
-                .note-structure-sentence { font-size: .94rem; line-height: 2.25; }
+                .note-structure-sentence { font-size: .94rem; line-height: 2.35; }
                 .syntax-core-label { font-size: .62rem; }
             }
         `;
