@@ -402,7 +402,7 @@
         const firstEvaluation = !session.evaluated.has(entry.key);
         const previousLevel = study.level;
         const previousSessionCount = study.sessionCount;
-        const wasPreviouslyLearned = previousSessionCount > 0 || previousLevel > 0 || !!word.memorized;
+        const wasPreviouslyLearned = previousLevel > 0 || !!word.memorized || study.firstKnownCount > 0;
         const attempt = sessionAttemptState(entry.key);
 
         attempt.responses += 1;
