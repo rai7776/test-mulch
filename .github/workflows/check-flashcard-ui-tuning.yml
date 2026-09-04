@@ -1,0 +1,54 @@
+name: Check flashcard UI tuning
+on:
+  push:
+    branches:
+      - feature/flashcard-ui-tuning
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply integration fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          js = Path('flashcard-study.js')
+          s = js.read_text()
+          old = """        merged.nextReviewAt = Number.isFinite(Number(merged.nextReviewAt)) ? Number(merged.nextReviewAt) : null;\n        merged.lastStudiedAt = Number.isFinite(Number(merged.lastStudiedAt)) ? Number(merged.lastStudiedAt) : null;\n        merged.lastReviewAt = Number.isFinite(Number(merged.lastReviewAt)) ? Number(merged.lastReviewAt) : null;"""
+          new = """        const optionalTimestamp = value => value === null || value === undefined || value === ''\n            ? null\n            : (Number.isFinite(Number(value)) ? Number(value) : null);\n        merged.nextReviewAt = optionalTimestamp(merged.nextReviewAt);\n        merged.lastStudiedAt = optionalTimestamp(merged.lastStudiedAt);\n        merged.lastReviewAt = optionalTimestamp(merged.lastReviewAt);"""
+          if old not in s:
+              raise SystemExit('timestamp normalization target not found')
+          js.write_text(s.replace(old, new, 1))
+
+          index = Path('index.html')
+          html = index.read_text()
+          old_tag = '    <script src="flashcard-study.js?v=1.0"></script>\n'
+          new_tag = old_tag + '    <script src="flashcard-ui-tuning.js?v=1.0"></script>\n'
+          if 'flashcard-ui-tuning.js?v=1.0' not in html:
+              if old_tag not in html:
+                  raise SystemExit('flashcard-study script tag not found')
+              html = html.replace(old_tag, new_tag, 1)
+              index.write_text(html)
+          PY
+      - name: Validate implementation
+        run: |
+          node --check flashcard-study.js
+          node --check flashcard-ui-tuning.js
+          grep -q "value === null || value === undefined || value === ''" flashcard-study.js
+          grep -q 'flashcard-ui-tuning.js?v=1.0' index.html
+          grep -q '#study-today-card .study-today-stats' flashcard-ui-tuning.js
+          grep -q '#side-panel .chapter-scope-controls' flashcard-ui-tuning.js
+          grep -q '#vocabulary-section #global-study-controls' flashcard-ui-tuning.js
+          grep -q 'background: #f7f3ee' flashcard-ui-tuning.js
+          grep -q 'height: 100dvh' flashcard-ui-tuning.js
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flashcard-study.js index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Tune flashcard mobile UI and due dates"
+          git push
