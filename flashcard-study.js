@@ -101,9 +101,12 @@
         merged.correctStreak = clampInteger(merged.correctStreak, 0, 1000000);
         merged.level = clampInteger(merged.level, 0, 6, word?.memorized ? 4 : 0);
         merged.intervalDays = clampInteger(merged.intervalDays, 0, 3650);
-        merged.nextReviewAt = Number.isFinite(Number(merged.nextReviewAt)) ? Number(merged.nextReviewAt) : null;
-        merged.lastStudiedAt = Number.isFinite(Number(merged.lastStudiedAt)) ? Number(merged.lastStudiedAt) : null;
-        merged.lastReviewAt = Number.isFinite(Number(merged.lastReviewAt)) ? Number(merged.lastReviewAt) : null;
+        const optionalTimestamp = value => value === null || value === undefined || value === ''
+            ? null
+            : (Number.isFinite(Number(value)) ? Number(value) : null);
+        merged.nextReviewAt = optionalTimestamp(merged.nextReviewAt);
+        merged.lastStudiedAt = optionalTimestamp(merged.lastStudiedAt);
+        merged.lastReviewAt = optionalTimestamp(merged.lastReviewAt);
         return merged;
     }
 
