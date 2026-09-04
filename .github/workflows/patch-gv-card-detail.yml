@@ -1,0 +1,57 @@
+name: Patch GV card detail
+on:
+  push:
+    branches:
+      - feature/global-vocab-card-detail-tuning
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch app.js
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+
+          old = """        if (forceExpanded) return;\n        globalVocabularyState.expandedKey = globalVocabularyState.expandedKey === entry.key ? null : entry.key;\n        renderGlobalVocabulary();\n"""
+          new = """        if (forceExpanded) return;\n        const opening = globalVocabularyState.expandedKey !== entry.key;\n        globalVocabularyState.expandedKey = opening ? entry.key : null;\n        if (opening) globalVocabularyState.contextCollapsedKeys.delete(entryKey);\n        renderGlobalVocabulary();\n"""
+          assert old in s, 'expand block not found'
+          s = s.replace(old, new, 1)
+
+          old = """    (entry.tags || []).forEach(tag => {\n        const tagElement = document.createElement('span');\n        tagElement.className = 'global-vocabulary-chip';\n        tagElement.textContent = tag;\n        metadata.appendChild(tagElement);\n    });\n"""
+          assert old in s, 'summary tag block not found'
+          s = s.replace(old, '', 1)
+
+          old = """        const details = document.createElement('div');\n        details.className = 'global-vocabulary-details';\n        addGlobalVocabularyDetail(details, '出典', entry.articleTitle);\n        if (entry.chapterTitle) addGlobalVocabularyDetail(details, '章', entry.chapterTitle);\n        if (entry.surfaceText && entry.surfaceText !== entry.wordText) addGlobalVocabularyDetail(details, '本文での表現', entry.surfaceText);\n        if (entry.partOfSpeech) addGlobalVocabularyDetail(details, '品詞', getVocabularyPartOfSpeechLabel(entry.partOfSpeech));\n        if (entry.tags.length) addGlobalVocabularyDetail(details, 'タグ', entry.tags.join(', '));\n        if (entry.memo) addGlobalVocabularyDetail(details, 'Memo', entry.memo);\n        if (entry.contextMeaning) addGlobalVocabularyDetail(details, 'Context訳', entry.contextMeaning);\n        appendGlobalVocabularyContext(details, entry);\n        if (entry.createdAt) addGlobalVocabularyDetail(details, '登録日', formatGlobalVocabularyDate(entry.createdAt));\n"""
+          new = """        const details = document.createElement('div');\n        details.className = 'global-vocabulary-details';\n        appendGlobalVocabularyContext(details, entry);\n        addGlobalVocabularyDetail(details, '出典', entry.articleTitle);\n        if (entry.chapterTitle) addGlobalVocabularyDetail(details, '章', entry.chapterTitle);\n        if (entry.surfaceText && entry.surfaceText !== entry.wordText) addGlobalVocabularyDetail(details, '本文での表現', entry.surfaceText);\n        if (entry.partOfSpeech) addGlobalVocabularyDetail(details, '品詞', getVocabularyPartOfSpeechLabel(entry.partOfSpeech));\n        if (entry.tags.length) addGlobalVocabularyDetail(details, 'タグ', entry.tags.join(', '));\n        if (entry.memo) addGlobalVocabularyDetail(details, 'Memo', entry.memo);\n        if (entry.contextMeaning) addGlobalVocabularyDetail(details, 'Context訳', entry.contextMeaning);\n        if (entry.createdAt) addGlobalVocabularyDetail(details, '登録日', formatGlobalVocabularyDate(entry.createdAt));\n"""
+          assert old in s, 'detail block not found'
+          s = s.replace(old, new, 1)
+
+          old = """    const groupTags = Array.from(new Set(group.entries.flatMap(entry => entry.tags || [])));\n    const groupMetadata = document.createElement('span');\n    groupMetadata.className = 'global-vocabulary-card-metadata';\n    groupTags.forEach(tag => {\n        const tagElement = document.createElement('span');\n        tagElement.className = 'global-vocabulary-chip';\n        tagElement.textContent = tag;\n        groupMetadata.appendChild(tagElement);\n    });\n    if (groupMetadata.childElementCount) summary.appendChild(groupMetadata);\n"""
+          assert old in s, 'group tag block not found'
+          s = s.replace(old, '', 1)
+
+          p.write_text(s, encoding='utf-8')
+      - name: Validate JavaScript
+        run: |
+          node --check app.js
+          grep -q "appendGlobalVocabularyContext(details, entry);" app.js
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('app.js').read_text(encoding='utf-8')
+          section=s[s.index('function createGlobalVocabularyCard'):s.index('function createGlobalVocabularyGroupCard')]
+          assert "(entry.tags || []).forEach" not in section
+          assert section.index("appendGlobalVocabularyContext(details, entry);") < section.index("addGlobalVocabularyDetail(details, '出典'")
+          print('GV card detail patch validation OK')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js
+          git commit -m "Refine Global Vocabulary card details"
+          git push
