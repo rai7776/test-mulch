@@ -1,10 +1,12 @@
 (function () {
     'use strict';
 
-    const STUDY_VERSION = 1;
+    const STUDY_VERSION = 2;
     const LEVEL_INTERVAL_DAYS = [0, 1, 3, 7, 14, 30, 60];
     const DEFAULT_REVIEW_LIMIT = 30;
     const DEFAULT_NEW_LIMIT = 10;
+    const DEFAULT_DIFFICULTY = 45;
+    const EXAMPLE_MODE_KEY = 'smart-reader-study-example-mode';
     const scopedGlobalFilter = {
         status: 'all',
         level: 'all',
@@ -15,6 +17,14 @@
         reviewLimit: DEFAULT_REVIEW_LIMIT,
         newLimit: DEFAULT_NEW_LIMIT,
         shuffle: true,
+        exampleMode: (() => {
+            try {
+                const value = localStorage.getItem(EXAMPLE_MODE_KEY);
+                return ['back', 'always', 'none'].includes(value) ? value : 'back';
+            } catch (_) {
+                return 'back';
+            }
+        })(),
         contextEntries: null,
         contextLabel: ''
     };
@@ -55,7 +65,7 @@
     }
 
     function formatShortDate(timestamp) {
-        if (!Number.isFinite(Number(timestamp))) return '未予定';
+        if (timestamp === null || timestamp === undefined || timestamp === '' || !Number.isFinite(Number(timestamp))) return '未予定';
         const value = Number(timestamp);
         const today = startOfLocalDay();
         const tomorrow = startOfNextLocalDay();
@@ -85,7 +95,16 @@
             lastReviewResult: null,
             lastReviewAt: null,
             intervalDays: 0,
-            nextReviewAt: null
+            nextReviewAt: null,
+            difficultyScore: DEFAULT_DIFFICULTY,
+            lapseCount: 0,
+            firstResponseCount: 0,
+            firstKnownCount: 0,
+            lastSessionAttempts: 0,
+            lastSessionWrongCount: 0,
+            lastSessionUnsureCount: 0,
+            lastSessionFirstResult: null,
+            lastSessionCompletedAt: null
         };
     }
 
@@ -101,13 +120,58 @@
         merged.correctStreak = clampInteger(merged.correctStreak, 0, 1000000);
         merged.level = clampInteger(merged.level, 0, 6, word?.memorized ? 4 : 0);
         merged.intervalDays = clampInteger(merged.intervalDays, 0, 3650);
+        merged.lapseCount = clampInteger(merged.lapseCount, 0, 1000000);
+        merged.firstResponseCount = clampInteger(merged.firstResponseCount, 0, 1000000);
+        merged.firstKnownCount = clampInteger(merged.firstKnownCount, 0, 1000000);
+        merged.lastSessionAttempts = clampInteger(merged.lastSessionAttempts, 0, 1000000);
+        merged.lastSessionWrongCount = clampInteger(merged.lastSessionWrongCount, 0, 1000000);
+        merged.lastSessionUnsureCount = clampInteger(merged.lastSessionUnsureCount, 0, 1000000);
+        if (Object.prototype.hasOwnProperty.call(raw, 'difficultyScore')) {
+            merged.difficultyScore = clampInteger(raw.difficultyScore, 0, 100, DEFAULT_DIFFICULTY);
+        } else {
+            const historical = DEFAULT_DIFFICULTY
+                + Math.min(32, merged.wrongCount * 4 + merged.unsureCount * 2)
+                - Math.min(15, merged.correctStreak * 3);
+            merged.difficultyScore = clampInteger(historical, 0, 100, DEFAULT_DIFFICULTY);
+        }
         const optionalTimestamp = value => value === null || value === undefined || value === ''
             ? null
             : (Number.isFinite(Number(value)) ? Number(value) : null);
         merged.nextReviewAt = optionalTimestamp(merged.nextReviewAt);
         merged.lastStudiedAt = optionalTimestamp(merged.lastStudiedAt);
         merged.lastReviewAt = optionalTimestamp(merged.lastReviewAt);
+        merged.lastSessionCompletedAt = optionalTimestamp(merged.lastSessionCompletedAt);
         return merged;
+    }
+
+    function difficultyLabel(score) {
+        const value = clampInteger(score, 0, 100, DEFAULT_DIFFICULTY);
+        if (value <= 25) return '低';
+        if (value <= 50) return '普通';
+        if (value <= 75) return '高';
+        return '非常に高';
+    }
+
+    function adjustDifficulty(study, delta) {
+        study.difficultyScore = clampInteger((study.difficultyScore ?? DEFAULT_DIFFICULTY) + delta, 0, 100, DEFAULT_DIFFICULTY);
+        return study.difficultyScore;
+    }
+
+    function adaptiveIntervalDays(level, difficultyScore) {
+        const base = LEVEL_INTERVAL_DAYS[level] || 60;
+        if (base <= 1) return Math.max(1, base);
+        const factor = Math.min(1.35, Math.max(0.55, 1.45 - clampInteger(difficultyScore, 0, 100, DEFAULT_DIFFICULTY) * 0.009));
+        return Math.max(1, Math.round(base * factor));
+    }
+
+    function sessionAttemptState(entryKey) {
+        if (!session) return { responses: 0, wrong: 0, unsure: 0, known: 0, firstResult: null };
+        let attempt = session.attempts.get(entryKey);
+        if (!attempt) {
+            attempt = { responses: 0, wrong: 0, unsure: 0, known: 0, firstResult: null };
+            session.attempts.set(entryKey, attempt);
+        }
+        return attempt;
     }
 
     function ensureStudy(word) {
@@ -129,9 +193,10 @@
         const mastered = !!word?.memorized || study.level >= 4;
         const learning = !isNew && !mastered;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
-        const difficult = study.wrongCount >= 2
+        const difficult = study.difficultyScore >= 65
+            || study.lapseCount >= 2
+            || study.wrongCount >= 4
             || study.lastReviewResult === 'wrong'
-            || study.lastResult === 'wrong'
             || (study.seenCount >= 4 && accuracy !== null && accuracy < 0.5);
         return { study, isNew, overdue, dueToday, due, mastered, learning, difficult, accuracy };
     }
@@ -257,7 +322,9 @@
         if (study.lastReviewResult === 'wrong' || study.lastResult === 'wrong') score += 2500;
         else if (study.lastReviewResult === 'unsure' || study.lastResult === 'unsure') score += 1500;
         score += (6 - study.level) * 100;
-        score += Math.min(100, study.wrongCount * 10);
+        score += Math.min(180, study.wrongCount * 10);
+        score += study.difficultyScore * 3;
+        score += Math.min(600, study.lapseCount * 150);
         return score;
     }
 
@@ -293,7 +360,7 @@
         if (mode === 'today') return selectTodayEntries();
         if (mode === 'overdue') return sortDue(all.filter(entry => studyView(entry.word).overdue));
         if (mode === 'due') return sortDue(all.filter(entry => studyView(entry.word).due));
-        if (mode === 'difficult') return all.filter(entry => studyView(entry.word).difficult).sort((a, b) => readStudy(b.word).wrongCount - readStudy(a.word).wrongCount);
+        if (mode === 'difficult') return all.filter(entry => studyView(entry.word).difficult).sort((a, b) => { const left = readStudy(a.word); const right = readStudy(b.word); return (right.difficultyScore - left.difficultyScore) || (right.lapseCount - left.lapseCount) || (right.wrongCount - left.wrongCount); });
         if (mode === 'new') return all.filter(entry => studyView(entry.word).isNew).slice(0, Math.max(uiState.newLimit, 1));
         if (mode === 'context') return dedupeEntries(uiState.contextEntries || []);
         return [];
@@ -334,6 +401,13 @@
         const timestamp = Date.now();
         const firstEvaluation = !session.evaluated.has(entry.key);
         const previousLevel = study.level;
+        const previousSessionCount = study.sessionCount;
+        const wasPreviouslyLearned = previousSessionCount > 0 || previousLevel > 0 || !!word.memorized;
+        const attempt = sessionAttemptState(entry.key);
+
+        attempt.responses += 1;
+        attempt[result] += 1;
+        if (!attempt.firstResult) attempt.firstResult = result;
 
         study.seenCount += 1;
         if (result === 'known') study.knownCount += 1;
@@ -344,23 +418,36 @@
 
         let promoted = false;
         let demoted = false;
+        let lapse = false;
         if (firstEvaluation) {
             session.evaluated.add(entry.key);
             study.sessionCount += 1;
+            study.firstResponseCount += 1;
             study.lastReviewResult = result;
             study.lastReviewAt = timestamp;
+            study.lastSessionFirstResult = result;
 
             if (result === 'known') {
+                study.firstKnownCount += 1;
                 study.correctStreak += 1;
-                study.level = Math.min(6, study.level + 1);
-                study.intervalDays = LEVEL_INTERVAL_DAYS[study.level] || 60;
+                const firstEverKnown = previousSessionCount === 0 && previousLevel === 0 && !word.memorized;
+                study.level = firstEverKnown ? 2 : Math.min(6, study.level + 1);
+                adjustDifficulty(study, firstEverKnown ? -18 : -9);
+                study.intervalDays = adaptiveIntervalDays(study.level, study.difficultyScore);
                 study.nextReviewAt = localDayAfter(study.intervalDays, timestamp);
             } else if (result === 'unsure') {
                 study.correctStreak = 0;
+                adjustDifficulty(study, 8);
                 study.intervalDays = 1;
                 study.nextReviewAt = localDayAfter(1, timestamp);
             } else {
                 study.correctStreak = 0;
+                lapse = wasPreviouslyLearned;
+                if (lapse) {
+                    study.lapseCount += 1;
+                    adjustDifficulty(study, 10);
+                }
+                adjustDifficulty(study, 15);
                 study.level = study.level >= 4 ? 3 : Math.max(0, study.level - 1);
                 study.intervalDays = 1;
                 study.nextReviewAt = localDayAfter(1, timestamp);
@@ -369,10 +456,18 @@
             word.memorized = study.level >= 4;
             promoted = study.level > previousLevel;
             demoted = study.level < previousLevel;
+        } else {
+            if (result === 'wrong') adjustDifficulty(study, 6);
+            else if (result === 'unsure') adjustDifficulty(study, 3);
         }
 
+        study.lastSessionAttempts = attempt.responses;
+        study.lastSessionWrongCount = attempt.wrong;
+        study.lastSessionUnsureCount = attempt.unsure;
+        if (result === 'known') study.lastSessionCompletedAt = timestamp;
+
         word.study = study;
-        return { firstEvaluation, previousLevel, nextLevel: study.level, promoted, demoted };
+        return { firstEvaluation, previousLevel, nextLevel: study.level, promoted, demoted, lapse };
     }
 
     function sessionSnapshot(entry) {
@@ -390,7 +485,8 @@
                 finished: session.finished,
                 stats: { ...session.stats },
                 evaluated: [...session.evaluated],
-                answeredUnique: [...session.answeredUnique]
+                answeredUnique: [...session.answeredUnique],
+                attempts: Array.from(session.attempts.entries()).map(([key, value]) => [key, { ...value }])
             }
         };
     }
@@ -408,6 +504,7 @@
         session.stats = { ...snapshot.sessionState.stats };
         session.evaluated = new Set(snapshot.sessionState.evaluated);
         session.answeredUnique = new Set(snapshot.sessionState.answeredUnique);
+        session.attempts = new Map((snapshot.sessionState.attempts || []).map(([key, value]) => [key, { ...value }]));
         scheduleSave();
     }
 
@@ -423,6 +520,7 @@
         session.stats[result] += 1;
         if (effect.promoted) session.stats.promoted += 1;
         if (effect.demoted) session.stats.demoted += 1;
+        if (effect.lapse) session.stats.lapses += 1;
 
         if (result !== 'known' && !session.nextRound.some(item => item.key === entry.key)) {
             session.nextRound.push(entry);
@@ -478,6 +576,8 @@
         const meaning = String(word.meaning || '').trim() || '意味未登録';
         const memo = String(word.memo || '').trim();
         const context = String(word.context || '').trim();
+        const showContextFront = !!context && uiState.exampleMode === 'always';
+        const showContextBack = !!context && uiState.exampleMode !== 'none';
         const tags = Array.isArray(word.tags) ? word.tags.filter(Boolean) : [];
         const part = String(word.partOfSpeech || '').trim();
         const card = document.getElementById('study-flashcard');
@@ -494,6 +594,7 @@
                 <div class="study-card-word">${escapeHtml(wordText)}</div>
                 ${surface && surface.toLocaleLowerCase() !== wordText.toLocaleLowerCase() ? `<div class="study-card-surface">${escapeHtml(surface)}</div>` : ''}
                 ${(part || tags.length) ? `<div class="study-card-meta">${part ? `<span>${escapeHtml(part)}</span>` : ''}${tags.slice(0, 3).map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+                ${showContextFront ? `<div class="study-card-context study-card-context-front">${escapeHtml(context)}</div>` : ''}
             `;
         }
         if (back) {
@@ -501,9 +602,9 @@
                 <div class="study-card-back-word">${escapeHtml(wordText)}</div>
                 <div class="study-card-meaning">${escapeHtml(meaning)}</div>
                 ${memo ? `<div class="study-card-memo">${escapeHtml(memo)}</div>` : ''}
-                ${context ? `<div class="study-card-context">${escapeHtml(context)}</div>` : ''}
+                ${showContextBack ? `<div class="study-card-context">${escapeHtml(context)}</div>` : ''}
                 <div class="study-card-source">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
-                <div class="study-card-studyline">Lv.${study.level} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
+                <div class="study-card-studyline">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
             `;
         }
     }
@@ -541,6 +642,7 @@
                 <div class="study-summary-grid">
                     <div><span>レベルアップ</span><strong>${session.stats.promoted}</strong></div>
                     <div><span>レベルダウン</span><strong>${session.stats.demoted}</strong></div>
+                    <div><span>忘却</span><strong>${session.stats.lapses}</strong></div>
                     <div><span>明日また復習</span><strong>${dueTomorrow}</strong></div>
                     <div><span>回答回数</span><strong>${session.stats.responses}</strong></div>
                 </div>
@@ -729,8 +831,9 @@
             finished: false,
             evaluated: new Set(),
             answeredUnique: new Set(),
+            attempts: new Map(),
             history: [],
-            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0 }
+            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0 }
         };
         closeStudyHub();
         renderSession();
@@ -759,9 +862,11 @@
         const reviewLimit = document.getElementById('study-review-limit');
         const newLimit = document.getElementById('study-new-limit');
         const shuffle = document.getElementById('study-shuffle');
+        const exampleMode = document.getElementById('study-example-mode');
         if (reviewLimit) reviewLimit.value = String(uiState.reviewLimit);
         if (newLimit) newLimit.value = String(uiState.newLimit);
         if (shuffle) shuffle.checked = uiState.shuffle;
+        if (exampleMode) exampleMode.value = uiState.exampleMode;
     }
 
     function openStudyHub(contextEntries = null, contextLabel = '') {
@@ -783,9 +888,12 @@
         const review = document.getElementById('study-review-limit');
         const fresh = document.getElementById('study-new-limit');
         const shuffle = document.getElementById('study-shuffle');
+        const exampleMode = document.getElementById('study-example-mode');
         uiState.reviewLimit = clampInteger(review?.value, 1, 500, DEFAULT_REVIEW_LIMIT);
         uiState.newLimit = clampInteger(fresh?.value, 0, 200, DEFAULT_NEW_LIMIT);
         uiState.shuffle = !!shuffle?.checked;
+        uiState.exampleMode = ['back', 'always', 'none'].includes(exampleMode?.value) ? exampleMode.value : 'back';
+        try { localStorage.setItem(EXAMPLE_MODE_KEY, uiState.exampleMode); } catch (_) {}
         if (review) review.value = String(uiState.reviewLimit);
         if (fresh) fresh.value = String(uiState.newLimit);
         updateHubCounts();
@@ -1059,6 +1167,7 @@
                         <summary>今日のセット設定</summary>
                         <div class="study-setting-row"><label>復習上限 <input type="number" id="study-review-limit" min="1" max="500" inputmode="numeric"></label><span>語</span></div>
                         <div class="study-setting-row"><label>新規上限 <input type="number" id="study-new-limit" min="0" max="200" inputmode="numeric"></label><span>語</span></div>
+                        <div class="study-setting-row"><label>例文表示 <select id="study-example-mode"><option value="back">裏面</option><option value="always">常に表示</option><option value="none">表示しない</option></select></label></div>
                         <label class="study-setting-check"><input type="checkbox" id="study-shuffle"> カード順をシャッフル</label>
                     </details>
                     <div class="study-swipe-guide" aria-label="判定ジェスチャー">
@@ -1072,7 +1181,7 @@
             document.body.appendChild(hub);
             hub.querySelector('#study-hub-close')?.addEventListener('click', closeStudyHub);
             hub.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => startPreset(button.dataset.mode)));
-            ['study-review-limit', 'study-new-limit', 'study-shuffle'].forEach(id => {
+            ['study-review-limit', 'study-new-limit', 'study-shuffle', 'study-example-mode'].forEach(id => {
                 document.getElementById(id)?.addEventListener('change', applyHubSettings);
             });
             hub.addEventListener('click', event => { if (event.target === hub) closeStudyHub(); });
@@ -1118,7 +1227,7 @@
             .study-hub{width:min(680px,100%);max-height:90vh;overflow:auto;padding:18px;border-radius:18px;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.22)}.study-hub-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
             .study-icon-action{width:42px;height:42px;border-radius:50%;border:1px solid #ded3c9;background:#fff;color:#65594d;font-size:1.25rem;display:inline-flex;align-items:center;justify-content:center}.study-icon-action:disabled{opacity:.35}
             .study-hub-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:16px}.study-preset{display:grid;grid-template-columns:1fr auto;grid-template-areas:'label count' 'hint hint';gap:2px 8px;text-align:left;padding:12px;border:1px solid #e5dbd1;border-radius:12px;background:#fff;color:#51463d}.study-preset.primary{border-color:#cdb59c;background:#fff8f0}.study-preset.context{grid-column:1/-1}.study-preset span{grid-area:label;font-weight:700}.study-preset strong{grid-area:count;font-size:1.35rem}.study-preset small{grid-area:hint;color:#897d71}
-            .study-hub-settings{margin-top:12px;padding:9px 11px;border:1px solid #e7ddd3;border-radius:10px;background:#faf7f3}.study-hub-settings summary{cursor:pointer;font-weight:700;color:#6b5c4e}.study-setting-row{display:flex;align-items:center;gap:6px;margin-top:8px}.study-setting-row label{display:flex;align-items:center;gap:7px}.study-setting-row input[type=number]{width:72px;min-height:36px;font-size:16px}.study-setting-check{display:flex;align-items:center;gap:7px;margin-top:9px}
+            .study-hub-settings{margin-top:12px;padding:9px 11px;border:1px solid #e7ddd3;border-radius:10px;background:#faf7f3}.study-hub-settings summary{cursor:pointer;font-weight:700;color:#6b5c4e}.study-setting-row{display:flex;align-items:center;gap:6px;margin-top:8px}.study-setting-row label{display:flex;align-items:center;gap:7px}.study-setting-row input[type=number]{width:72px;min-height:36px;font-size:16px}.study-setting-row select{min-height:36px;padding:5px 8px;border:1px solid #ded3c9;border-radius:8px;background:#fff;color:#5f5348;font-size:16px}.study-setting-check{display:flex;align-items:center;gap:7px;margin-top:9px}
             .study-swipe-guide{display:flex;justify-content:center;gap:30px;margin-top:14px}.study-swipe-guide span{display:flex;align-items:center;gap:7px;font-weight:800}.study-swipe-guide i{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-style:normal}.study-swipe-guide .wrong i{background:var(--study-red)}.study-swipe-guide .unsure i{background:var(--study-gray)}.study-swipe-guide .known i{background:var(--study-green)}.study-hub-status{min-height:1.2em;margin:10px 0 0;color:var(--study-red);font-size:.85rem}
             .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
             .study-session-shell{width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap span{display:block;margin-top:2px;color:#817568;font-size:.78rem}
@@ -1126,7 +1235,7 @@
             .study-flashcard-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .28s ease}.study-flashcard.flipped .study-flashcard-inner{transform:rotateY(180deg)}.study-card-face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid #dfd3c7;border-radius:22px;background:var(--study-paper);box-shadow:0 15px 38px rgba(79,63,50,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:auto}.study-card-back{transform:rotateY(180deg)}
             .study-card-judge{position:absolute;z-index:5;top:18px;right:20px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.1rem;font-weight:900;opacity:var(--study-feedback-alpha);pointer-events:none}.study-flashcard[data-direction=wrong] .study-card-judge{background:var(--study-red)}.study-flashcard[data-direction=known] .study-card-judge{background:var(--study-green)}.study-flashcard[data-direction=unsure] .study-card-judge{background:var(--study-gray)}
             .study-flashcard[data-direction=wrong] .study-card-face{border-color:color-mix(in srgb,var(--study-red) 60%,#fff);box-shadow:0 15px 38px rgba(160,55,55,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=known] .study-card-face{border-color:color-mix(in srgb,var(--study-green) 60%,#fff);box-shadow:0 15px 38px rgba(50,130,85,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=unsure] .study-card-face{border-color:color-mix(in srgb,var(--study-gray) 60%,#fff)}
-            .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{margin-top:5px;color:#8c7c6d;font-size:.72rem}
+            .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-context-front{margin-top:14px;max-height:38%;overflow:auto;font-size:.82rem}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{max-width:100%;margin-top:5px;color:#8c7c6d;font-size:.72rem;line-height:1.45;text-align:center}
             .study-direction-hint{position:absolute;z-index:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.45rem;font-weight:900;opacity:.78}.hint-wrong{left:-8px;top:50%;background:var(--study-red)}.hint-known{right:-8px;top:50%;background:var(--study-green)}.hint-unsure{left:50%;top:3px;transform:translateX(-50%);background:var(--study-gray)}
             .study-touch-actions{display:flex;justify-content:center;gap:26px;margin-top:14px}.study-judge-button{width:48px;height:48px;border:0;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.12)}.study-judge-button.wrong{background:var(--study-red)}.study-judge-button.unsure{background:var(--study-gray)}.study-judge-button.known{background:var(--study-green)}.study-session-source{text-align:center;color:#8a7c70;font-size:.75rem;min-height:1.2em}
             .study-session-summary{width:min(560px,94vw);padding:24px;border:1px solid #e1d7cd;border-radius:20px;background:#fff;text-align:center;box-shadow:0 14px 38px rgba(70,55,44,.12)}.study-summary-mark{width:56px;height:56px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--study-green);color:#fff;font-size:1.8rem}.study-session-summary h2{margin:8px 0;color:#433930}.study-summary-main{display:flex;align-items:baseline;justify-content:center;gap:7px}.study-summary-main strong{font-size:2.4rem}.study-summary-main span{color:#7b6e62}.study-summary-judges{display:flex;justify-content:center;gap:18px;margin:18px 0}.study-judge-stat{display:flex;align-items:center;gap:7px}.study-judge-stat span{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900}.study-judge-stat.wrong span{background:var(--study-red)}.study-judge-stat.unsure span{background:var(--study-gray)}.study-judge-stat.known span{background:var(--study-green)}.study-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}.study-summary-grid>div{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:9px;background:#f7f3ef}.study-summary-grid span{color:#75685c;font-size:.82rem}.study-summary-actions{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px}
