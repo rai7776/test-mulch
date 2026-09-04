@@ -1,0 +1,38 @@
+name: Integrate folder panel context
+on:
+  push:
+    branches:
+      - feature/folder-panel-context
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add script include
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='    <script src="global-vocab-mobile-ui.js?v=1.0"></script>\n'
+          include='    <script src="folder-panel-context.js?v=1.0"></script>\n'
+          assert marker in s, 'script marker not found'
+          if include not in s:
+              s=s.replace(marker, marker+include, 1)
+          p.write_text(s, encoding='utf-8')
+      - name: Validate
+        run: |
+          node --check folder-panel-context.js
+          grep -q 'folder-panel-context.js?v=1.0' index.html
+          grep -q 'このフォルダの単語を学習' folder-panel-context.js
+          grep -q 'folder-panel-source-group' folder-panel-context.js
+          grep -q "textContent || '').trim().toLowerCase() === 'vocabulary'" folder-panel-context.js
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html folder-panel-context.js
+          git commit -m "Integrate folder panel context" || true
+          git push
