@@ -1,20 +1,22 @@
 (function () {
     'use strict';
 
-    function loadScript(src, id, onload) {
-        if (document.getElementById(id)) {
-            if (typeof onload === 'function') onload();
-            return;
-        }
+    function loadScript(src, id) {
+        if (document.getElementById(id)) return;
         const script = document.createElement('script');
         script.id = id;
         script.src = src;
-        script.onload = () => { if (typeof onload === 'function') onload(); };
         script.onerror = () => console.error(`Failed to load ${src}`);
         document.head.appendChild(script);
     }
 
-    loadScript('note-structure-ui-core.js?v=1.1', 'note-structure-ui-core-loader', () => {
-        loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
-    });
+    // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
+    const style = document.createElement('style');
+    style.id = 'note-structure-sample-v2-style';
+    style.textContent = '#panel-content:has(.note-block-card:not(.note-structure-sample-card) > .note-structure-box) #note-structure-sample{display:none!important}';
+    document.head.appendChild(style);
+
+    // 元の文構造UIはそのまま保持し、サンプル更新ロジックだけ独立して追加する。
+    loadScript('note-structure-ui-core.js?v=1.1', 'note-structure-ui-core-loader');
+    loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
 })();
