@@ -165,6 +165,23 @@
         else setTimeout(run, 0);
     }
 
+    function isArrowLayerNode(node) {
+        if (!node) return false;
+        if (node.nodeType === 1) {
+            if (node.classList?.contains('note-structure-relation-layer')) return true;
+            return !!node.closest?.('.note-structure-relation-layer');
+        }
+        return !!node.parentElement?.closest?.('.note-structure-relation-layer');
+    }
+
+    function hasMeaningfulMutation(records) {
+        return records.some(record => {
+            if (record.type === 'attributes') return !isArrowLayerNode(record.target);
+            const nodes = [...record.addedNodes, ...record.removedNodes];
+            return nodes.some(node => !isArrowLayerNode(node));
+        });
+    }
+
     function injectStyle() {
         if (document.getElementById('note-structure-arrows-style')) return;
         const style = document.createElement('style');
@@ -187,7 +204,9 @@
 
         const panel = document.getElementById('panel-content');
         if (panel) {
-            new MutationObserver(queueDraw).observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ['open', 'class', 'style'] });
+            new MutationObserver(records => {
+                if (hasMeaningfulMutation(records)) queueDraw();
+            }).observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ['open', 'class', 'style'] });
         }
 
         if (typeof ResizeObserver === 'function') {
@@ -196,7 +215,11 @@
                 document.querySelectorAll('.note-structure-body, .note-structure-sentence').forEach(node => resizeObserver.observe(node));
             };
             observeSentences();
-            if (panel) new MutationObserver(observeSentences).observe(panel, { childList: true, subtree: true });
+            if (panel) {
+                new MutationObserver(records => {
+                    if (hasMeaningfulMutation(records)) observeSentences();
+                }).observe(panel, { childList: true, subtree: true });
+            }
         }
 
         window.addEventListener('resize', queueDraw, { passive: true });
@@ -214,7 +237,8 @@
     window.SmartReaderNoteStructureArrows = {
         redraw: queueDraw,
         relationGeometry,
-        closestRectPair
+        closestRectPair,
+        hasMeaningfulMutation
     };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
