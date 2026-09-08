@@ -268,7 +268,7 @@
             .syntax-annotation { position: relative; }
             .syntax-core { display: inline-block; max-width: 100%; position: relative; vertical-align: baseline; line-height: inherit; margin: 0; }
             .syntax-core-text { display: inline; }
-            .syntax-core-label { position: absolute; left: 50%; top: calc(100% + .08em); transform: translateX(-50%); margin: 0; font-size: .66rem; line-height: 1; font-weight: 800; color: #59636e; letter-spacing: .03em; white-space: nowrap; pointer-events: none; }
+            .syntax-core-label { position: absolute; left: 50%; top: calc(100% - .10em); transform: translateX(-50%); margin: 0; font-size: .66rem; line-height: 1; font-weight: 800; color: #59636e; letter-spacing: .03em; white-space: nowrap; pointer-events: none; }
             .syntax-modifier { display: inline; position: relative; padding: 0 .08em; }
             .syntax-modifier::before, .syntax-modifier::after { font-weight: 700; color: #69737e; }
             .syntax-modifier.notation-angle::before { content: '《'; }
