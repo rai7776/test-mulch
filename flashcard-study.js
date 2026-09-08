@@ -7,6 +7,39 @@
     const DEFAULT_NEW_LIMIT = 10;
     const DEFAULT_DIFFICULTY = 45;
     const EXAMPLE_MODE_KEY = 'smart-reader-study-example-mode';
+    const STUDY_SETTINGS_KEY = 'smart-reader-study-settings-v1';
+
+    function clampInteger(value, min, max, fallback = 0) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return fallback;
+        return Math.min(max, Math.max(min, Math.trunc(number)));
+    }
+
+    function loadSavedStudySettings() {
+        let saved = {};
+        let legacyExampleMode = null;
+        try {
+            const raw = localStorage.getItem(STUDY_SETTINGS_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') saved = parsed;
+            }
+            legacyExampleMode = localStorage.getItem(EXAMPLE_MODE_KEY);
+        } catch (_) {}
+
+        const exampleMode = ['back', 'always', 'none'].includes(saved.exampleMode)
+            ? saved.exampleMode
+            : (['back', 'always', 'none'].includes(legacyExampleMode) ? legacyExampleMode : 'back');
+
+        return {
+            reviewLimit: clampInteger(saved.reviewLimit, 1, 500, DEFAULT_REVIEW_LIMIT),
+            newLimit: clampInteger(saved.newLimit, 0, 200, DEFAULT_NEW_LIMIT),
+            shuffle: typeof saved.shuffle === 'boolean' ? saved.shuffle : true,
+            exampleMode
+        };
+    }
+
+    const savedStudySettings = loadSavedStudySettings();
     const scopedGlobalFilter = {
         status: 'all',
         level: 'all',
@@ -14,17 +47,10 @@
         wrong: 'all'
     };
     const uiState = {
-        reviewLimit: DEFAULT_REVIEW_LIMIT,
-        newLimit: DEFAULT_NEW_LIMIT,
-        shuffle: true,
-        exampleMode: (() => {
-            try {
-                const value = localStorage.getItem(EXAMPLE_MODE_KEY);
-                return ['back', 'always', 'none'].includes(value) ? value : 'back';
-            } catch (_) {
-                return 'back';
-            }
-        })(),
+        reviewLimit: savedStudySettings.reviewLimit,
+        newLimit: savedStudySettings.newLimit,
+        shuffle: savedStudySettings.shuffle,
+        exampleMode: savedStudySettings.exampleMode,
         contextEntries: null,
         contextLabel: ''
     };
@@ -36,12 +62,7 @@
     let originalShowLibrary = null;
     let originalRenderList = null;
     let dragState = null;
-
-    function clampInteger(value, min, max, fallback = 0) {
-        const number = Number(value);
-        if (!Number.isFinite(number)) return fallback;
-        return Math.min(max, Math.max(min, Math.trunc(number)));
-    }
+    let pendingCommit = null;
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -544,7 +565,17 @@
     }
 
     function undoLast() {
-        if (!session || !session.history.length) return;
+        if (!session) return;
+
+        if (pendingCommit) {
+            clearTimeout(pendingCommit.timerId);
+            pendingCommit = null;
+            resetCardPosition(document.getElementById('study-flashcard'));
+            renderSessionHeader();
+            return;
+        }
+
+        if (!session.history.length) return;
         const snapshot = session.history.pop();
         restoreSnapshot(snapshot);
         renderSession();
@@ -556,6 +587,10 @@
         if (!force && !session.finished && session.stats.responses > 0) {
             if (!window.confirm('学習を途中で終了しますか？ここまでの結果は保存されます。')) return;
         }
+        if (pendingCommit) {
+            clearTimeout(pendingCommit.timerId);
+            pendingCommit = null;
+        }
         flushSave();
         session = null;
         const overlay = document.getElementById('study-session-overlay');
@@ -566,6 +601,87 @@
 
     function currentSessionEntry() {
         return session && !session.finished ? session.queue[session.index] || null : null;
+    }
+
+    function currentWordText() {
+        const entry = currentSessionEntry();
+        const word = entry?.word || {};
+        const surface = String(word.surfaceText || '').trim();
+        return String(word.word || '').trim() || surface || '';
+    }
+
+    function currentVisibleCardText() {
+        const card = document.getElementById('study-flashcard');
+        if (!card) return '';
+        const selector = card.classList.contains('flipped') ? '.study-card-back' : '.study-card-front';
+        const face = card.querySelector(selector);
+        return String(face?.innerText || face?.textContent || '').trim();
+    }
+
+    function fallbackCopyText(text) {
+        try {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            textarea.setSelectionRange(0, textarea.value.length);
+            const copied = document.execCommand('copy');
+            textarea.remove();
+            return copied;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async function copyCurrentCard(button) {
+        const text = currentVisibleCardText();
+        if (!text) return;
+        let copied = false;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                copied = true;
+            }
+        } catch (_) {}
+        if (!copied) copied = fallbackCopyText(text);
+
+        if (button && copied) {
+            const original = button.textContent;
+            button.textContent = '✓';
+            button.setAttribute('aria-label', 'コピーしました');
+            window.setTimeout(() => {
+                if (!button.isConnected) return;
+                button.textContent = original;
+                button.setAttribute('aria-label', '表示中のカード内容をコピー');
+            }, 900);
+        }
+    }
+
+    function speakCurrentWord() {
+        const text = currentWordText();
+        if (!text || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
+        try {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        } catch (_) {}
+    }
+
+    function hasActiveTextSelection() {
+        try {
+            return !!window.getSelection?.().toString().trim();
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function isCardControlTarget(target) {
+        return !!target?.closest?.('.study-card-corner-action');
     }
 
     function renderCardContent(entry) {
@@ -591,20 +707,20 @@
         const back = card.querySelector('.study-card-back');
         if (front) {
             front.innerHTML = `
-                <div class="study-card-word">${escapeHtml(wordText)}</div>
-                ${surface && surface.toLocaleLowerCase() !== wordText.toLocaleLowerCase() ? `<div class="study-card-surface">${escapeHtml(surface)}</div>` : ''}
-                ${(part || tags.length) ? `<div class="study-card-meta">${part ? `<span>${escapeHtml(part)}</span>` : ''}${tags.slice(0, 3).map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
-                ${showContextFront ? `<div class="study-card-context study-card-context-front">${escapeHtml(context)}</div>` : ''}
+                <div class="study-card-word study-card-selectable">${escapeHtml(wordText)}</div>
+                ${surface && surface.toLocaleLowerCase() !== wordText.toLocaleLowerCase() ? `<div class="study-card-surface study-card-selectable">${escapeHtml(surface)}</div>` : ''}
+                ${(part || tags.length) ? `<div class="study-card-meta">${part ? `<span class="study-card-selectable">${escapeHtml(part)}</span>` : ''}${tags.slice(0, 3).map(tag => `<span class="study-card-selectable">${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+                ${showContextFront ? `<div class="study-card-context study-card-context-front study-card-selectable">${escapeHtml(context)}</div>` : ''}
             `;
         }
         if (back) {
             back.innerHTML = `
-                <div class="study-card-back-word">${escapeHtml(wordText)}</div>
-                <div class="study-card-meaning">${escapeHtml(meaning)}</div>
-                ${memo ? `<div class="study-card-memo">${escapeHtml(memo)}</div>` : ''}
-                ${showContextBack ? `<div class="study-card-context">${escapeHtml(context)}</div>` : ''}
-                <div class="study-card-source">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
-                <div class="study-card-studyline">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
+                <div class="study-card-back-word study-card-selectable">${escapeHtml(wordText)}</div>
+                <div class="study-card-meaning study-card-selectable">${escapeHtml(meaning)}</div>
+                ${memo ? `<div class="study-card-memo study-card-selectable">${escapeHtml(memo)}</div>` : ''}
+                ${showContextBack ? `<div class="study-card-context study-card-selectable">${escapeHtml(context)}</div>` : ''}
+                <div class="study-card-source study-card-selectable">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
+                <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
             `;
         }
     }
@@ -617,7 +733,7 @@
         const source = document.getElementById('study-session-source');
         if (progress) progress.textContent = session?.finished ? `${session.initialCount}語` : `${Math.min(session.index + 1, session.queue.length)} / ${session.queue.length}`;
         if (round) round.textContent = `${session?.round || 1}周目`;
-        if (undo) undo.disabled = !session?.history.length;
+        if (undo) undo.disabled = !(session?.history.length || pendingCommit);
         if (source) source.textContent = entry ? `${entry.articleTitle}${entry.chapterTitle ? ` / ${entry.chapterTitle}` : ''}` : session?.label || '';
     }
 
@@ -676,6 +792,8 @@
                 <div class="study-direction-hint hint-unsure" aria-hidden="true">?</div>
                 <div class="study-direction-hint hint-known" aria-hidden="true">✓</div>
                 <div id="study-flashcard" class="study-flashcard" tabindex="0" role="button" aria-label="カード。タップで表裏を切り替え">
+                    <button type="button" class="study-card-corner-action study-card-copy" aria-label="表示中のカード内容をコピー">⧉</button>
+                    <button type="button" class="study-card-corner-action study-card-speak" aria-label="単語を再生">▶️</button>
                     <div class="study-card-judge" aria-hidden="true"></div>
                     <div class="study-flashcard-inner">
                         <section class="study-card-face study-card-front"></section>
@@ -684,9 +802,18 @@
                 </div>
             </div>
             <div class="study-touch-actions" aria-label="スワイプの代替操作">
-                <button type="button" class="study-judge-button wrong" data-result="wrong" aria-label="思い出せなかった">×</button>
-                <button type="button" class="study-judge-button unsure" data-result="unsure" aria-label="あやふや">?</button>
-                <button type="button" class="study-judge-button known" data-result="known" aria-label="思い出せた">✓</button>
+                <div class="study-judge-control">
+                    <button type="button" class="study-judge-button wrong" data-result="wrong" aria-label="思い出せなかった">×</button>
+                    <small class="study-judge-count" aria-label="×の回数">${session.stats.wrong}</small>
+                </div>
+                <div class="study-judge-control">
+                    <button type="button" class="study-judge-button unsure" data-result="unsure" aria-label="あやふや">?</button>
+                    <small class="study-judge-count" aria-label="?の回数">${session.stats.unsure}</small>
+                </div>
+                <div class="study-judge-control">
+                    <button type="button" class="study-judge-button known" data-result="known" aria-label="思い出せた">✓</button>
+                    <small class="study-judge-count" aria-label="✓の回数">${session.stats.known}</small>
+                </div>
             </div>
         `;
         const entry = currentSessionEntry();
@@ -725,7 +852,7 @@
 
     function commitResult(result) {
         const card = document.getElementById('study-flashcard');
-        if (!card || !session || session.finished) return;
+        if (!card || !session || session.finished || pendingCommit) return;
         card.classList.add('is-committing');
         card.dataset.direction = result;
         const judge = card.querySelector('.study-card-judge');
@@ -734,7 +861,14 @@
         if (result === 'known') card.style.transform = 'translate3d(120vw, 0, 0) rotate(15deg)';
         if (result === 'wrong') card.style.transform = 'translate3d(-120vw, 0, 0) rotate(-15deg)';
         if (result === 'unsure') card.style.transform = 'translate3d(0, -110vh, 0)';
-        window.setTimeout(() => answerCurrent(result), 190);
+
+        const timerId = window.setTimeout(() => {
+            if (!pendingCommit || pendingCommit.timerId !== timerId) return;
+            pendingCommit = null;
+            answerCurrent(result);
+        }, 190);
+        pendingCommit = { result, timerId };
+        renderSessionHeader();
     }
 
     function bindCardInteractions() {
@@ -742,7 +876,19 @@
         if (!card) return;
         const threshold = Math.max(68, Math.min(120, card.getBoundingClientRect().width * 0.22));
 
+        card.querySelector('.study-card-copy')?.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            copyCurrentCard(event.currentTarget);
+        });
+        card.querySelector('.study-card-speak')?.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            speakCurrentWord();
+        });
+
         card.addEventListener('pointerdown', event => {
+            if (isCardControlTarget(event.target)) return;
             if (event.button !== undefined && event.button !== 0) return;
             dragState = {
                 pointerId: event.pointerId,
@@ -751,9 +897,13 @@
                 dx: 0,
                 dy: 0,
                 moved: false,
-                threshold
+                threshold,
+                captured: false
             };
-            card.setPointerCapture?.(event.pointerId);
+            if (event.pointerType !== 'touch') {
+                card.setPointerCapture?.(event.pointerId);
+                dragState.captured = true;
+            }
             card.classList.add('is-dragging');
         });
 
@@ -761,7 +911,13 @@
             if (!dragState || dragState.pointerId !== event.pointerId) return;
             dragState.dx = event.clientX - dragState.startX;
             dragState.dy = Math.min(0, event.clientY - dragState.startY);
-            if (Math.abs(dragState.dx) > 7 || Math.abs(dragState.dy) > 7) dragState.moved = true;
+            if (Math.abs(dragState.dx) > 7 || Math.abs(dragState.dy) > 7) {
+                dragState.moved = true;
+                if (!dragState.captured) {
+                    card.setPointerCapture?.(event.pointerId);
+                    dragState.captured = true;
+                }
+            }
             const result = resultDirection(dragState.dx, dragState.dy);
             const distance = dragDistanceFor(result, dragState.dx, dragState.dy);
             const alpha = Math.min(1, distance / dragState.threshold);
@@ -783,7 +939,7 @@
                 return;
             }
             resetCardPosition(card);
-            if (!state.moved) card.classList.toggle('flipped');
+            if (!state.moved && !hasActiveTextSelection()) card.classList.toggle('flipped');
         });
 
         card.addEventListener('pointercancel', () => {
@@ -792,9 +948,10 @@
         });
 
         card.addEventListener('keydown', event => {
+            if (isCardControlTarget(event.target)) return;
             if (event.key === ' ' || event.key === 'Enter') {
                 event.preventDefault();
-                card.classList.toggle('flipped');
+                if (!hasActiveTextSelection()) card.classList.toggle('flipped');
             } else if (event.key === 'ArrowLeft') {
                 event.preventDefault();
                 commitResult('wrong');
@@ -820,6 +977,7 @@
             return;
         }
         const queue = uiState.shuffle ? shuffleEntries(selected) : [...selected];
+        pendingCommit = null;
         session = {
             label: label || '学習',
             initialEntries: [...selected],
@@ -884,6 +1042,18 @@
         document.getElementById('study-hub-overlay')?.classList.remove('show');
     }
 
+    function persistStudySettings() {
+        try {
+            localStorage.setItem(STUDY_SETTINGS_KEY, JSON.stringify({
+                reviewLimit: uiState.reviewLimit,
+                newLimit: uiState.newLimit,
+                shuffle: uiState.shuffle,
+                exampleMode: uiState.exampleMode
+            }));
+            localStorage.setItem(EXAMPLE_MODE_KEY, uiState.exampleMode);
+        } catch (_) {}
+    }
+
     function applyHubSettings() {
         const review = document.getElementById('study-review-limit');
         const fresh = document.getElementById('study-new-limit');
@@ -893,7 +1063,7 @@
         uiState.newLimit = clampInteger(fresh?.value, 0, 200, DEFAULT_NEW_LIMIT);
         uiState.shuffle = !!shuffle?.checked;
         uiState.exampleMode = ['back', 'always', 'none'].includes(exampleMode?.value) ? exampleMode.value : 'back';
-        try { localStorage.setItem(EXAMPLE_MODE_KEY, uiState.exampleMode); } catch (_) {}
+        persistStudySettings();
         if (review) review.value = String(uiState.reviewLimit);
         if (fresh) fresh.value = String(uiState.newLimit);
         updateHubCounts();
@@ -1164,7 +1334,7 @@
                         <button type="button" id="study-hub-context" class="study-preset context" data-mode="context" hidden><span id="study-hub-context-label">現在の範囲</span><strong id="study-hub-context-count">0</strong><small>指定した範囲</small></button>
                     </div>
                     <details class="study-hub-settings">
-                        <summary>今日のセット設定</summary>
+                        <summary>出題設定</summary>
                         <div class="study-setting-row"><label>復習上限 <input type="number" id="study-review-limit" min="1" max="500" inputmode="numeric"></label><span>語</span></div>
                         <div class="study-setting-row"><label>新規上限 <input type="number" id="study-new-limit" min="0" max="200" inputmode="numeric"></label><span>語</span></div>
                         <div class="study-setting-row"><label>例文表示 <select id="study-example-mode"><option value="back">裏面</option><option value="always">常に表示</option><option value="none">表示しない</option></select></label></div>
@@ -1231,15 +1401,17 @@
             .study-swipe-guide{display:flex;justify-content:center;gap:30px;margin-top:14px}.study-swipe-guide span{display:flex;align-items:center;gap:7px;font-weight:800}.study-swipe-guide i{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-style:normal}.study-swipe-guide .wrong i{background:var(--study-red)}.study-swipe-guide .unsure i{background:var(--study-gray)}.study-swipe-guide .known i{background:var(--study-green)}.study-hub-status{min-height:1.2em;margin:10px 0 0;color:var(--study-red);font-size:.85rem}
             .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
             .study-session-shell{width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap span{display:block;margin-top:2px;color:#817568;font-size:.78rem}
-            .study-session-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:470px}.study-gesture-field{position:relative;width:min(500px,92vw);padding:52px 0 18px}.study-flashcard{--study-feedback-alpha:0;position:relative;width:100%;height:min(350px,58vw);min-height:285px;max-height:390px;touch-action:none;user-select:none;cursor:grab;transition:transform .22s ease;transform-origin:center center;outline:none}.study-flashcard.is-dragging{cursor:grabbing;transition:none}.study-flashcard.is-committing{transition:transform .19s ease-out}.study-flashcard:focus-visible{outline:3px solid rgba(141,90,43,.25);outline-offset:5px;border-radius:22px}
+            .study-session-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:470px}.study-gesture-field{position:relative;width:min(500px,92vw);padding:52px 0 18px}.study-flashcard{--study-feedback-alpha:0;position:relative;width:100%;height:min(350px,58vw);min-height:285px;max-height:390px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:transform .22s ease;transform-origin:center center;outline:none}.study-flashcard.is-dragging{cursor:grabbing;transition:none}.study-flashcard.is-committing{transition:transform .19s ease-out}.study-flashcard:focus-visible{outline:3px solid rgba(141,90,43,.25);outline-offset:5px;border-radius:22px}
             .study-flashcard-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .28s ease}.study-flashcard.flipped .study-flashcard-inner{transform:rotateY(180deg)}.study-card-face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid #dfd3c7;border-radius:22px;background:var(--study-paper);box-shadow:0 15px 38px rgba(79,63,50,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:auto}.study-card-back{transform:rotateY(180deg)}
-            .study-card-judge{position:absolute;z-index:5;top:18px;right:20px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.1rem;font-weight:900;opacity:var(--study-feedback-alpha);pointer-events:none}.study-flashcard[data-direction=wrong] .study-card-judge{background:var(--study-red)}.study-flashcard[data-direction=known] .study-card-judge{background:var(--study-green)}.study-flashcard[data-direction=unsure] .study-card-judge{background:var(--study-gray)}
+            .study-card-selectable{user-select:text!important;-webkit-user-select:text!important;-webkit-touch-callout:default;touch-action:auto;cursor:text}.study-card-selectable::selection{background:rgba(141,90,43,.2)}
+            .study-card-corner-action{position:absolute;z-index:9;top:14px;width:40px;height:40px;border:1px solid #ded3c9;border-radius:50%;background:rgba(255,253,249,.94);color:#65594d;display:flex;align-items:center;justify-content:center;font-size:1rem;line-height:1;box-shadow:0 3px 10px rgba(70,55,44,.08);user-select:none;-webkit-user-select:none;touch-action:manipulation}.study-card-copy{left:14px}.study-card-speak{right:14px;font-size:.9rem}
+            .study-card-judge{position:absolute;z-index:5;top:62px;right:20px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.1rem;font-weight:900;opacity:var(--study-feedback-alpha);pointer-events:none}.study-flashcard[data-direction=wrong] .study-card-judge{background:var(--study-red)}.study-flashcard[data-direction=known] .study-card-judge{background:var(--study-green)}.study-flashcard[data-direction=unsure] .study-card-judge{background:var(--study-gray)}
             .study-flashcard[data-direction=wrong] .study-card-face{border-color:color-mix(in srgb,var(--study-red) 60%,#fff);box-shadow:0 15px 38px rgba(160,55,55,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=known] .study-card-face{border-color:color-mix(in srgb,var(--study-green) 60%,#fff);box-shadow:0 15px 38px rgba(50,130,85,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=unsure] .study-card-face{border-color:color-mix(in srgb,var(--study-gray) 60%,#fff)}
             .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-context-front{margin-top:14px;max-height:38%;overflow:auto;font-size:.82rem}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{max-width:100%;margin-top:5px;color:#8c7c6d;font-size:.72rem;line-height:1.45;text-align:center}
             .study-direction-hint{position:absolute;z-index:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.45rem;font-weight:900;opacity:.78}.hint-wrong{left:-8px;top:50%;background:var(--study-red)}.hint-known{right:-8px;top:50%;background:var(--study-green)}.hint-unsure{left:50%;top:3px;transform:translateX(-50%);background:var(--study-gray)}
-            .study-touch-actions{display:flex;justify-content:center;gap:26px;margin-top:14px}.study-judge-button{width:48px;height:48px;border:0;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.12)}.study-judge-button.wrong{background:var(--study-red)}.study-judge-button.unsure{background:var(--study-gray)}.study-judge-button.known{background:var(--study-green)}.study-session-source{text-align:center;color:#8a7c70;font-size:.75rem;min-height:1.2em}
+            .study-touch-actions{display:flex;justify-content:center;align-items:flex-start;gap:26px;margin-top:14px}.study-judge-control{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:48px}.study-judge-button{width:48px;height:48px;border:0;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.12)}.study-judge-button.wrong{background:var(--study-red)}.study-judge-button.unsure{background:var(--study-gray)}.study-judge-button.known{background:var(--study-green)}.study-judge-count{display:block;min-height:1em;color:#8a7c70;font-size:.7rem;font-weight:700;line-height:1}.study-session-source{text-align:center;color:#8a7c70;font-size:.75rem;min-height:1.2em}
             .study-session-summary{width:min(560px,94vw);padding:24px;border:1px solid #e1d7cd;border-radius:20px;background:#fff;text-align:center;box-shadow:0 14px 38px rgba(70,55,44,.12)}.study-summary-mark{width:56px;height:56px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--study-green);color:#fff;font-size:1.8rem}.study-session-summary h2{margin:8px 0;color:#433930}.study-summary-main{display:flex;align-items:baseline;justify-content:center;gap:7px}.study-summary-main strong{font-size:2.4rem}.study-summary-main span{color:#7b6e62}.study-summary-judges{display:flex;justify-content:center;gap:18px;margin:18px 0}.study-judge-stat{display:flex;align-items:center;gap:7px}.study-judge-stat span{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900}.study-judge-stat.wrong span{background:var(--study-red)}.study-judge-stat.unsure span{background:var(--study-gray)}.study-judge-stat.known span{background:var(--study-green)}.study-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}.study-summary-grid>div{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:9px;background:#f7f3ef}.study-summary-grid span{color:#75685c;font-size:.82rem}.study-summary-actions{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px}
-            @media(max-width:700px){.study-today-card{margin:10px 0 14px;padding:12px}.study-today-heading{align-items:flex-start}.study-today-heading h2{font-size:1.2rem}.study-today-stats{grid-template-columns:1fr 1fr}.study-primary-action{padding:8px 11px;font-size:.86rem}.global-study-controls{display:grid;grid-template-columns:1fr 1fr;grid-column:1/-1;gap:6px;width:100%}.global-study-controls select,.global-study-controls button{width:100%;min-width:0;font-size:13px}.global-study-controls button{grid-column:span 1}.sidebar-study-controls{grid-template-columns:1fr auto}.study-overlay{align-items:flex-end;padding:0}.study-hub{width:100%;max-height:92vh;border-radius:18px 18px 0 0;padding:15px}.study-hub-preset-grid{grid-template-columns:1fr 1fr}.study-preset{padding:10px}.study-preset small{font-size:.68rem}.study-swipe-guide{gap:22px}.study-session-shell{padding:10px 12px 18px}.study-session-stage{min-height:420px}.study-gesture-field{width:min(88vw,470px);padding-top:48px}.study-flashcard{height:58vh;max-height:420px;min-height:300px}.study-card-face{padding:22px 18px}.study-touch-actions{gap:30px}.study-judge-button{width:52px;height:52px}.study-summary-grid{grid-template-columns:1fr}.hint-wrong{left:-6px}.hint-known{right:-6px}}
+            @media(max-width:700px){.study-today-card{margin:10px 0 14px;padding:12px}.study-today-heading{align-items:flex-start}.study-today-heading h2{font-size:1.2rem}.study-today-stats{grid-template-columns:1fr 1fr}.study-primary-action{padding:8px 11px;font-size:.86rem}.global-study-controls{display:grid;grid-template-columns:1fr 1fr;grid-column:1/-1;gap:6px;width:100%}.global-study-controls select,.global-study-controls button{width:100%;min-width:0;font-size:13px}.global-study-controls button{grid-column:span 1}.sidebar-study-controls{grid-template-columns:1fr auto}.study-overlay{align-items:flex-end;padding:0}.study-hub{width:100%;max-height:92vh;border-radius:18px 18px 0 0;padding:15px}.study-hub-preset-grid{grid-template-columns:1fr 1fr}.study-preset{padding:10px}.study-preset small{font-size:.68rem}.study-swipe-guide{gap:22px}.study-session-shell{padding:10px 12px 18px}.study-session-stage{min-height:420px}.study-gesture-field{width:min(88vw,470px);padding-top:48px}.study-flashcard{height:58vh;max-height:420px;min-height:300px}.study-card-face{padding:22px 18px}.study-touch-actions{gap:30px}.study-judge-button{width:52px;height:52px}.study-judge-control{min-width:52px}.study-summary-grid{grid-template-columns:1fr}.hint-wrong{left:-6px}.hint-known{right:-6px}}
             @media(max-width:390px){.study-hub-preset-grid{grid-template-columns:1fr}.study-preset.context{grid-column:auto}.study-today-heading{flex-direction:column}.study-today-heading .study-primary-action{width:100%}.study-session-stage{min-height:390px}.study-flashcard{min-height:285px;height:56vh}.study-direction-hint{width:40px;height:40px;font-size:1.2rem}}
         `;
         document.head.appendChild(style);
