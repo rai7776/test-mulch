@@ -1,0 +1,60 @@
+name: Tune note structure label spacing
+on:
+  push:
+    branches:
+      - feature/note-structure-label-spacing
+jobs:
+  tune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move structure labels upward
+        shell: python
+        run: |
+          from pathlib import Path
+
+          core = Path('note-structure-ui-core.js')
+          s = core.read_text(encoding='utf-8')
+          old = "top: calc(100% + .08em);"
+          new = "top: calc(100% - .10em);"
+          assert s.count(old) == 1, f'expected one label position, found {s.count(old)}'
+          s = s.replace(old, new, 1)
+          core.write_text(s, encoding='utf-8')
+
+          wrapper = Path('note-structure-ui.js')
+          w = wrapper.read_text(encoding='utf-8')
+          old_core = "loadScript('note-structure-ui-core.js?v=1.1', 'note-structure-ui-core-loader');"
+          new_core = "loadScript('note-structure-ui-core.js?v=1.2', 'note-structure-ui-core-loader');"
+          assert old_core in w, 'core cache-bust marker missing'
+          w = w.replace(old_core, new_core, 1)
+          wrapper.write_text(w, encoding='utf-8')
+
+          index = Path('index.html')
+          h = index.read_text(encoding='utf-8')
+          old_wrapper = '<script src="note-structure-ui.js?v=1.1"></script>'
+          new_wrapper = '<script src="note-structure-ui.js?v=1.2"></script>'
+          assert old_wrapper in h, 'wrapper cache-bust marker missing'
+          h = h.replace(old_wrapper, new_wrapper, 1)
+          index.write_text(h, encoding='utf-8')
+      - name: Validate
+        run: |
+          node --check note-structure-ui-core.js
+          node --check note-structure-ui.js
+          grep -q 'top: calc(100% - .10em);' note-structure-ui-core.js
+          grep -q "note-structure-ui-core.js?v=1.2" note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=1.2' index.html
+          if grep -q 'top: calc(100% + .08em);' note-structure-ui-core.js; then
+            echo 'old label offset still present'
+            exit 1
+          fi
+      - name: Commit adjustment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add note-structure-ui-core.js note-structure-ui.js index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Tighten note structure label spacing"
+            git push
+          fi
