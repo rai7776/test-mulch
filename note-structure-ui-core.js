@@ -107,6 +107,7 @@
         const sentence = document.createElement('div');
         sentence.className = 'note-structure-sentence';
         const roots = resolveAnnotations(originalText, structure);
+        sentence._smartReaderStructure = structure || null;
         appendRange(sentence, String(originalText || ''), 0, String(originalText || '').length, roots);
         return sentence;
     }
