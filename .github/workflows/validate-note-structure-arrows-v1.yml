@@ -1,0 +1,22 @@
+name: Validate note structure arrows v1
+on:
+  push:
+    branches:
+      - feature/note-structure-arrows-v1-impl
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and wiring checks
+        run: |
+          node --check note-structure-ui-core.js
+          node --check note-structure-ui.js
+          node --check note-structure-arrows.js
+          grep -q 'sentence._smartReaderStructure = structure || null' note-structure-ui-core.js
+          grep -q "note-structure-ui-core.js?v=1.5" note-structure-ui.js
+          grep -q "note-structure-arrows.js?v=1" note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=1.5' index.html
+          grep -q 'hasMeaningfulMutation' note-structure-arrows.js
+          grep -q 'ResizeObserver' note-structure-arrows.js
+          grep -q 'marker-end' note-structure-arrows.js
