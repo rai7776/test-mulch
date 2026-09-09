@@ -1,0 +1,31 @@
+name: Fix note structure arrow direction
+on:
+  push:
+    branches:
+      - feature/note-structure-arrows-direction-fix-finalwork
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply fix
+        run: python .tmp-fix-note-structure-arrows.py
+      - name: Validate
+        run: |
+          node --check note-structure-arrows.js
+          node --check note-structure-ui.js
+          grep -q "note-structure-arrows.js?v=3" note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=1.7' index.html
+          grep -q 'z-index: 2; pointer-events: none' note-structure-arrows.js
+          grep -q 'const targetIsRight = toCenter.x > fromCenter.x' note-structure-arrows.js
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add note-structure-arrows.js note-structure-ui.js index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix note structure arrow routing"
+            git push
+          fi
