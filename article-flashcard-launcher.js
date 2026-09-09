@@ -2,6 +2,8 @@
     'use strict';
 
     const FALLBACK_ID = 'article-study-fallback';
+    let syncTimer = null;
+    let delayedSyncTimer = null;
 
     function isFolderPanelMode() {
         return document.getElementById('side-panel')?.classList.contains('folder-panel-mode') || false;
@@ -24,7 +26,8 @@
     }
 
     function removeFallback() {
-        document.getElementById(FALLBACK_ID)?.remove();
+        const fallback = document.getElementById(FALLBACK_ID);
+        if (fallback) fallback.remove();
     }
 
     function ensureFallbackLauncher() {
@@ -56,18 +59,31 @@
 
         const button = row.querySelector('[data-article-study-open]');
         if (button) {
-            button.textContent = rangeLabel();
-            button.disabled = !window.SmartReaderStudy?.startCurrentRange;
+            const label = rangeLabel();
+            if (button.textContent !== label) button.textContent = label;
+
+            const shouldDisable = !window.SmartReaderStudy?.startCurrentRange;
+            if (button.disabled !== shouldDisable) button.disabled = shouldDisable;
         }
     }
 
     function syncSoon() {
-        ensureFallbackLauncher();
-        window.setTimeout(ensureFallbackLauncher, 0);
-        window.setTimeout(ensureFallbackLauncher, 60);
+        if (syncTimer === null) {
+            syncTimer = window.setTimeout(() => {
+                syncTimer = null;
+                ensureFallbackLauncher();
+            }, 0);
+        }
+
+        if (delayedSyncTimer !== null) window.clearTimeout(delayedSyncTimer);
+        delayedSyncTimer = window.setTimeout(() => {
+            delayedSyncTimer = null;
+            ensureFallbackLauncher();
+        }, 80);
     }
 
     function init() {
+        ensureFallbackLauncher();
         syncSoon();
 
         const panel = document.getElementById('side-panel');
