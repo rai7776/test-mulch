@@ -64,19 +64,24 @@
     function relationGeometry(pair, bodyRect, body, lane) {
         const fromCenter = rectCenter(pair.fromRect);
         const toCenter = rectCenter(pair.toRect);
-        const lineThreshold = Math.max(pair.fromRect.height, pair.toRect.height) * 0.7;
+        const lineThreshold = Math.max(pair.fromRect.height, pair.toRect.height) * 0.72;
         const sameLine = Math.abs(fromCenter.y - toCenter.y) <= lineThreshold;
 
         if (sameLine) {
             const targetIsRight = toCenter.x > fromCenter.x;
-            const sourceEdge = targetIsRight ? pair.fromRect.right : pair.fromRect.left;
-            const targetEdge = targetIsRight ? pair.toRect.left : pair.toRect.right;
-            const gap = 2.5;
-            const sx = localX(sourceEdge + (targetIsRight ? gap : -gap), bodyRect, body);
-            const tx = localX(targetEdge + (targetIsRight ? -gap : gap), bodyRect, body);
-            const sy = localY(pair.fromRect.top - 1.5, bodyRect, body);
-            const ty = localY(pair.toRect.top - 1.5, bodyRect, body);
-            const routeY = Math.max(3, Math.min(sy, ty) - 5 - lane * 3);
+            const sourceX = targetIsRight ? pair.fromRect.right + 1.5 : pair.fromRect.left - 1.5;
+            const targetX = targetIsRight ? pair.toRect.left - 1.5 : pair.toRect.right + 1.5;
+            const sourceY = pair.fromRect.top - 1.5;
+            const targetY = pair.toRect.top - 1.5;
+            const laneLift = 7 + lane * 4;
+            const routeYClient = Math.min(sourceY, targetY) - laneLift;
+
+            const sx = localX(sourceX, bodyRect, body);
+            const tx = localX(targetX, bodyRect, body);
+            const sy = localY(sourceY, bodyRect, body);
+            const ty = localY(targetY, bodyRect, body);
+            const routeY = Math.max(3, localY(routeYClient, bodyRect, body));
+
             return {
                 path: `M ${sx.toFixed(1)} ${sy.toFixed(1)} L ${sx.toFixed(1)} ${routeY.toFixed(1)} L ${tx.toFixed(1)} ${routeY.toFixed(1)} L ${tx.toFixed(1)} ${ty.toFixed(1)}`,
                 sameLine: true
@@ -91,8 +96,8 @@
         const sy = localY(sourceY, bodyRect, body);
         const ty = localY(targetY, bodyRect, body);
 
-        const leftCorridor = Math.min(pair.fromRect.left, pair.toRect.left) - 8 - lane * 4;
-        const rightCorridor = Math.max(pair.fromRect.right, pair.toRect.right) + 8 + lane * 4;
+        const leftCorridor = Math.min(pair.fromRect.left, pair.toRect.left) - 10 - lane * 5;
+        const rightCorridor = Math.max(pair.fromRect.right, pair.toRect.right) + 10 + lane * 5;
         const leftCost = Math.abs(fromCenter.x - leftCorridor) + Math.abs(toCenter.x - leftCorridor);
         const rightCost = Math.abs(fromCenter.x - rightCorridor) + Math.abs(toCenter.x - rightCorridor);
         const routeX = localX(leftCost <= rightCost ? leftCorridor : rightCorridor, bodyRect, body);
@@ -212,7 +217,7 @@
         style.textContent = `
             .note-structure-body { position: relative; }
             .note-structure-sentence { position: relative; z-index: 1; }
-            .note-structure-relation-layer { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+            .note-structure-relation-layer { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; overflow: visible; }
             .note-structure-relation-path { fill: none; stroke: #7a8591; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; opacity: .64; vector-effect: non-scaling-stroke; }
             .note-structure-arrowhead { fill: #7a8591; opacity: .76; }
             @media (max-width: 600px) {
