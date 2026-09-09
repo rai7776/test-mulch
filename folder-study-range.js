@@ -176,17 +176,71 @@
         return value;
     }
 
-    function chooseEntries(entries) {
-        const limit = Math.min(normalizeLimit(), entries.length);
-        if (entries.length <= limit) return [...entries];
-        const shuffle = !!document.getElementById('study-shuffle')?.checked;
-        if (!shuffle) return entries.slice(0, limit);
+    function shuffledCopy(entries) {
         const copy = [...entries];
         for (let i = copy.length - 1; i > 0; i -= 1) {
             const j = Math.floor(Math.random() * (i + 1));
             [copy[i], copy[j]] = [copy[j], copy[i]];
         }
-        return copy.slice(0, limit);
+        return copy;
+    }
+
+    function studySelectionBucket(entry) {
+        const word = entry?.word || {};
+        const study = word.study && typeof word.study === 'object' ? word.study : {};
+        const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+        const seenCount = number(study.seenCount);
+        const knownCount = number(study.knownCount);
+        const unsureCount = number(study.unsureCount);
+        const wrongCount = number(study.wrongCount);
+        const lapseCount = number(study.lapseCount);
+        const difficultyScore = Number.isFinite(Number(study.difficultyScore)) ? Number(study.difficultyScore) : 45;
+        const level = number(study.level);
+        const correctStreak = number(study.correctStreak);
+        const lastResult = String(study.lastReviewResult || study.lastResult || '');
+        const unstudied = seenCount === 0 && knownCount === 0 && unsureCount === 0 && wrongCount === 0 && !word.memorized;
+        if (unstudied) return 'new';
+
+        const stable = !!word.memorized || level >= 4 || correctStreak >= 3;
+        const difficult = lastResult === 'wrong'
+            || lastResult === 'unsure'
+            || difficultyScore >= 65
+            || lapseCount >= 1
+            || (!stable && (wrongCount >= 1 || unsureCount >= 1));
+        return difficult ? 'difficult' : 'known';
+    }
+
+    function chooseEntries(entries) {
+        const limit = Math.min(normalizeLimit(), entries.length);
+        if (entries.length <= limit) return [...entries];
+
+        const buckets = { new: [], difficult: [], known: [] };
+        entries.forEach(entry => buckets[studySelectionBucket(entry)].push(entry));
+        Object.keys(buckets).forEach(key => { buckets[key] = shuffledCopy(buckets[key]); });
+
+        const targetNew = Math.round(limit * 0.60);
+        const targetDifficult = Math.round(limit * 0.30);
+        const targetKnown = Math.max(0, limit - targetNew - targetDifficult);
+        const selected = [];
+
+        const take = (key, count) => {
+            if (count <= 0 || !buckets[key].length) return;
+            selected.push(...buckets[key].splice(0, Math.min(count, buckets[key].length)));
+        };
+
+        take('new', targetNew);
+        take('difficult', targetDifficult);
+        take('known', targetKnown);
+
+        let remaining = limit - selected.length;
+        ['new', 'difficult', 'known'].forEach(key => {
+            if (remaining <= 0) return;
+            const count = Math.min(remaining, buckets[key].length);
+            take(key, count);
+            remaining -= count;
+        });
+
+        return selected.slice(0, limit);
     }
 
     function ensurePanel() {
@@ -383,7 +437,7 @@
         const preview = document.getElementById('folder-study-selected-preview');
         const limitInput = document.getElementById('folder-study-limit');
         if (matchedNode) matchedNode.textContent = String(matched.length);
-        if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題` : 'この条件に一致する単語はありません';
+        if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題 · 未学習60% / 苦手30% / その他10%を目安` : 'この条件に一致する単語はありません';
         if (limitInput) limitInput.disabled = matched.length === 0;
         const contextButton = document.getElementById('study-hub-context');
         if (contextButton) contextButton.disabled = matched.length === 0;
