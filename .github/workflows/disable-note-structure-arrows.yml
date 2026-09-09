@@ -1,0 +1,45 @@
+name: Disable note structure arrows
+on:
+  push:
+    branches:
+      - feature/disable-note-structure-arrows
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable arrow renderer
+        shell: python
+        run: |
+          from pathlib import Path
+
+          wrapper = Path('note-structure-ui.js')
+          s = wrapper.read_text(encoding='utf-8')
+          old = "    loadScript('note-structure-arrows.js?v=3', 'note-structure-arrows-loader');\n"
+          assert s.count(old) == 1, f'arrow loader count={s.count(old)}'
+          s = s.replace(old, "    // relation data is retained for a future arrow renderer.\n", 1)
+          wrapper.write_text(s, encoding='utf-8')
+
+          index = Path('index.html')
+          h = index.read_text(encoding='utf-8')
+          old_outer = '<script src="note-structure-ui.js?v=1.7"></script>'
+          new_outer = '<script src="note-structure-ui.js?v=1.8"></script>'
+          assert h.count(old_outer) == 1, f'outer cache marker count={h.count(old_outer)}'
+          index.write_text(h.replace(old_outer, new_outer, 1), encoding='utf-8')
+      - name: Validate
+        run: |
+          node --check note-structure-ui.js
+          ! grep -q "note-structure-arrows.js" note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=1.8' index.html
+          grep -q "relation data is retained" note-structure-ui.js
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add note-structure-ui.js index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Disable note structure arrow rendering"
+            git push
+          fi
