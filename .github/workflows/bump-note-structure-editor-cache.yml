@@ -1,0 +1,36 @@
+name: Bump note structure editor cache
+on:
+  push:
+    branches:
+      - feature/note-structure-editor
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update cache key
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'note-structure-ui.js?v=1.8'
+          new = 'note-structure-ui.js?v=1.9'
+          if old in s:
+              s = s.replace(old, new, 1)
+              p.write_text(s, encoding='utf-8')
+          elif new not in s:
+              raise SystemExit('note structure cache marker not found')
+          PY
+          grep -q 'note-structure-ui.js?v=1.9' index.html
+          node --check note-structure-editor.js
+      - name: Commit cache bump
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Bump note structure editor cache"
+          git push
