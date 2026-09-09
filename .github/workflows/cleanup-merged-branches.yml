@@ -1,0 +1,46 @@
+name: Cleanup merged branches
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-merged-branches.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete only branches fully merged into main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --all --prune
+          deleted=0
+          kept=0
+          while IFS= read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            case "$branch" in
+              main|HEAD) continue ;;
+            esac
+
+            if git merge-base --is-ancestor "refs/remotes/origin/$branch" "refs/remotes/origin/main"; then
+              echo "DELETE $branch"
+              git push origin --delete "$branch"
+              deleted=$((deleted + 1))
+            else
+              echo "KEEP   $branch (contains commits not in main)"
+              kept=$((kept + 1))
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin)
+
+          echo "Deleted: $deleted"
+          echo "Kept: $kept"
