@@ -1,0 +1,31 @@
+name: Update note structure AI prompt rules
+on:
+  push:
+    branches:
+      - feature/note-structure-prompt-rules
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply prompt patch
+        run: python .tmp_patch_prompt_rules.py
+      - name: Verify
+        run: |
+          node --check note-structure-editor.js
+          grep -q 'S1 / V1 / O1 / C1 など数字付きラベルは使わない' note-structure-editor.js
+          grep -q 'relations は必ず \[\] とする' note-structure-editor.js
+          grep -q 'square: 名詞・名詞句を修飾する形容詞的要素' note-structure-editor.js
+          grep -q 'angle: 動詞・形容詞・副詞・節・文全体を修飾する副詞的要素' note-structure-editor.js
+          grep -q 'round: 挿入、同格、補足説明など' note-structure-editor.js
+          grep -q 'note-structure-editor.js?v=4' note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=2.2' index.html
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add note-structure-editor.js note-structure-ui.js index.html
+          git commit -m 'Refine AI note structure prompt rules'
+          git push
