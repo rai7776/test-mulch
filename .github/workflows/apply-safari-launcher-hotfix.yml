@@ -1,0 +1,56 @@
+name: Apply Safari launcher hotfix
+
+on:
+  push:
+    branches: [fix/safari-article-launcher-loop-2]
+    paths:
+      - '.github/workflows/apply-safari-launcher-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/safari-article-launcher-loop-2
+          fetch-depth: 0
+      - name: Create savepoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag='save/2026-09-10-before-safari-launcher-hotfix'
+          target='900a3bfc50ec271cd044c97e32dc64c858d76ae6'
+          git tag -f "$tag" "$target"
+          git push origin -f "refs/tags/$tag"
+      - name: Bust launcher cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text()
+          old = 'article-flashcard-launcher.js?v=1'
+          new = 'article-flashcard-launcher.js?v=2'
+          if old not in text:
+              raise SystemExit('launcher cache anchor not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check article-flashcard-launcher.js
+          grep -q 'article-flashcard-launcher.js?v=2' index.html
+      - name: Commit cache bust
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Bust Safari cache for launcher hotfix'
+          git push origin HEAD:fix/safari-article-launcher-loop-2
