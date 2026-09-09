@@ -1,0 +1,23 @@
+name: Cleanup article flashcard launcher branch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-article-flashcard-launcher.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Delete merged feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin --delete fix/article-flashcard-launcher || true
