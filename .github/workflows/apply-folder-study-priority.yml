@@ -22,22 +22,10 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
           path = Path('folder-study-range.js')
           text = path.read_text()
-          old = '''    function chooseEntries(entries) {
-              const limit = Math.min(normalizeLimit(), entries.length);
-              if (entries.length <= limit) return [...entries];
-              const shuffle = !!document.getElementById('study-shuffle')?.checked;
-              if (!shuffle) return entries.slice(0, limit);
-              const copy = [...entries];
-              for (let i = copy.length - 1; i > 0; i -= 1) {
-                  const j = Math.floor(Math.random() * (i + 1));
-                  [copy[i], copy[j]] = [copy[j], copy[i]];
-              }
-              return copy.slice(0, limit);
-          }
-          '''
-          new = '''    function shuffledCopy(entries) {
+          new_block = '''    function shuffledCopy(entries) {
               const copy = [...entries];
               for (let i = copy.length - 1; i > 0; i -= 1) {
                   const j = Math.floor(Math.random() * (i + 1));
@@ -103,10 +91,11 @@ jobs:
 
               return selected.slice(0, limit);
           }
-          '''
-          if old not in text:
-              raise SystemExit('target block not found')
-          text = text.replace(old, new, 1)
+'''
+          pattern = r"    function chooseEntries\(entries\) \{.*?\n    \}\n\n(?=    function ensurePanel\(\))"
+          text, count = re.subn(pattern, new_block + '\n', text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'chooseEntries replacement count={count}')
           old_preview = "if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題` : 'この条件に一致する単語はありません';"
           new_preview = "if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題 · 未学習60% / 苦手30% / その他10%を目安` : 'この条件に一致する単語はありません';"
           if old_preview not in text:
