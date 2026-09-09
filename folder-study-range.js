@@ -218,8 +218,8 @@
         entries.forEach(entry => buckets[studySelectionBucket(entry)].push(entry));
         Object.keys(buckets).forEach(key => { buckets[key] = shuffledCopy(buckets[key]); });
 
-        const targetNew = Math.round(limit * 0.60);
-        const targetDifficult = Math.round(limit * 0.30);
+        const targetNew = Math.round(limit * 0.70);
+        const targetDifficult = Math.round(limit * 0.25);
         const targetKnown = Math.max(0, limit - targetNew - targetDifficult);
         const selected = [];
 
@@ -437,7 +437,7 @@
         const preview = document.getElementById('folder-study-selected-preview');
         const limitInput = document.getElementById('folder-study-limit');
         if (matchedNode) matchedNode.textContent = String(matched.length);
-        if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題 · 未学習60% / 苦手30% / その他10%を目安` : 'この条件に一致する単語はありません';
+        if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題 · 未学習70% / 苦手25% / その他5%を目安` : 'この条件に一致する単語はありません';
         if (limitInput) limitInput.disabled = matched.length === 0;
         const contextButton = document.getElementById('study-hub-context');
         if (contextButton) contextButton.disabled = matched.length === 0;
