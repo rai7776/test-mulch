@@ -22,4 +22,5 @@
     loadScript('note-structure-editor.js?v=4', 'note-structure-editor-loader');
     loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
     loadScript('global-vocab-card-display.js?v=1', 'global-vocab-card-display-loader');
+    loadScript('folder-study-range.js?v=1', 'folder-study-range-loader');
 })();
