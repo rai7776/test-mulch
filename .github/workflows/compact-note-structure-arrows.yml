@@ -1,0 +1,41 @@
+name: Compact note structure arrows
+on:
+  push:
+    branches:
+      - feature/note-structure-arrows-compact
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump outer cache marker
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '<script src="note-structure-ui.js?v=1.5"></script>'
+          new = '<script src="note-structure-ui.js?v=1.6"></script>'
+          assert s.count(old) == 1, f'wrapper cache marker count={s.count(old)}'
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+      - name: Validate compact arrows
+        run: |
+          node --check note-structure-arrows.js
+          node --check note-structure-ui.js
+          grep -q "note-structure-arrows.js?v=2" note-structure-ui.js
+          grep -q 'note-structure-ui.js?v=1.6' index.html
+          grep -q 'function visualElement' note-structure-arrows.js
+          grep -q ' L .* L .* L ' note-structure-arrows.js
+          grep -q "markerWidth', '4'" note-structure-arrows.js
+          grep -q 'stroke-width: 1;' note-structure-arrows.js
+      - name: Commit cache update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Refresh compact arrow cache"
+            git push
+          fi
