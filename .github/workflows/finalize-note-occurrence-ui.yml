@@ -1,0 +1,42 @@
+name: Finalize note occurrence UI
+on:
+  push:
+    branches:
+      - feature/note-structure-occurrence-ui
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump outer cache and verify
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'note-structure-ui.js?v=1.9'
+          new = 'note-structure-ui.js?v=2.0'
+          if old in s:
+              s = s.replace(old, new, 1)
+              p.write_text(s, encoding='utf-8')
+          elif new not in s:
+              raise SystemExit('outer cache marker not found')
+          PY
+          node --check note-structure-editor.js
+          node --check note-structure-ui.js
+          grep -q "note-structure-editor.js?v=2" note-structure-ui.js
+          grep -q "note-structure-ui.js?v=2.0" index.html
+          grep -q "occurrenceWrap.hidden = true" note-structure-editor.js
+          grep -q "出現位置" note-structure-editor.js
+          ! grep -q "occurrence.type = 'number'" note-structure-editor.js
+      - name: Commit cache bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Bump note structure occurrence UI cache"
+            git push
+          fi
