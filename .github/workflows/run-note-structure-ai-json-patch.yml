@@ -1,0 +1,31 @@
+name: Run note structure AI JSON patch
+on:
+  push:
+    branches:
+      - feature/note-structure-ai-json
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python .tmp_patch_ai_json.py
+      - name: Verify
+        run: |
+          node --check note-structure-editor.js
+          node --check note-structure-ui.js
+          grep -q 'data-ai-json-open' note-structure-editor.js
+          grep -q 'smart-reader-bulk v2' note-structure-editor.js
+          grep -q "note-structure-editor.js?v=3" note-structure-ui.js
+          grep -q "note-structure-ui.js?v=2.1" index.html
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add note-structure-editor.js note-structure-ui.js index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Add AI JSON note structure import"
+            git push
+          fi
