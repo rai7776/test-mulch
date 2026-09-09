@@ -23,4 +23,5 @@
     loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
     loadScript('global-vocab-card-display.js?v=1', 'global-vocab-card-display-loader');
     loadScript('folder-study-range.js?v=1', 'folder-study-range-loader');
+    loadScript('flashcard-auto-audio.js?v=1', 'flashcard-auto-audio-loader');
 })();
