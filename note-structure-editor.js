@@ -320,7 +320,6 @@
                         <button type="button" data-add-core="O">＋O</button>
                         <button type="button" data-add-core="C">＋C</button>
                         <button type="button" data-add-modifier>＋修飾</button>
-                        <button type="button" data-add-target class="note-structure-editor-target-add">＋接続点</button>
                     </div>
                     <div class="note-structure-editor-preview-wrap">
                         <div class="note-structure-editor-preview-title">プレビュー</div>
@@ -338,7 +337,6 @@
         section.insertBefore(root, extraLabel);
         root.querySelectorAll('[data-add-core]').forEach(button => button.addEventListener('click', () => addCore(button.dataset.addCore)));
         root.querySelector('[data-add-modifier]')?.addEventListener('click', addModifier);
-        root.querySelector('[data-add-target]')?.addEventListener('click', addTarget);
         document.getElementById('input-note-eng')?.addEventListener('input', updatePreview);
     }
 
@@ -483,7 +481,7 @@
         installStyles();
         installEditor();
         wrapGlobal('showUnifiedModal', () => loadFromContext(true));
-        wrapGlobal('switchModalType', () => loadFromContext(true));
+        wrapGlobal('switchModalType', () => loadFromContext(false));
         wrapGlobal('openUnifiedModal', () => loadFromContext(true));
         wrapGlobal('closeModal', resetContext);
         wrapSave();
@@ -492,7 +490,9 @@
         if (overlay) {
             new MutationObserver(() => {
                 const section = noteSection();
-                if (section && getComputedStyle(section).display !== 'none' && getComputedStyle(overlay).display !== 'none') loadFromContext(false);
+                const visible = section && getComputedStyle(section).display !== 'none' && getComputedStyle(overlay).display !== 'none';
+                if (visible) loadFromContext(false);
+                else if (getComputedStyle(overlay).display === 'none') resetContext();
             }).observe(overlay, { attributes: true, attributeFilter: ['class', 'style'] });
         }
         document.addEventListener('click', event => {
