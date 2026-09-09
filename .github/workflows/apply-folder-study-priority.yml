@@ -1,0 +1,121 @@
+name: Apply folder study priority
+
+on:
+  push:
+    branches: [feature/folder-study-priority]
+    paths:
+      - '.github/workflows/apply-folder-study-priority.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/folder-study-priority
+          fetch-depth: 0
+      - name: Patch selection logic
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('folder-study-range.js')
+          text = path.read_text()
+          old = '''    function chooseEntries(entries) {
+        const limit = Math.min(normalizeLimit(), entries.length);
+        if (entries.length <= limit) return [...entries];
+        const shuffle = !!document.getElementById('study-shuffle')?.checked;
+        if (!shuffle) return entries.slice(0, limit);
+        const copy = [...entries];
+        for (let i = copy.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy.slice(0, limit);
+    }
+'''
+          new = '''    function shuffledCopy(entries) {
+        const copy = [...entries];
+        for (let i = copy.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    function studySelectionBucket(entry) {
+        const word = entry?.word || {};
+        const study = word.study && typeof word.study === 'object' ? word.study : {};
+        const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+        const seenCount = number(study.seenCount);
+        const knownCount = number(study.knownCount);
+        const unsureCount = number(study.unsureCount);
+        const wrongCount = number(study.wrongCount);
+        const lapseCount = number(study.lapseCount);
+        const difficultyScore = Number.isFinite(Number(study.difficultyScore)) ? Number(study.difficultyScore) : 45;
+        const level = number(study.level);
+        const correctStreak = number(study.correctStreak);
+        const lastResult = String(study.lastReviewResult || study.lastResult || '');
+        const unstudied = seenCount === 0 && knownCount === 0 && unsureCount === 0 && wrongCount === 0 && !word.memorized;
+        if (unstudied) return 'new';
+
+        const stable = !!word.memorized || level >= 4 || correctStreak >= 3;
+        const difficult = lastResult === 'wrong'
+            || lastResult === 'unsure'
+            || difficultyScore >= 65
+            || lapseCount >= 1
+            || (!stable && (wrongCount >= 1 || unsureCount >= 1));
+        return difficult ? 'difficult' : 'known';
+    }
+
+    function chooseEntries(entries) {
+        const limit = Math.min(normalizeLimit(), entries.length);
+        if (entries.length <= limit) return [...entries];
+
+        const buckets = { new: [], difficult: [], known: [] };
+        entries.forEach(entry => buckets[studySelectionBucket(entry)].push(entry));
+        Object.keys(buckets).forEach(key => { buckets[key] = shuffledCopy(buckets[key]); });
+
+        const targetNew = Math.round(limit * 0.60);
+        const targetDifficult = Math.round(limit * 0.30);
+        const targetKnown = Math.max(0, limit - targetNew - targetDifficult);
+        const selected = [];
+
+        const take = (key, count) => {
+            if (count <= 0 || !buckets[key].length) return;
+            selected.push(...buckets[key].splice(0, Math.min(count, buckets[key].length)));
+        };
+
+        take('new', targetNew);
+        take('difficult', targetDifficult);
+        take('known', targetKnown);
+
+        let remaining = limit - selected.length;
+        ['new', 'difficult', 'known'].forEach(key => {
+            if (remaining <= 0) return;
+            const count = Math.min(remaining, buckets[key].length);
+            take(key, count);
+            remaining -= count;
+        });
+
+        return selected.slice(0, limit);
+    }
+'''
+          if old not in text:
+              raise SystemExit('target block not found')
+          text = text.replace(old, new, 1)
+          text = text.replace("if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題` : 'この条件に一致する単語はありません';", "if (preview) preview.textContent = matched.length ? `${matched.length}語から${selected}語を出題 · 未学習60% / 苦手30% / その他10%を目安` : 'この条件に一致する単語はありません';", 1)
+          path.write_text(text)
+      - name: Check JavaScript syntax
+        run: node --check folder-study-range.js
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add folder-study-range.js
+          git commit -m 'Prioritize new and difficult words in folder study'
+          git push origin HEAD:feature/folder-study-priority
