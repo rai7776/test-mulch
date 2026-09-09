@@ -11,9 +11,18 @@
             .find(node => String(node.dataset.annotationId || '') === target) || null;
     }
 
+    function visualElement(element) {
+        if (!element) return null;
+        if (element.classList?.contains('syntax-core')) {
+            return element.querySelector(':scope > .syntax-core-text') || element;
+        }
+        return element;
+    }
+
     function clientRects(element) {
-        if (!element) return [];
-        const rects = Array.from(element.getClientRects?.() || []);
+        const visual = visualElement(element);
+        if (!visual) return [];
+        const rects = Array.from(visual.getClientRects?.() || []);
         return rects.filter(rect => rect.width > 0 && rect.height > 0);
     }
 
@@ -44,38 +53,52 @@
         return best;
     }
 
-    function toContentPoint(rect, bodyRect, body, edge) {
-        const centerX = rect.left + rect.width / 2 - bodyRect.left + body.scrollLeft;
-        let y;
-        if (edge === 'top') y = rect.top - bodyRect.top + body.scrollTop;
-        else if (edge === 'bottom') y = rect.bottom - bodyRect.top + body.scrollTop;
-        else y = rect.top + rect.height / 2 - bodyRect.top + body.scrollTop;
-        return { x: centerX, y };
+    function localX(value, bodyRect, body) {
+        return value - bodyRect.left + body.scrollLeft;
+    }
+
+    function localY(value, bodyRect, body) {
+        return value - bodyRect.top + body.scrollTop;
     }
 
     function relationGeometry(pair, bodyRect, body, lane) {
         const fromCenter = rectCenter(pair.fromRect);
         const toCenter = rectCenter(pair.toRect);
-        const lineThreshold = Math.max(pair.fromRect.height, pair.toRect.height) * 0.8;
+        const lineThreshold = Math.max(pair.fromRect.height, pair.toRect.height) * 0.7;
         const sameLine = Math.abs(fromCenter.y - toCenter.y) <= lineThreshold;
 
         if (sameLine) {
-            const from = toContentPoint(pair.fromRect, bodyRect, body, 'top');
-            const to = toContentPoint(pair.toRect, bodyRect, body, 'top');
-            const routeY = Math.max(4, Math.min(from.y, to.y) - 7 - lane * 3);
+            const targetIsRight = toCenter.x > fromCenter.x;
+            const sourceEdge = targetIsRight ? pair.fromRect.right : pair.fromRect.left;
+            const targetEdge = targetIsRight ? pair.toRect.left : pair.toRect.right;
+            const gap = 2.5;
+            const sx = localX(sourceEdge + (targetIsRight ? gap : -gap), bodyRect, body);
+            const tx = localX(targetEdge + (targetIsRight ? -gap : gap), bodyRect, body);
+            const sy = localY(pair.fromRect.top - 1.5, bodyRect, body);
+            const ty = localY(pair.toRect.top - 1.5, bodyRect, body);
+            const routeY = Math.max(3, Math.min(sy, ty) - 5 - lane * 3);
             return {
-                path: `M ${from.x.toFixed(1)} ${from.y.toFixed(1)} C ${from.x.toFixed(1)} ${routeY.toFixed(1)}, ${to.x.toFixed(1)} ${routeY.toFixed(1)}, ${to.x.toFixed(1)} ${to.y.toFixed(1)}`,
+                path: `M ${sx.toFixed(1)} ${sy.toFixed(1)} L ${sx.toFixed(1)} ${routeY.toFixed(1)} L ${tx.toFixed(1)} ${routeY.toFixed(1)} L ${tx.toFixed(1)} ${ty.toFixed(1)}`,
                 sameLine: true
             };
         }
 
         const targetBelow = toCenter.y > fromCenter.y;
-        const from = toContentPoint(pair.fromRect, bodyRect, body, targetBelow ? 'bottom' : 'top');
-        const to = toContentPoint(pair.toRect, bodyRect, body, targetBelow ? 'top' : 'bottom');
-        const midY = (from.y + to.y) / 2;
-        const bend = lane * 3;
+        const sourceY = targetBelow ? pair.fromRect.bottom + 2 : pair.fromRect.top - 2;
+        const targetY = targetBelow ? pair.toRect.top - 2 : pair.toRect.bottom + 2;
+        const sx = localX(fromCenter.x, bodyRect, body);
+        const tx = localX(toCenter.x, bodyRect, body);
+        const sy = localY(sourceY, bodyRect, body);
+        const ty = localY(targetY, bodyRect, body);
+
+        const leftCorridor = Math.min(pair.fromRect.left, pair.toRect.left) - 8 - lane * 4;
+        const rightCorridor = Math.max(pair.fromRect.right, pair.toRect.right) + 8 + lane * 4;
+        const leftCost = Math.abs(fromCenter.x - leftCorridor) + Math.abs(toCenter.x - leftCorridor);
+        const rightCost = Math.abs(fromCenter.x - rightCorridor) + Math.abs(toCenter.x - rightCorridor);
+        const routeX = localX(leftCost <= rightCost ? leftCorridor : rightCorridor, bodyRect, body);
+
         return {
-            path: `M ${from.x.toFixed(1)} ${from.y.toFixed(1)} C ${from.x.toFixed(1)} ${(midY + bend).toFixed(1)}, ${to.x.toFixed(1)} ${(midY - bend).toFixed(1)}, ${to.x.toFixed(1)} ${to.y.toFixed(1)}`,
+            path: `M ${sx.toFixed(1)} ${sy.toFixed(1)} L ${routeX.toFixed(1)} ${sy.toFixed(1)} L ${routeX.toFixed(1)} ${ty.toFixed(1)} L ${tx.toFixed(1)} ${ty.toFixed(1)}`,
             sameLine: false
         };
     }
@@ -102,8 +125,8 @@
         marker.setAttribute('viewBox', '0 0 8 8');
         marker.setAttribute('refX', '7');
         marker.setAttribute('refY', '4');
-        marker.setAttribute('markerWidth', '5');
-        marker.setAttribute('markerHeight', '5');
+        marker.setAttribute('markerWidth', '4');
+        marker.setAttribute('markerHeight', '4');
         marker.setAttribute('orient', 'auto-start-reverse');
         const markerPath = document.createElementNS(SVG_NS, 'path');
         markerPath.setAttribute('d', 'M 0 0 L 8 4 L 0 8 z');
@@ -189,11 +212,11 @@
         style.textContent = `
             .note-structure-body { position: relative; }
             .note-structure-sentence { position: relative; z-index: 1; }
-            .note-structure-relation-layer { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; overflow: visible; }
-            .note-structure-relation-path { fill: none; stroke: #7a8591; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; opacity: .78; vector-effect: non-scaling-stroke; }
-            .note-structure-arrowhead { fill: #7a8591; opacity: .9; }
+            .note-structure-relation-layer { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+            .note-structure-relation-path { fill: none; stroke: #7a8591; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; opacity: .64; vector-effect: non-scaling-stroke; }
+            .note-structure-arrowhead { fill: #7a8591; opacity: .76; }
             @media (max-width: 600px) {
-                .note-structure-relation-path { stroke-width: 1.15; }
+                .note-structure-relation-path { stroke-width: .95; }
             }
         `;
         document.head.appendChild(style);
