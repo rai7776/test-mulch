@@ -18,7 +18,7 @@
 
     // 元の文構造UIはそのまま保持し、サンプル更新ロジックだけ独立して追加する。
     loadScript('note-structure-ui-core.js?v=1.5', 'note-structure-ui-core-loader');
-    loadScript('note-structure-arrows.js?v=1', 'note-structure-arrows-loader');
+    loadScript('note-structure-arrows.js?v=2', 'note-structure-arrows-loader');
     loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
     loadScript('global-vocab-card-display.js?v=1', 'global-vocab-card-display-loader');
 })();
