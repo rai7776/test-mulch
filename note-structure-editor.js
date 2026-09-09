@@ -75,6 +75,21 @@
         return { text, occurrence: Math.max(1, occurrence) };
     }
 
+    function countOccurrences(source, needle) {
+        const text = String(source || '');
+        const target = String(needle || '').trim();
+        if (!target) return 0;
+        let count = 0;
+        let from = 0;
+        while (from <= text.length - target.length) {
+            const found = text.indexOf(target, from);
+            if (found < 0) break;
+            count += 1;
+            from = found + Math.max(1, target.length);
+        }
+        return count;
+    }
+
     function addCore(label) {
         const selected = selectionFromOriginal();
         state.rows.push({ id: uniqueId(), text: selected.text, occurrence: selected.occurrence, kind: 'core', label });
@@ -237,20 +252,49 @@
         textInput.className = 'note-structure-editor-text';
         textInput.placeholder = '原文中の語句';
         textInput.value = row.text || '';
-        textInput.addEventListener('input', () => { row.text = textInput.value; state.dirty = true; updatePreview(); });
+        textInput.addEventListener('input', () => { row.text = textInput.value; syncOccurrenceControl(); state.dirty = true; updatePreview(); });
 
-        const occurrence = document.createElement('input');
-        occurrence.type = 'number'; occurrence.min = '1'; occurrence.step = '1';
-        occurrence.className = 'note-structure-editor-occurrence';
-        occurrence.title = '原文内で何回目に現れる語句か';
-        occurrence.value = String(row.occurrence || 1);
-        occurrence.addEventListener('input', () => { row.occurrence = Math.max(1, Number(occurrence.value) || 1); state.dirty = true; updatePreview(); });
+        const occurrenceWrap = document.createElement('label');
+        occurrenceWrap.className = 'note-structure-editor-occurrence-wrap';
+        const occurrenceCaption = document.createElement('span');
+        occurrenceCaption.textContent = '出現位置';
+        const occurrenceSelect = document.createElement('select');
+        occurrenceSelect.className = 'note-structure-editor-occurrence';
+        occurrenceSelect.setAttribute('aria-label', '原文中の出現位置');
+        occurrenceWrap.append(occurrenceCaption, occurrenceSelect);
+
+        function syncOccurrenceControl() {
+            const source = String(document.getElementById('input-note-eng')?.value || '');
+            const total = countOccurrences(source, row.text);
+            occurrenceSelect.replaceChildren();
+            if (total <= 1) {
+                row.occurrence = 1;
+                occurrenceWrap.hidden = true;
+                return;
+            }
+            occurrenceWrap.hidden = false;
+            const current = Math.min(total, Math.max(1, Number(row.occurrence) || 1));
+            row.occurrence = current;
+            for (let n = 1; n <= total; n += 1) {
+                const option = document.createElement('option');
+                option.value = String(n);
+                option.textContent = `${n}回目 / ${total}`;
+                occurrenceSelect.appendChild(option);
+            }
+            occurrenceSelect.value = String(current);
+        }
+        occurrenceSelect.addEventListener('change', () => {
+            row.occurrence = Math.max(1, Number(occurrenceSelect.value) || 1);
+            state.dirty = true;
+            updatePreview();
+        });
+        syncOccurrenceControl();
 
         const remove = document.createElement('button');
         remove.type = 'button'; remove.className = 'note-structure-editor-remove'; remove.textContent = '×'; remove.setAttribute('aria-label', `${index + 1}番目の要素を削除`);
         remove.addEventListener('click', () => { state.rows.splice(index, 1); state.dirty = true; renderRows(); });
 
-        top.append(kind, textInput, occurrence, remove);
+        top.append(kind, textInput, remove);
         card.appendChild(top);
 
         const options = document.createElement('div');
@@ -276,6 +320,7 @@
         } else {
             const note = document.createElement('span'); note.textContent = '将来の矢印用接続点。現在は表示されません。'; options.appendChild(note);
         }
+        options.appendChild(occurrenceWrap);
         card.appendChild(options);
         return card;
     }
@@ -312,7 +357,7 @@
             <details>
                 <summary><span>文構造（任意）</span><small id="note-structure-editor-count">未設定</small></summary>
                 <div class="note-structure-editor-body">
-                    <p class="note-structure-editor-help">原文欄で語句を選択してから追加すると自動入力されます。V'・S1などは追加後に変更できます。</p>
+                    <p class="note-structure-editor-help">原文欄で語句を選択してから追加すると自動入力されます。V'・S1などは追加後に変更できます。同じ語句が原文に複数ある場合だけ「出現位置」が表示されます。</p>
                     <div id="note-structure-editor-rows"></div>
                     <div class="note-structure-editor-actions" aria-label="文構造を追加">
                         <button type="button" data-add-core="S">＋S</button>
@@ -337,7 +382,7 @@
         section.insertBefore(root, extraLabel);
         root.querySelectorAll('[data-add-core]').forEach(button => button.addEventListener('click', () => addCore(button.dataset.addCore)));
         root.querySelector('[data-add-modifier]')?.addEventListener('click', addModifier);
-        document.getElementById('input-note-eng')?.addEventListener('input', updatePreview);
+        document.getElementById('input-note-eng')?.addEventListener('input', renderRows);
     }
 
     function loadFromContext(force = false) {
@@ -378,9 +423,11 @@
             .note-structure-editor-body { border-top: 1px solid #e7eaee; padding: 11px; }
             .note-structure-editor-help { margin: 0 0 10px; font-size: .76rem; line-height: 1.55; color: #6b7580; }
             .note-structure-editor-row { border: 1px solid #e1e5e9; border-radius: 8px; padding: 8px; margin-bottom: 8px; background: #fff; }
-            .note-structure-editor-row-top { display: grid; grid-template-columns: minmax(86px, .8fr) minmax(130px, 2fr) 58px 34px; gap: 6px; align-items: center; }
+            .note-structure-editor-row-top { display: grid; grid-template-columns: minmax(86px, .8fr) minmax(130px, 2fr) 34px; gap: 6px; align-items: center; }
             .note-structure-editor-row input, .note-structure-editor-row select { min-width: 0; width: 100%; box-sizing: border-box; }
-            .note-structure-editor-occurrence { text-align: center; }
+            .note-structure-editor-occurrence-wrap { display: flex; align-items: center; gap: 6px; margin-left: auto; white-space: nowrap; color: #67727d; }
+            .note-structure-editor-occurrence-wrap[hidden] { display: none !important; }
+            .note-structure-editor-occurrence-wrap select { width: auto; min-width: 104px; }
             .note-structure-editor-remove { min-width: 34px; height: 34px; border-radius: 7px; border: 1px solid #e0e4e8; background: #fff; color: #7a3f3f; font-size: 1rem; }
             .note-structure-editor-row-options { display: flex; align-items: center; gap: 7px; margin-top: 7px; font-size: .72rem; color: #717b85; }
             .note-structure-editor-row-options input, .note-structure-editor-row-options select { max-width: 160px; }
@@ -396,7 +443,8 @@
             .note-structure-editor-status { min-height: 1.2em; margin-top: 7px; font-size: .72rem; color: #66717c; }
             .note-structure-editor-status.is-error { color: #ad3f3f; }
             @media (max-width: 600px) {
-                .note-structure-editor-row-top { grid-template-columns: 92px minmax(0, 1fr) 54px 34px; }
+                .note-structure-editor-row-top { grid-template-columns: 92px minmax(0, 1fr) 34px; }
+                .note-structure-editor-occurrence-wrap { width: 100%; justify-content: flex-start; margin-left: 0; }
                 .note-structure-editor-actions button { flex: 1 1 56px; }
                 .note-structure-editor-target-add { flex-basis: 100% !important; }
             }
@@ -503,6 +551,7 @@
     window.SmartReaderNoteStructureEditor = {
         validate,
         buildStructure,
+        countOccurrences,
         refresh: () => loadFromContext(true)
     };
 
