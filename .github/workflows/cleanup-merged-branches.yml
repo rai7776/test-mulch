@@ -1,4 +1,4 @@
-name: Cleanup merged branches
+name: Cleanup remaining branches
 
 on:
   push:
@@ -19,34 +19,52 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Delete branches already represented by main
+      - name: Archive all remaining branch tips, then delete branches
         shell: bash
         run: |
           set -euo pipefail
           git fetch --all --prune
-          deleted=0
-          kept=0
-          while IFS= read -r ref; do
+
+          mapfile -t refs < <(
+            git for-each-ref --format='%(refname)' refs/remotes/origin \
+            | grep -v '^refs/remotes/origin/main$' \
+            | grep -v '^refs/remotes/origin/HEAD$' || true
+          )
+
+          if [ "${#refs[@]}" -eq 0 ]; then
+            echo 'No non-main branches remain.'
+            exit 0
+          fi
+
+          export GIT_AUTHOR_NAME='Smart Reader branch cleanup'
+          export GIT_AUTHOR_EMAIL='noreply@smart-reader.local'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+
+          tree=$(git rev-parse refs/remotes/origin/main^{tree})
+          parents=(-p refs/remotes/origin/main)
+          echo 'Archiving these branch tips:'
+          for ref in "${refs[@]}"; do
             branch="${ref#refs/remotes/origin/}"
-            case "$branch" in
-              main|HEAD) continue ;;
-            esac
+            echo "  $branch -> $(git rev-parse "$ref")"
+            parents+=(-p "$ref")
+          done
 
-            if git merge-base --is-ancestor "refs/remotes/origin/$branch" "refs/remotes/origin/main"; then
-              reason="fully merged"
-            elif git diff --quiet "refs/remotes/origin/main" "refs/remotes/origin/$branch"; then
-              reason="tree identical to main"
-            else
-              echo "KEEP   $branch"
-              git diff --stat "refs/remotes/origin/main" "refs/remotes/origin/$branch" | sed 's/^/       /'
-              kept=$((kept + 1))
-              continue
-            fi
+          archive_commit=$(printf '%s\n' \
+            'Archive branch tips before cleanup on 2026-09-09.' \
+            'The tree matches main; extra parents preserve every deleted branch history.' \
+            | git commit-tree "$tree" "${parents[@]}")
 
-            echo "DELETE $branch ($reason)"
+          archive_tag='archive/branch-cleanup-2026-09-09'
+          git tag -f "$archive_tag" "$archive_commit"
+          git push origin -f "refs/tags/$archive_tag"
+          echo "Created archive tag: $archive_tag -> $archive_commit"
+
+          deleted=0
+          for ref in "${refs[@]}"; do
+            branch="${ref#refs/remotes/origin/}"
+            echo "DELETE $branch"
             git push origin --delete "$branch"
             deleted=$((deleted + 1))
-          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin)
-
+          done
           echo "Deleted: $deleted"
-          echo "Kept: $kept"
