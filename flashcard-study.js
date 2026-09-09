@@ -420,6 +420,9 @@
         const word = entry.word;
         const study = ensureStudy(word);
         const timestamp = Date.now();
+        const previousNextReviewAt = study.nextReviewAt;
+        const wasDueBeforeAnswer = previousNextReviewAt !== null
+            && previousNextReviewAt < startOfNextLocalDay(timestamp);
         const firstEvaluation = !session.evaluated.has(entry.key);
         const previousLevel = study.level;
         const previousSessionCount = study.sessionCount;
@@ -460,7 +463,7 @@
                 study.correctStreak = 0;
                 adjustDifficulty(study, 8);
                 study.intervalDays = 1;
-                study.nextReviewAt = localDayAfter(1, timestamp);
+                study.nextReviewAt = wasDueBeforeAnswer ? previousNextReviewAt : localDayAfter(1, timestamp);
             } else {
                 study.correctStreak = 0;
                 lapse = wasPreviouslyLearned;
@@ -471,7 +474,7 @@
                 adjustDifficulty(study, 15);
                 study.level = study.level >= 4 ? 3 : Math.max(0, study.level - 1);
                 study.intervalDays = 1;
-                study.nextReviewAt = localDayAfter(1, timestamp);
+                study.nextReviewAt = wasDueBeforeAnswer ? previousNextReviewAt : localDayAfter(1, timestamp);
             }
 
             word.memorized = study.level >= 4;
@@ -480,6 +483,10 @@
         } else {
             if (result === 'wrong') adjustDifficulty(study, 6);
             else if (result === 'unsure') adjustDifficulty(study, 3);
+            else if (result === 'known' && wasDueBeforeAnswer) {
+                study.intervalDays = Math.max(1, study.intervalDays || 1);
+                study.nextReviewAt = localDayAfter(study.intervalDays, timestamp);
+            }
         }
 
         study.lastSessionAttempts = attempt.responses;
