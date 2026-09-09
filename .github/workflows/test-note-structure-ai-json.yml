@@ -1,0 +1,22 @@
+name: Test note structure AI JSON
+on:
+  push:
+    branches:
+      - feature/note-structure-ai-json
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: |
+          node --check note-structure-editor.js
+          node --check note-structure-ui.js
+      - name: Parser tests
+        run: node .tmp_test_ai_json.js
+      - name: Contract checks
+        run: |
+          grep -q '✨ AI JSON' note-structure-editor.js
+          grep -q 'AI用指示をコピー' note-structure-editor.js
+          grep -q "note-structure-editor.js?v=3" note-structure-ui.js
+          grep -q "note-structure-ui.js?v=2.1" index.html
