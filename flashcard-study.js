@@ -536,7 +536,7 @@
         scheduleSave();
     }
 
-    function answerCurrent(result) {
+    function answerCurrent(result, { deferRender = false } = {}) {
         if (!session || session.finished || !session.queue[session.index]) return;
         const entry = session.queue[session.index];
         session.history.push(sessionSnapshot(entry));
@@ -567,8 +567,10 @@
         }
 
         scheduleSave();
-        refreshStudySurfaces();
-        renderSession();
+        if (!deferRender) {
+            refreshStudySurfaces();
+            renderSession();
+        }
     }
 
     function undoLast() {
@@ -577,12 +579,13 @@
         if (pendingCommit) {
             clearTimeout(pendingCommit.timerId);
             pendingCommit = null;
+        }
+
+        if (!session.history.length) {
             resetCardPosition(document.getElementById('study-flashcard'));
             renderSessionHeader();
             return;
         }
-
-        if (!session.history.length) return;
         const snapshot = session.history.pop();
         restoreSnapshot(snapshot);
         renderSession();
@@ -869,13 +872,19 @@
         if (result === 'wrong') card.style.transform = 'translate3d(-120vw, 0, 0) rotate(-15deg)';
         if (result === 'unsure') card.style.transform = 'translate3d(0, -110vh, 0)';
 
+        // Record the judgement immediately so undo always has one history item to restore.
+        // Only the visual transition to the next card is delayed.
+        answerCurrent(result, { deferRender: true });
+
         const timerId = window.setTimeout(() => {
             if (!pendingCommit || pendingCommit.timerId !== timerId) return;
             pendingCommit = null;
-            answerCurrent(result);
+            refreshStudySurfaces();
+            renderSession();
         }, 190);
         pendingCommit = { result, timerId };
-        renderSessionHeader();
+        const undo = document.getElementById('study-session-undo');
+        if (undo) undo.disabled = false;
     }
 
     function bindCardInteractions() {
