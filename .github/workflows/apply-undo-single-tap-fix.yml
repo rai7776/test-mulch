@@ -43,85 +43,88 @@ jobs:
               raise SystemExit('answerCurrent signature anchor not found')
           text = text.replace(old_sig, new_sig, 1)
 
-          old_tail = """        scheduleSave();
-        refreshStudySurfaces();
-        renderSession();
-    }
-
-    function undoLast() {
-        if (!session) return;
-
-        if (pendingCommit) {
-            clearTimeout(pendingCommit.timerId);
-            pendingCommit = null;
-            resetCardPosition(document.getElementById('study-flashcard'));
-            renderSessionHeader();
-            return;
-        }
-
-        if (!session.history.length) return;
-        const snapshot = session.history.pop();
-        restoreSnapshot(snapshot);
-        renderSession();
-        refreshStudySurfaces();
-    }
-"""
-          new_tail = """        scheduleSave();
-        if (!deferRender) {
-            refreshStudySurfaces();
-            renderSession();
-        }
-    }
-
-    function undoLast() {
-        if (!session) return;
-
-        if (pendingCommit) {
-            clearTimeout(pendingCommit.timerId);
-            pendingCommit = null;
-        }
-
-        if (!session.history.length) {
-            resetCardPosition(document.getElementById('study-flashcard'));
-            renderSessionHeader();
-            return;
-        }
-        const snapshot = session.history.pop();
-        restoreSnapshot(snapshot);
-        renderSession();
-        refreshStudySurfaces();
-    }
-"""
+          old_tail = "\n".join([
+              "        scheduleSave();",
+              "        refreshStudySurfaces();",
+              "        renderSession();",
+              "    }",
+              "",
+              "    function undoLast() {",
+              "        if (!session) return;",
+              "",
+              "        if (pendingCommit) {",
+              "            clearTimeout(pendingCommit.timerId);",
+              "            pendingCommit = null;",
+              "            resetCardPosition(document.getElementById('study-flashcard'));",
+              "            renderSessionHeader();",
+              "            return;",
+              "        }",
+              "",
+              "        if (!session.history.length) return;",
+              "        const snapshot = session.history.pop();",
+              "        restoreSnapshot(snapshot);",
+              "        renderSession();",
+              "        refreshStudySurfaces();",
+              "    }",
+          ])
+          new_tail = "\n".join([
+              "        scheduleSave();",
+              "        if (!deferRender) {",
+              "            refreshStudySurfaces();",
+              "            renderSession();",
+              "        }",
+              "    }",
+              "",
+              "    function undoLast() {",
+              "        if (!session) return;",
+              "",
+              "        if (pendingCommit) {",
+              "            clearTimeout(pendingCommit.timerId);",
+              "            pendingCommit = null;",
+              "        }",
+              "",
+              "        if (!session.history.length) {",
+              "            resetCardPosition(document.getElementById('study-flashcard'));",
+              "            renderSessionHeader();",
+              "            return;",
+              "        }",
+              "        const snapshot = session.history.pop();",
+              "        restoreSnapshot(snapshot);",
+              "        renderSession();",
+              "        refreshStudySurfaces();",
+              "    }",
+          ])
           if old_tail not in text:
               raise SystemExit('answerCurrent/undoLast block anchor not found')
           text = text.replace(old_tail, new_tail, 1)
 
-          old_commit = """        const timerId = window.setTimeout(() => {
-            if (!pendingCommit || pendingCommit.timerId !== timerId) return;
-            pendingCommit = null;
-            answerCurrent(result);
-        }, 190);
-        pendingCommit = { result, timerId };
-        renderSessionHeader();
-"""
-          new_commit = """        // Record the judgement immediately so undo always has one history item to restore.
-        // Only the visual transition to the next card is delayed.
-        answerCurrent(result, { deferRender: true });
-
-        const timerId = window.setTimeout(() => {
-            if (!pendingCommit || pendingCommit.timerId !== timerId) return;
-            pendingCommit = null;
-            refreshStudySurfaces();
-            renderSession();
-        }, 190);
-        pendingCommit = { result, timerId };
-        const undo = document.getElementById('study-session-undo');
-        if (undo) undo.disabled = false;
-"""
+          old_commit = "\n".join([
+              "        const timerId = window.setTimeout(() => {",
+              "            if (!pendingCommit || pendingCommit.timerId !== timerId) return;",
+              "            pendingCommit = null;",
+              "            answerCurrent(result);",
+              "        }, 190);",
+              "        pendingCommit = { result, timerId };",
+              "        renderSessionHeader();",
+          ])
+          new_commit = "\n".join([
+              "        // Record the judgement immediately so undo always has one history item to restore.",
+              "        // Only the visual transition to the next card is delayed.",
+              "        answerCurrent(result, { deferRender: true });",
+              "",
+              "        const timerId = window.setTimeout(() => {",
+              "            if (!pendingCommit || pendingCommit.timerId !== timerId) return;",
+              "            pendingCommit = null;",
+              "            refreshStudySurfaces();",
+              "            renderSession();",
+              "        }, 190);",
+              "        pendingCommit = { result, timerId };",
+              "        const undo = document.getElementById('study-session-undo');",
+              "        if (undo) undo.disabled = false;",
+          ])
           if old_commit not in text:
               raise SystemExit('commitResult anchor not found')
           text = text.replace(old_commit, new_commit, 1)
-
           path.write_text(text)
 
           index = Path('index.html')
@@ -138,9 +141,9 @@ jobs:
         run: |
           set -euo pipefail
           node --check flashcard-study.js
-          grep -q "function answerCurrent(result, { deferRender = false } = {})" flashcard-study.js
-          grep -q "answerCurrent(result, { deferRender: true })" flashcard-study.js
-          grep -q 'flashcard-study.js?v=1.3' index.html
+          grep -Fq 'function answerCurrent(result, { deferRender = false } = {})' flashcard-study.js
+          grep -Fq 'answerCurrent(result, { deferRender: true })' flashcard-study.js
+          grep -Fq 'flashcard-study.js?v=1.3' index.html
 
       - name: Commit fix
         shell: bash
