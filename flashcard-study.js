@@ -565,8 +565,6 @@
         const previousSessionCount = study.sessionCount;
         const wasPreviouslyLearned = previousLevel > 0 || !!word.memorized || study.firstKnownCount > 0;
         const manualMasteredBeforeAnswer = !!study.manualMasteredAt && !!word.memorized;
-        const previousWeakness = weaknessScore(study);
-        const wasDifficult = previousWeakness >= 65;
         const attempt = sessionAttemptState(entry.key);
 
         if (result === 'wrong' && study.manualMasteredAt) {
@@ -642,21 +640,7 @@
         if (result === 'known') study.lastSessionCompletedAt = timestamp;
 
         word.study = study;
-        const nextWeakness = weaknessScore(study);
-        const weaknessImprovement = Math.max(0, previousWeakness - nextWeakness);
-        const difficultCleared = wasDifficult && nextWeakness < 65;
-        return {
-            firstEvaluation,
-            previousLevel,
-            nextLevel: study.level,
-            promoted,
-            demoted,
-            lapse,
-            previousWeakness,
-            nextWeakness,
-            weaknessImprovement,
-            difficultCleared
-        };
+        return { firstEvaluation, previousLevel, nextLevel: study.level, promoted, demoted, lapse };
     }
 
     function sessionSnapshot(entry) {
@@ -675,8 +659,6 @@
                 stats: { ...session.stats },
                 evaluated: [...session.evaluated],
                 answeredUnique: [...session.answeredUnique],
-                weakImprovedKeys: [...session.weakImprovedKeys],
-                weakClearedKeys: [...session.weakClearedKeys],
                 attempts: Array.from(session.attempts.entries()).map(([key, value]) => [key, { ...value }])
             }
         };
@@ -695,8 +677,6 @@
         session.stats = { ...snapshot.sessionState.stats };
         session.evaluated = new Set(snapshot.sessionState.evaluated);
         session.answeredUnique = new Set(snapshot.sessionState.answeredUnique);
-        session.weakImprovedKeys = new Set(snapshot.sessionState.weakImprovedKeys || []);
-        session.weakClearedKeys = new Set(snapshot.sessionState.weakClearedKeys || []);
         session.attempts = new Map((snapshot.sessionState.attempts || []).map(([key, value]) => [key, { ...value }]));
         scheduleSave();
     }
@@ -711,28 +691,9 @@
         session.answeredUnique.add(entry.key);
         session.stats.responses += 1;
         session.stats[result] += 1;
-        if (result === 'known') {
-            session.stats.currentStreak += 1;
-            session.stats.bestStreak = Math.max(session.stats.bestStreak, session.stats.currentStreak);
-        } else {
-            session.stats.currentStreak = 0;
-        }
         if (effect.promoted) session.stats.promoted += 1;
         if (effect.demoted) session.stats.demoted += 1;
         if (effect.lapse) session.stats.lapses += 1;
-        if (result === 'known' && effect.weaknessImprovement >= 5 && !session.weakImprovedKeys.has(entry.key)) {
-            session.weakImprovedKeys.add(entry.key);
-            session.stats.weakImproved += 1;
-        }
-        if (result === 'known' && effect.difficultCleared && !session.weakClearedKeys.has(entry.key)) {
-            session.weakClearedKeys.add(entry.key);
-            session.stats.weakCleared += 1;
-        }
-        effect.streak = session.stats.currentStreak;
-        effect.bestStreak = session.stats.bestStreak;
-        const progressAttempt = session.attempts.get(entry.key);
-        effect.progressAdvanced = result === 'known' && (progressAttempt?.known || 0) === 1;
-        effect.progressCount = session.initialEntries.filter(item => (session.attempts.get(item.key)?.known || 0) > 0).length;
 
         if (result !== 'known' && !session.nextRound.some(item => item.key === entry.key)) {
             session.nextRound.push(entry);
@@ -755,58 +716,10 @@
             refreshStudySurfaces();
             renderSession();
         }
-        return effect;
-    }
-
-    function hideAnswerFeedback() {
-        clearTimeout(feedbackTimer);
-        feedbackTimer = null;
-        const feedback = document.getElementById('study-answer-feedback');
-        if (!feedback) return;
-        feedback.classList.remove('show', 'known', 'unsure', 'wrong', 'special');
-        feedback.innerHTML = '';
-    }
-
-    function showAnswerFeedback(result, effect = {}) {
-        const feedback = document.getElementById('study-answer-feedback');
-        if (!feedback || !session) return;
-        clearTimeout(feedbackTimer);
-
-        let title = result === 'known' ? '✓ Nice!' : result === 'unsure' ? '? もう一度' : '× もう一度';
-        let detail = result === 'known' ? '' : '次の周でもう一度確認';
-        let special = false;
-
-        if (result === 'known' && effect.difficultCleared) {
-            title = '✨ 苦手克服';
-            detail = `苦手度 ${effect.previousWeakness} → ${effect.nextWeakness}`;
-            special = true;
-        } else if (result === 'known' && effect.weaknessImprovement >= 5) {
-            title = '✓ 苦手度ダウン';
-            detail = `${effect.previousWeakness} → ${effect.nextWeakness}`;
-            special = true;
-        } else if (result === 'known' && effect.streak >= 3) {
-            title = `🔥 ${effect.streak} streak`;
-            detail = effect.streak >= 10 ? '10連続正解！' : '連続正解';
-            special = effect.streak >= 5;
-        } else if (result === 'known' && effect.promoted) {
-            title = '↑ Level up';
-            detail = `Lv.${effect.previousLevel} → Lv.${effect.nextLevel}`;
-            special = true;
-        }
-
-        if (effect.progressAdvanced && effect.progressCount && effect.progressCount % 10 === 0) {
-            detail = `${detail ? `${detail} · ` : ''}${effect.progressCount}語達成`;
-            special = true;
-        }
-
-        feedback.className = `study-answer-feedback show ${result}${special ? ' special' : ''}`;
-        feedback.innerHTML = `<strong>${escapeHtml(title)}</strong>${detail ? `<span>${escapeHtml(detail)}</span>` : ''}`;
-        feedbackTimer = window.setTimeout(hideAnswerFeedback, special ? 950 : 620);
     }
 
     function undoLast() {
         if (!session) return;
-        hideAnswerFeedback();
 
         if (pendingCommit) {
             clearTimeout(pendingCommit.timerId);
@@ -826,7 +739,6 @@
 
     function closeSession(force = false) {
         if (!session) return;
-        hideAnswerFeedback();
         if (!force && !session.finished && session.stats.responses > 0) {
             if (!window.confirm('学習を途中で終了しますか？ここまでの結果は保存されます。')) return;
         }
@@ -964,7 +876,7 @@
                 ${memo ? `<div class="study-card-memo study-card-selectable">${escapeHtml(memo)}</div>` : ''}
                 ${showContextBack ? `<div class="study-card-context study-card-selectable">${escapeHtml(context)}</div>` : ''}
                 <div class="study-card-source study-card-selectable">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
-                <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${weaknessScore(study)} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
+                <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
             `;
         }
     }
@@ -975,21 +887,8 @@
         const round = document.getElementById('study-session-round');
         const undo = document.getElementById('study-session-undo');
         const source = document.getElementById('study-session-source');
-        const streak = document.getElementById('study-session-streak');
-        const fill = document.getElementById('study-session-progress-fill');
         if (progress) progress.textContent = session?.finished ? `${session.initialCount}語` : `${Math.min(session.index + 1, session.queue.length)} / ${session.queue.length}`;
         if (round) round.textContent = `${session?.round || 1}周目`;
-        if (streak) {
-            const current = Number(session?.stats?.currentStreak) || 0;
-            streak.textContent = `🔥 ${current}`;
-            streak.hidden = current < 2;
-        }
-        if (fill) {
-            const completed = session?.initialCount
-                ? session.initialEntries.filter(item => (session.attempts.get(item.key)?.known || 0) > 0).length
-                : 0;
-            fill.style.width = `${session?.initialCount ? Math.round(completed / session.initialCount * 100) : 0}%`;
-        }
         if (undo) undo.disabled = !(session?.history.length || pendingCommit);
         if (source) source.textContent = entry ? `${entry.articleTitle}${entry.chapterTitle ? ` / ${entry.chapterTitle}` : ''}` : session?.label || '';
     }
@@ -1018,9 +917,6 @@
                     <div><span>忘却</span><strong>${session.stats.lapses}</strong></div>
                     <div><span>明日また復習</span><strong>${dueTomorrow}</strong></div>
                     <div><span>回答回数</span><strong>${session.stats.responses}</strong></div>
-                    <div><span>最高連続正解</span><strong>🔥 ${session.stats.bestStreak}</strong></div>
-                    <div><span>苦手改善</span><strong>${session.stats.weakImproved}</strong></div>
-                    <div><span>苦手克服</span><strong>${session.stats.weakCleared}</strong></div>
                 </div>
                 <div class="study-summary-actions">
                     <button type="button" id="study-summary-undo" class="study-icon-action" ${session.history.length ? '' : 'disabled'} aria-label="直前の判定を戻す">↶</button>
@@ -1124,9 +1020,7 @@
 
         // Record the judgement immediately so undo always has one history item to restore.
         // Only the visual transition to the next card is delayed.
-        const effect = answerCurrent(result, { deferRender: true });
-        showAnswerFeedback(result, effect);
-        renderSessionHeader();
+        answerCurrent(result, { deferRender: true });
 
         const timerId = window.setTimeout(() => {
             if (!pendingCommit || pendingCommit.timerId !== timerId) return;
@@ -1349,21 +1243,7 @@
             answeredUnique: new Set(),
             attempts: new Map(),
             history: [],
-            weakImprovedKeys: new Set(),
-            weakClearedKeys: new Set(),
-            stats: {
-                responses: 0,
-                known: 0,
-                unsure: 0,
-                wrong: 0,
-                promoted: 0,
-                demoted: 0,
-                lapses: 0,
-                currentStreak: 0,
-                bestStreak: 0,
-                weakImproved: 0,
-                weakCleared: 0
-            }
+            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0 }
         };
         closeStudyHub();
         renderSession();
