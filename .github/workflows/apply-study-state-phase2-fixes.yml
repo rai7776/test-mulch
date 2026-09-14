@@ -1,0 +1,39 @@
+name: Apply Study Center phase 2 fixes
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/apply-study-state-phase2-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+
+      - name: Apply follow-up patch
+        run: python .github/scripts/patch-study-state-phase2-fixes.py
+
+      - name: Verify
+        run: |
+          set -euo pipefail
+          node --check flashcard-study.js
+          node --check study-center.js
+          grep -Fq 'manualMasteredBeforeAnswer' flashcard-study.js
+          grep -Fq 'view.suspended || view.manualMastered' study-center.js
+
+      - name: Commit follow-up
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add flashcard-study.js study-center.js
+          git commit -m 'Refine Study Center new and mastered state handling'
+          git push origin HEAD:feature/study-center
