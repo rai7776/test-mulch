@@ -1,0 +1,36 @@
+name: Apply flashcard touch tracking fix
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/apply-flashcard-touch-track.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+      - name: Apply patch
+        run: python .github/scripts/patch-flashcard-touch-track.py
+      - name: Verify
+        run: |
+          set -euo pipefail
+          node --check flashcard-study.js
+          grep -Fq "card.addEventListener('touchmove'" flashcard-study.js
+          grep -Fq "event.pointerType === 'touch'" flashcard-study.js
+          grep -Fq 'flashcard-study.js?v=1.9' index.html
+      - name: Commit fix
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add flashcard-study.js index.html
+          git commit -m 'Keep flashcard swipes attached on iPhone'
+          git push origin HEAD:feature/study-center
