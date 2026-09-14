@@ -532,6 +532,7 @@
                                     <div class="study-center-history-breakdown">
                                         <span>新規 ${Number(session.newCount) || 0}</span><span>復習 ${Number(session.reviewCount) || 0}</span>
                                         <span>✓ ${Number(session.stats?.known) || 0}</span><span>? ${Number(session.stats?.unsure) || 0}</span><span>✕ ${Number(session.stats?.wrong) || 0}</span>
+                                        <span>🔥 ${Number(session.stats?.bestStreak) || 0}</span><span>苦手克服 ${Number(session.stats?.weakCleared) || 0}</span>
                                     </div>
                                     <div class="study-center-history-words">
                                         ${(Array.isArray(session.words) ? session.words : []).map(item => `<div><strong>${escapeHtml(item.word || '—')}</strong><span>${escapeHtml(item.meaning || '')}</span><b class="result-${escapeHtml(item.finalResult || '')}">${resultMark(item.finalResult)}</b></div>`).join('') || '<span>単語詳細はありません。</span>'}
@@ -585,6 +586,8 @@
         const known7 = last7.reduce((sum, item) => sum + (Number(item.stats?.known) || 0), 0);
         const words7 = last7.reduce((sum, item) => sum + (Number(item.uniqueCount) || 0), 0);
         const words30 = last30.reduce((sum, item) => sum + (Number(item.uniqueCount) || 0), 0);
+        const bestAnswerStreak = last30.reduce((best, item) => Math.max(best, Number(item.stats?.bestStreak) || 0), 0);
+        const weakCleared30 = last30.reduce((sum, item) => sum + (Number(item.stats?.weakCleared) || 0), 0);
         const streak = consecutiveStudyDays(sessions);
         return `
             <section class="study-center-stats">
@@ -595,6 +598,8 @@
                     <div><span>連続学習</span><strong>${streak}</strong><small>日</small></div>
                     <div><span>苦手</span><strong>${model.difficult.length}</strong><small>現在</small></div>
                     <div><span>保留</span><strong>${model.held.length}</strong><small>自動出題から除外</small></div>
+                    <div><span>最高streak</span><strong>🔥 ${bestAnswerStreak}</strong><small>直近30日</small></div>
+                    <div><span>苦手克服</span><strong>${weakCleared30}</strong><small>直近30日</small></div>
                 </div>
                 <div class="study-center-panel">
                     <div class="study-center-panel-heading"><div><span class="study-center-eyebrow">ACTIVITY</span><h3>直近7日間</h3></div></div>

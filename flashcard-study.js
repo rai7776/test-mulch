@@ -65,6 +65,7 @@
     let originalRenderList = null;
     let dragState = null;
     let pendingCommit = null;
+    let feedbackTimer = null;
     let studyHistoryCache = [];
     let studyHistoryLoaded = false;
     let studyHistoryLoadPromise = null;
@@ -564,6 +565,8 @@
         const previousSessionCount = study.sessionCount;
         const wasPreviouslyLearned = previousLevel > 0 || !!word.memorized || study.firstKnownCount > 0;
         const manualMasteredBeforeAnswer = !!study.manualMasteredAt && !!word.memorized;
+        const previousWeakness = weaknessScore(study);
+        const wasDifficult = previousWeakness >= 65;
         const attempt = sessionAttemptState(entry.key);
 
         if (result === 'wrong' && study.manualMasteredAt) {
@@ -639,7 +642,21 @@
         if (result === 'known') study.lastSessionCompletedAt = timestamp;
 
         word.study = study;
-        return { firstEvaluation, previousLevel, nextLevel: study.level, promoted, demoted, lapse };
+        const nextWeakness = weaknessScore(study);
+        const weaknessImprovement = Math.max(0, previousWeakness - nextWeakness);
+        const difficultCleared = wasDifficult && nextWeakness < 65;
+        return {
+            firstEvaluation,
+            previousLevel,
+            nextLevel: study.level,
+            promoted,
+            demoted,
+            lapse,
+            previousWeakness,
+            nextWeakness,
+            weaknessImprovement,
+            difficultCleared
+        };
     }
 
     function sessionSnapshot(entry) {
@@ -658,6 +675,8 @@
                 stats: { ...session.stats },
                 evaluated: [...session.evaluated],
                 answeredUnique: [...session.answeredUnique],
+                weakImprovedKeys: [...session.weakImprovedKeys],
+                weakClearedKeys: [...session.weakClearedKeys],
                 attempts: Array.from(session.attempts.entries()).map(([key, value]) => [key, { ...value }])
             }
         };
@@ -676,6 +695,8 @@
         session.stats = { ...snapshot.sessionState.stats };
         session.evaluated = new Set(snapshot.sessionState.evaluated);
         session.answeredUnique = new Set(snapshot.sessionState.answeredUnique);
+        session.weakImprovedKeys = new Set(snapshot.sessionState.weakImprovedKeys || []);
+        session.weakClearedKeys = new Set(snapshot.sessionState.weakClearedKeys || []);
         session.attempts = new Map((snapshot.sessionState.attempts || []).map(([key, value]) => [key, { ...value }]));
         scheduleSave();
     }
@@ -690,9 +711,26 @@
         session.answeredUnique.add(entry.key);
         session.stats.responses += 1;
         session.stats[result] += 1;
+        if (result === 'known') {
+            session.stats.currentStreak += 1;
+            session.stats.bestStreak = Math.max(session.stats.bestStreak, session.stats.currentStreak);
+        } else {
+            session.stats.currentStreak = 0;
+        }
         if (effect.promoted) session.stats.promoted += 1;
         if (effect.demoted) session.stats.demoted += 1;
         if (effect.lapse) session.stats.lapses += 1;
+        if (result === 'known' && effect.weaknessImprovement >= 5 && !session.weakImprovedKeys.has(entry.key)) {
+            session.weakImprovedKeys.add(entry.key);
+            session.stats.weakImproved += 1;
+        }
+        if (result === 'known' && effect.difficultCleared && !session.weakClearedKeys.has(entry.key)) {
+            session.weakClearedKeys.add(entry.key);
+            session.stats.weakCleared += 1;
+        }
+        effect.streak = session.stats.currentStreak;
+        effect.bestStreak = session.stats.bestStreak;
+        effect.progressCount = session.answeredUnique.size;
 
         if (result !== 'known' && !session.nextRound.some(item => item.key === entry.key)) {
             session.nextRound.push(entry);
@@ -715,10 +753,58 @@
             refreshStudySurfaces();
             renderSession();
         }
+        return effect;
+    }
+
+    function hideAnswerFeedback() {
+        clearTimeout(feedbackTimer);
+        feedbackTimer = null;
+        const feedback = document.getElementById('study-answer-feedback');
+        if (!feedback) return;
+        feedback.classList.remove('show', 'known', 'unsure', 'wrong', 'special');
+        feedback.innerHTML = '';
+    }
+
+    function showAnswerFeedback(result, effect = {}) {
+        const feedback = document.getElementById('study-answer-feedback');
+        if (!feedback || !session) return;
+        clearTimeout(feedbackTimer);
+
+        let title = result === 'known' ? '✓ Nice!' : result === 'unsure' ? '? もう一度' : '× もう一度';
+        let detail = result === 'known' ? '' : '次の周でもう一度確認';
+        let special = false;
+
+        if (result === 'known' && effect.difficultCleared) {
+            title = '✨ 苦手克服';
+            detail = `苦手度 ${effect.previousWeakness} → ${effect.nextWeakness}`;
+            special = true;
+        } else if (result === 'known' && effect.weaknessImprovement >= 5) {
+            title = '✓ 苦手度ダウン';
+            detail = `${effect.previousWeakness} → ${effect.nextWeakness}`;
+            special = true;
+        } else if (result === 'known' && effect.streak >= 3) {
+            title = `🔥 ${effect.streak} streak`;
+            detail = effect.streak >= 10 ? '10連続正解！' : '連続正解';
+            special = effect.streak >= 5;
+        } else if (result === 'known' && effect.promoted) {
+            title = '↑ Level up';
+            detail = `Lv.${effect.previousLevel} → Lv.${effect.nextLevel}`;
+            special = true;
+        }
+
+        if (effect.progressCount && effect.progressCount % 10 === 0) {
+            detail = `${detail ? `${detail} · ` : ''}${effect.progressCount}語達成`;
+            special = true;
+        }
+
+        feedback.className = `study-answer-feedback show ${result}${special ? ' special' : ''}`;
+        feedback.innerHTML = `<strong>${escapeHtml(title)}</strong>${detail ? `<span>${escapeHtml(detail)}</span>` : ''}`;
+        feedbackTimer = window.setTimeout(hideAnswerFeedback, special ? 950 : 620);
     }
 
     function undoLast() {
         if (!session) return;
+        hideAnswerFeedback();
 
         if (pendingCommit) {
             clearTimeout(pendingCommit.timerId);
@@ -738,6 +824,7 @@
 
     function closeSession(force = false) {
         if (!session) return;
+        hideAnswerFeedback();
         if (!force && !session.finished && session.stats.responses > 0) {
             if (!window.confirm('学習を途中で終了しますか？ここまでの結果は保存されます。')) return;
         }
@@ -875,7 +962,7 @@
                 ${memo ? `<div class="study-card-memo study-card-selectable">${escapeHtml(memo)}</div>` : ''}
                 ${showContextBack ? `<div class="study-card-context study-card-selectable">${escapeHtml(context)}</div>` : ''}
                 <div class="study-card-source study-card-selectable">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
-                <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
+                <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${weaknessScore(study)} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
             `;
         }
     }
@@ -886,8 +973,19 @@
         const round = document.getElementById('study-session-round');
         const undo = document.getElementById('study-session-undo');
         const source = document.getElementById('study-session-source');
+        const streak = document.getElementById('study-session-streak');
+        const fill = document.getElementById('study-session-progress-fill');
         if (progress) progress.textContent = session?.finished ? `${session.initialCount}語` : `${Math.min(session.index + 1, session.queue.length)} / ${session.queue.length}`;
         if (round) round.textContent = `${session?.round || 1}周目`;
+        if (streak) {
+            const current = Number(session?.stats?.currentStreak) || 0;
+            streak.textContent = `🔥 ${current}`;
+            streak.hidden = current < 2;
+        }
+        if (fill) {
+            const completed = session?.initialCount ? Math.min(session.initialCount, session.answeredUnique.size) : 0;
+            fill.style.width = `${session?.initialCount ? Math.round(completed / session.initialCount * 100) : 0}%`;
+        }
         if (undo) undo.disabled = !(session?.history.length || pendingCommit);
         if (source) source.textContent = entry ? `${entry.articleTitle}${entry.chapterTitle ? ` / ${entry.chapterTitle}` : ''}` : session?.label || '';
     }
@@ -916,6 +1014,9 @@
                     <div><span>忘却</span><strong>${session.stats.lapses}</strong></div>
                     <div><span>明日また復習</span><strong>${dueTomorrow}</strong></div>
                     <div><span>回答回数</span><strong>${session.stats.responses}</strong></div>
+                    <div><span>最高連続正解</span><strong>🔥 ${session.stats.bestStreak}</strong></div>
+                    <div><span>苦手改善</span><strong>${session.stats.weakImproved}</strong></div>
+                    <div><span>苦手克服</span><strong>${session.stats.weakCleared}</strong></div>
                 </div>
                 <div class="study-summary-actions">
                     <button type="button" id="study-summary-undo" class="study-icon-action" ${session.history.length ? '' : 'disabled'} aria-label="直前の判定を戻す">↶</button>
@@ -1019,7 +1120,9 @@
 
         // Record the judgement immediately so undo always has one history item to restore.
         // Only the visual transition to the next card is delayed.
-        answerCurrent(result, { deferRender: true });
+        const effect = answerCurrent(result, { deferRender: true });
+        showAnswerFeedback(result, effect);
+        renderSessionHeader();
 
         const timerId = window.setTimeout(() => {
             if (!pendingCommit || pendingCommit.timerId !== timerId) return;
@@ -1175,7 +1278,21 @@
             answeredUnique: new Set(),
             attempts: new Map(),
             history: [],
-            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0 }
+            weakImprovedKeys: new Set(),
+            weakClearedKeys: new Set(),
+            stats: {
+                responses: 0,
+                known: 0,
+                unsure: 0,
+                wrong: 0,
+                promoted: 0,
+                demoted: 0,
+                lapses: 0,
+                currentStreak: 0,
+                bestStreak: 0,
+                weakImproved: 0,
+                weakCleared: 0
+            }
         };
         closeStudyHub();
         renderSession();
@@ -1549,9 +1666,11 @@
                 <div class="study-session-shell" role="dialog" aria-modal="true" aria-label="フラッシュカード学習">
                     <header class="study-session-header">
                         <button type="button" id="study-session-close" class="study-icon-action" aria-label="学習を終了">×</button>
-                        <div class="study-session-progress-wrap"><strong id="study-session-progress">1 / 1</strong><span id="study-session-round">1周目</span></div>
+                        <div class="study-session-progress-wrap"><strong id="study-session-progress">1 / 1</strong><span id="study-session-round">1周目</span><span id="study-session-streak" class="study-session-streak" hidden></span></div>
                         <button type="button" id="study-session-undo" class="study-icon-action" aria-label="直前の判定を戻す">↶</button>
                     </header>
+                    <div class="study-session-progress-bar" aria-hidden="true"><span id="study-session-progress-fill"></span></div>
+                    <div id="study-answer-feedback" class="study-answer-feedback" aria-live="polite"></div>
                     <div id="study-session-stage" class="study-session-stage"></div>
                     <div id="study-session-source" class="study-session-source"></div>
                 </div>
@@ -1584,7 +1703,7 @@
             .study-hub-settings{margin-top:12px;padding:9px 11px;border:1px solid #e7ddd3;border-radius:10px;background:#faf7f3}.study-hub-settings summary{cursor:pointer;font-weight:700;color:#6b5c4e}.study-setting-row{display:flex;align-items:center;gap:6px;margin-top:8px}.study-setting-row label{display:flex;align-items:center;gap:7px}.study-setting-row input[type=number]{width:72px;min-height:36px;font-size:16px}.study-setting-row select{min-height:36px;padding:5px 8px;border:1px solid #ded3c9;border-radius:8px;background:#fff;color:#5f5348;font-size:16px}.study-setting-check{display:flex;align-items:center;gap:7px;margin-top:9px}
             .study-swipe-guide{display:flex;justify-content:center;gap:30px;margin-top:14px}.study-swipe-guide span{display:flex;align-items:center;gap:7px;font-weight:800}.study-swipe-guide i{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-style:normal}.study-swipe-guide .wrong i{background:var(--study-red)}.study-swipe-guide .unsure i{background:var(--study-gray)}.study-swipe-guide .known i{background:var(--study-green)}.study-hub-status{min-height:1.2em;margin:10px 0 0;color:var(--study-red);font-size:.85rem}
             .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
-            .study-session-shell{width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap span{display:block;margin-top:2px;color:#817568;font-size:.78rem}
+            .study-session-shell{position:relative;width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap>span{display:inline-block;margin:2px 3px 0;color:#817568;font-size:.78rem}.study-session-streak{padding:2px 7px;border-radius:999px;background:#fff0d5;color:#9b5b08!important;font-weight:850}.study-session-streak[hidden]{display:none!important}.study-session-progress-bar{height:5px;margin:9px 54px 0;border-radius:999px;background:#e9e1d9;overflow:hidden}.study-session-progress-bar span{display:block;width:0;height:100%;border-radius:inherit;background:var(--study-green);transition:width .28s ease}.study-answer-feedback{position:absolute;z-index:20;top:78px;left:50%;transform:translate(-50%,-8px) scale(.94);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:150px;max-width:82%;padding:9px 15px;border:1px solid #dfd5cb;border-radius:14px;background:rgba(255,253,249,.96);box-shadow:0 8px 24px rgba(67,57,48,.13);opacity:0;pointer-events:none}.study-answer-feedback.show{animation:study-feedback-pop .2s ease-out forwards}.study-answer-feedback strong{font-size:1rem;color:#433930}.study-answer-feedback span{font-size:.72rem;color:#76695e}.study-answer-feedback.known{border-color:#b9d9c5}.study-answer-feedback.unsure{border-color:#d4d5da}.study-answer-feedback.wrong{border-color:#e6bbbb}.study-answer-feedback.special{box-shadow:0 10px 28px rgba(150,100,30,.2)}@keyframes study-feedback-pop{from{opacity:0;transform:translate(-50%,-8px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
             .study-session-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:470px}.study-gesture-field{position:relative;width:min(500px,92vw);padding:52px 0 18px}.study-flashcard{--study-feedback-alpha:0;position:relative;width:100%;height:min(350px,58vw);min-height:285px;max-height:390px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:transform .22s ease;transform-origin:center center;outline:none}.study-flashcard.is-dragging{cursor:grabbing;transition:none}.study-flashcard.is-committing{transition:transform .19s ease-out}.study-flashcard:focus-visible{outline:3px solid rgba(141,90,43,.25);outline-offset:5px;border-radius:22px}
             .study-flashcard-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .28s ease}.study-flashcard.flipped .study-flashcard-inner{transform:rotateY(180deg)}.study-card-face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid #dfd3c7;border-radius:22px;background:var(--study-paper);box-shadow:0 15px 38px rgba(79,63,50,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:auto}.study-card-back{transform:rotateY(180deg)}
             .study-card-selectable{user-select:text!important;-webkit-user-select:text!important;-webkit-touch-callout:default;touch-action:auto;cursor:text}.study-card-selectable::selection{background:rgba(141,90,43,.2)}
@@ -1596,7 +1715,8 @@
             .study-touch-actions{display:flex;justify-content:center;align-items:flex-start;gap:26px;margin-top:14px}.study-judge-control{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:48px}.study-judge-button{width:48px;height:48px;border:0;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.12)}.study-judge-button.wrong{background:var(--study-red)}.study-judge-button.unsure{background:var(--study-gray)}.study-judge-button.known{background:var(--study-green)}.study-judge-count{display:block;min-height:1em;color:#8a7c70;font-size:.7rem;font-weight:700;line-height:1}.study-session-source{text-align:center;color:#8a7c70;font-size:.75rem;min-height:1.2em}
             .study-session-summary{width:min(560px,94vw);padding:24px;border:1px solid #e1d7cd;border-radius:20px;background:#fff;text-align:center;box-shadow:0 14px 38px rgba(70,55,44,.12)}.study-summary-mark{width:56px;height:56px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--study-green);color:#fff;font-size:1.8rem}.study-session-summary h2{margin:8px 0;color:#433930}.study-summary-main{display:flex;align-items:baseline;justify-content:center;gap:7px}.study-summary-main strong{font-size:2.4rem}.study-summary-main span{color:#7b6e62}.study-summary-judges{display:flex;justify-content:center;gap:18px;margin:18px 0}.study-judge-stat{display:flex;align-items:center;gap:7px}.study-judge-stat span{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900}.study-judge-stat.wrong span{background:var(--study-red)}.study-judge-stat.unsure span{background:var(--study-gray)}.study-judge-stat.known span{background:var(--study-green)}.study-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}.study-summary-grid>div{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:9px;background:#f7f3ef}.study-summary-grid span{color:#75685c;font-size:.82rem}.study-summary-actions{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px}
             @media(max-width:700px){.study-today-card{margin:10px 0 14px;padding:12px}.study-today-heading{align-items:flex-start}.study-today-heading h2{font-size:1.2rem}.study-today-stats{grid-template-columns:1fr 1fr}.study-primary-action{padding:8px 11px;font-size:.86rem}.global-study-controls{display:grid;grid-template-columns:1fr 1fr;grid-column:1/-1;gap:6px;width:100%}.global-study-controls select,.global-study-controls button{width:100%;min-width:0;font-size:13px}.global-study-controls button{grid-column:span 1}.sidebar-study-controls{grid-template-columns:1fr auto}.study-overlay{align-items:flex-end;padding:0}.study-hub{width:100%;max-height:92vh;border-radius:18px 18px 0 0;padding:15px}.study-hub-preset-grid{grid-template-columns:1fr 1fr}.study-preset{padding:10px}.study-preset small{font-size:.68rem}.study-swipe-guide{gap:22px}.study-session-shell{padding:10px 12px 18px}.study-session-stage{min-height:420px}.study-gesture-field{width:min(88vw,470px);padding-top:48px}.study-flashcard{height:58vh;max-height:420px;min-height:300px}.study-card-face{padding:22px 18px}.study-touch-actions{gap:30px}.study-judge-button{width:52px;height:52px}.study-judge-control{min-width:52px}.study-summary-grid{grid-template-columns:1fr}.hint-wrong{left:-6px}.hint-known{right:-6px}}
-            @media(max-width:390px){.study-hub-preset-grid{grid-template-columns:1fr}.study-preset.context{grid-column:auto}.study-today-heading{flex-direction:column}.study-today-heading .study-primary-action{width:100%}.study-session-stage{min-height:390px}.study-flashcard{min-height:285px;height:56vh}.study-direction-hint{width:40px;height:40px;font-size:1.2rem}}
+            @media(max-width:390px){.study-hub-preset-grid{grid-template-columns:1fr}.study-preset.context{grid-column:auto}.study-today-heading{flex-direction:column}.study-today-heading .study-primary-action{width:100%}.study-session-stage{min-height:390px}.study-flashcard{min-height:285px;height:56vh}.study-direction-hint{width:40px;height:40px;font-size:1.2rem}.study-session-progress-bar{margin-left:50px;margin-right:50px}.study-answer-feedback{top:72px}}
+            @media(prefers-reduced-motion:reduce){.study-answer-feedback.show{animation:none;opacity:1;transform:translate(-50%,0) scale(1)}.study-session-progress-bar span{transition:none}}
         `;
         document.head.appendChild(style);
     }
