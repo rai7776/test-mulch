@@ -1141,7 +1141,7 @@
     function bindCardInteractions() {
         const card = document.getElementById('study-flashcard');
         if (!card) return;
-        const threshold = Math.max(68, Math.min(120, card.getBoundingClientRect().width * 0.22));
+        const threshold = Math.max(52, Math.min(96, card.getBoundingClientRect().width * 0.18));
 
         card.querySelector('.study-card-copy')?.addEventListener('click', event => {
             event.preventDefault();
@@ -1165,6 +1165,7 @@
                 dy: 0,
                 moved: false,
                 threshold,
+                startedAt: performance.now(),
                 captured: false
             };
             if (event.pointerType !== 'touch') {
@@ -1200,6 +1201,14 @@
             const state = dragState;
             dragState = null;
 
+            // Safari can coalesce the final pointermove of a quick flick. Use the
+            // pointerup coordinates as the authoritative final drag position.
+            if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+                state.dx = event.clientX - state.startX;
+                state.dy = Math.min(0, event.clientY - state.startY);
+            }
+            if (Math.abs(state.dx) > 7 || Math.abs(state.dy) > 7) state.moved = true;
+
             // Explicitly release pointer capture before committing a swipe.
             // iOS Safari can otherwise swallow the next tap on the header undo button.
             if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
@@ -1209,8 +1218,10 @@
 
             const result = resultDirection(state.dx, state.dy);
             const distance = dragDistanceFor(result, state.dx, state.dy);
-            if (result && distance >= state.threshold) {
-                event.preventDefault();
+            const elapsed = Math.max(1, performance.now() - (state.startedAt || performance.now()));
+            const velocity = distance / elapsed;
+            const isQuickFlick = distance >= 34 && velocity >= 0.28;
+            if (result && (distance >= state.threshold || isQuickFlick)) {
                 commitResult(result);
                 return;
             }
@@ -1228,8 +1239,9 @@
 
         card.addEventListener('lostpointercapture', event => {
             if (dragState?.pointerId !== event.pointerId) return;
-            dragState = null;
-            card.classList.remove('is-dragging');
+            // Do not discard the gesture here. iOS Safari may drop pointer capture
+            // before pointerup during a fast swipe; pointerup/pointercancel owns cleanup.
+            dragState.captured = false;
         });
 
         card.addEventListener('keydown', event => {
