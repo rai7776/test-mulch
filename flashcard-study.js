@@ -730,7 +730,8 @@
         }
         effect.streak = session.stats.currentStreak;
         effect.bestStreak = session.stats.bestStreak;
-        effect.progressAdvanced = result === 'known' && attempt.known === 1;
+        const progressAttempt = session.attempts.get(entry.key);
+        effect.progressAdvanced = result === 'known' && (progressAttempt?.known || 0) === 1;
         effect.progressCount = session.initialEntries.filter(item => (session.attempts.get(item.key)?.known || 0) > 0).length;
 
         if (result !== 'known' && !session.nextRound.some(item => item.key === entry.key)) {
