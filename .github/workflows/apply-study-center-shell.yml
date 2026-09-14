@@ -1,0 +1,63 @@
+name: Apply Study Center shell
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/apply-study-center-shell.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+
+      - name: Patch index and verify Study Center
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text()
+
+          css_anchor = '<link rel="stylesheet" href="style.css?v=1.4">'
+          css_line = css_anchor + '\n    <link rel="stylesheet" href="study-center.css?v=1">'
+          if 'study-center.css?v=1' not in text:
+              if css_anchor not in text:
+                  raise SystemExit('style.css anchor not found')
+              text = text.replace(css_anchor, css_line, 1)
+
+          js_anchor = '<script src="flashcard-ui-tuning.js?v=1.1"></script>'
+          js_line = js_anchor + '\n    <script src="study-center.js?v=1"></script>'
+          if 'study-center.js?v=1' not in text:
+              if js_anchor not in text:
+                  raise SystemExit('flashcard-ui-tuning anchor not found')
+              text = text.replace(js_anchor, js_line, 1)
+
+          path.write_text(text)
+          PY
+          node --check study-center.js
+          grep -Fq 'study-center.css?v=1' index.html
+          grep -Fq 'study-center.js?v=1' index.html
+
+      - name: Commit integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then
+            echo 'No integration changes needed.'
+          else
+            git commit -m 'Integrate initial Study Center shell'
+            git push origin HEAD:feature/study-center
+          fi
