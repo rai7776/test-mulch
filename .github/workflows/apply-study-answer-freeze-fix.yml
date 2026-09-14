@@ -1,0 +1,49 @@
+name: Apply Study answer freeze fix
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/apply-study-answer-freeze-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+
+      - name: Apply patch
+        run: python .github/scripts/patch-study-answer-freeze.py
+
+      - name: Verify regression
+        run: |
+          set -euo pipefail
+          node --check flashcard-study.js
+          node - <<'NODE'
+          const fs = require('fs');
+          const text = fs.readFileSync('flashcard-study.js', 'utf8');
+          const start = text.indexOf('    function answerCurrent(');
+          const end = text.indexOf('    function hideAnswerFeedback()', start);
+          if (start < 0 || end < 0) throw new Error('answerCurrent block not found');
+          const body = text.slice(start, end);
+          if (body.includes('attempt.known')) throw new Error('undefined attempt reference remains');
+          if (!body.includes("const progressAttempt = session.attempts.get(entry.key);")) throw new Error('progressAttempt lookup missing');
+          if (!body.includes("(progressAttempt?.known || 0) === 1")) throw new Error('safe progress check missing');
+          NODE
+          grep -Fq 'flashcard-study.js?v=1.10' index.html
+          grep -Fq "card.addEventListener('touchmove'" flashcard-study.js
+
+      - name: Commit fix
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add flashcard-study.js index.html
+          git commit -m 'Fix Study card freeze after answering'
+          git push origin HEAD:feature/study-center
