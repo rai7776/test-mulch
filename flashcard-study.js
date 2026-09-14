@@ -8,6 +8,8 @@
     const DEFAULT_DIFFICULTY = 45;
     const EXAMPLE_MODE_KEY = 'smart-reader-study-example-mode';
     const STUDY_SETTINGS_KEY = 'smart-reader-study-settings-v1';
+    const STUDY_HISTORY_KEY = 'study_history_v1';
+    const STUDY_HISTORY_LIMIT = 500;
 
     function clampInteger(value, min, max, fallback = 0) {
         const number = Number(value);
@@ -63,6 +65,96 @@
     let originalRenderList = null;
     let dragState = null;
     let pendingCommit = null;
+    let studyHistoryCache = [];
+    let studyHistoryLoaded = false;
+    let studyHistoryLoadPromise = null;
+
+    function studyHistoryStore() {
+        try {
+            if (typeof db !== 'undefined' && db?.getItem && db?.setItem) return db;
+        } catch (_) {}
+        try {
+            if (window.localforage?.createInstance) return window.localforage.createInstance({ name: 'ProjectA_DB_v3' });
+        } catch (_) {}
+        return null;
+    }
+
+    async function ensureStudyHistoryLoaded() {
+        if (studyHistoryLoaded) return studyHistoryCache;
+        if (studyHistoryLoadPromise) return studyHistoryLoadPromise;
+        studyHistoryLoadPromise = (async () => {
+            try {
+                const store = studyHistoryStore();
+                const raw = store ? await store.getItem(STUDY_HISTORY_KEY) : [];
+                studyHistoryCache = Array.isArray(raw) ? raw.filter(item => item && typeof item === 'object').slice(0, STUDY_HISTORY_LIMIT) : [];
+            } catch (error) {
+                console.error('Study history load failed', error);
+                studyHistoryCache = [];
+            }
+            studyHistoryLoaded = true;
+            studyHistoryLoadPromise = null;
+            window.dispatchEvent(new CustomEvent('smartreader:study-history-updated'));
+            return studyHistoryCache;
+        })();
+        return studyHistoryLoadPromise;
+    }
+
+    async function persistStudyHistory() {
+        try {
+            const store = studyHistoryStore();
+            if (store) await store.setItem(STUDY_HISTORY_KEY, studyHistoryCache.slice(0, STUDY_HISTORY_LIMIT));
+        } catch (error) {
+            console.error('Study history save failed', error);
+        }
+    }
+
+    async function recordStudySession(current) {
+        if (!current || !current.stats || current.stats.responses <= 0) return;
+        await ensureStudyHistoryLoaded();
+        const completedAt = Date.now();
+        const words = [];
+        const initialByKey = new Map((current.initialEntries || []).map(entry => [entry.key, entry]));
+        (current.attempts instanceof Map ? Array.from(current.attempts.entries()) : []).forEach(([key, attempt]) => {
+            if (!attempt || !attempt.responses) return;
+            const entry = initialByKey.get(key);
+            if (!entry?.word) return;
+            const initial = current.initialStates instanceof Map ? current.initialStates.get(key) : null;
+            words.push({
+                key,
+                articleId: entry.articleId ?? entry.article?.id ?? null,
+                articleTitle: String(entry.articleTitle || entry.article?.name || ''),
+                chapterId: entry.chapterId ?? null,
+                chapterTitle: String(entry.chapterTitle || ''),
+                word: String(entry.word.word || entry.word.surfaceText || ''),
+                meaning: String(entry.word.meaning || ''),
+                responses: Number(attempt.responses) || 0,
+                known: Number(attempt.known) || 0,
+                unsure: Number(attempt.unsure) || 0,
+                wrong: Number(attempt.wrong) || 0,
+                firstResult: attempt.firstResult || null,
+                finalResult: entry.word.study?.lastResult || attempt.firstResult || null,
+                kind: initial?.isNew ? 'new' : 'review'
+            });
+        });
+        const record = {
+            id: `${current.startedAt || completedAt}-${completedAt}-${Math.random().toString(36).slice(2, 8)}`,
+            startedAt: current.startedAt || completedAt,
+            completedAt,
+            finished: !!current.finished,
+            label: String(current.label || '学習'),
+            initialCount: Number(current.initialCount) || 0,
+            round: Number(current.round) || 1,
+            stats: { ...current.stats },
+            newCount: words.filter(item => item.kind === 'new').length,
+            reviewCount: words.filter(item => item.kind !== 'new').length,
+            uniqueCount: words.length,
+            words
+        };
+        studyHistoryCache.unshift(record);
+        studyHistoryCache = studyHistoryCache.slice(0, STUDY_HISTORY_LIMIT);
+        await persistStudyHistory();
+        window.dispatchEvent(new CustomEvent('smartreader:study-history-updated', { detail: record }));
+    }
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -654,6 +746,7 @@
             pendingCommit = null;
         }
         flushSave();
+        void recordStudySession(session);
         session = null;
         const overlay = document.getElementById('study-session-overlay');
         if (overlay) overlay.classList.remove('show');
@@ -1066,7 +1159,12 @@
         pendingCommit = null;
         session = {
             label: label || '学習',
+            startedAt: Date.now(),
             initialEntries: [...selected],
+            initialStates: new Map(selected.map(entry => {
+                const view = studyView(entry.word);
+                return [entry.key, { isNew: view.isNew, due: view.due, difficult: view.difficult, level: view.study.level }];
+            })),
             initialCount: selected.length,
             queue,
             nextRound: [],
@@ -1523,6 +1621,7 @@
         injectSidebarStudyControls();
         bindGlobalKeyboard();
         refreshStudySurfaces();
+        void ensureStudyHistoryLoaded();
 
         window.SmartReaderStudy = {
             open: openStudyHub,
@@ -1532,6 +1631,9 @@
             getSummary: () => summarizeEntries(),
             getWordStudy: word => readStudy(word),
             getWordView: word => studyView(word),
+            getHistory: () => studyHistoryCache.map(item => ({ ...item, stats: { ...(item.stats || {}) }, words: Array.isArray(item.words) ? item.words.map(word => ({ ...word })) : [] })),
+            loadHistory: () => ensureStudyHistoryLoaded(),
+            isHistoryLoaded: () => studyHistoryLoaded,
             refresh: refreshStudySurfaces
         };
     }

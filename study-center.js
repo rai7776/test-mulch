@@ -466,16 +466,144 @@
         `;
     }
 
-    function renderPlaceholder(kind) {
-        const isHistory = kind === 'history';
+    function historySessions() {
+        const list = window.SmartReaderStudy?.getHistory?.();
+        return Array.isArray(list) ? list : [];
+    }
+
+    function localDateKey(timestamp) {
+        const date = new Date(Number(timestamp) || Date.now());
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function dateHeading(timestamp) {
+        return new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(Number(timestamp)));
+    }
+
+    function timeLabel(timestamp) {
+        return new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit' }).format(new Date(Number(timestamp)));
+    }
+
+    function resultMark(result) {
+        if (result === 'known') return '✓';
+        if (result === 'wrong') return '✕';
+        if (result === 'unsure') return '?';
+        return '—';
+    }
+
+    function sessionAccuracy(session) {
+        const stats = session?.stats || {};
+        const responses = Number(stats.responses) || 0;
+        return responses ? Math.round(((Number(stats.known) || 0) / responses) * 100) : 0;
+    }
+
+    function renderHistory() {
+        const sessions = historySessions();
+        if (!window.SmartReaderStudy?.isHistoryLoaded?.()) {
+            return `<section class="study-center-placeholder"><div class="study-center-placeholder-icon">↺</div><h2>学習履歴</h2><p>履歴を読み込んでいます。</p></section>`;
+        }
+        if (!sessions.length) return `<section class="study-center-placeholder"><div class="study-center-placeholder-icon">↺</div><h2>学習履歴</h2><p>カード学習を終えると、ここに学習した日時と結果が残ります。</p></section>`;
+
+        const groups = new Map();
+        sessions.forEach(session => {
+            const key = localDateKey(session.completedAt || session.startedAt);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(session);
+        });
         return `
-            <section class="study-center-placeholder">
-                <div class="study-center-placeholder-icon">${isHistory ? '↺' : '⌁'}</div>
-                <h2>${isHistory ? '学習履歴' : '統計'}</h2>
-                <p>${isHistory
-                    ? 'ここには、日ごとの学習語数・新規/復習の内訳・その日に解いた単語を表示できるようにします。'
-                    : 'ここには、正答率・学習量・苦手克服・期限超過・連続学習などをまとめる予定です。'}</p>
-                <span>画面の土台だけ先に用意しています</span>
+            <section class="study-center-history">
+                <div class="study-center-list-heading"><strong>${sessions.length}セッション</strong><span>カード学習の終了時に自動保存</span></div>
+                ${Array.from(groups.entries()).map(([, daySessions]) => {
+                    const stamp = daySessions[0].completedAt || daySessions[0].startedAt;
+                    const unique = daySessions.reduce((sum, item) => sum + (Number(item.uniqueCount) || 0), 0);
+                    const responses = daySessions.reduce((sum, item) => sum + (Number(item.stats?.responses) || 0), 0);
+                    return `
+                        <section class="study-center-history-day">
+                            <div class="study-center-history-day-heading"><div><h3>${escapeHtml(dateHeading(stamp))}</h3><span>${unique}語・${responses}回答</span></div></div>
+                            ${daySessions.map(session => `
+                                <details class="study-center-history-session">
+                                    <summary>
+                                        <div><strong>${escapeHtml(session.label || '学習')}</strong><span>${escapeHtml(timeLabel(session.completedAt || session.startedAt))}${session.finished ? '' : '・途中終了'}</span></div>
+                                        <div class="study-center-history-numbers"><span>${Number(session.uniqueCount) || 0}語</span><span>正解 ${sessionAccuracy(session)}%</span></div>
+                                    </summary>
+                                    <div class="study-center-history-breakdown">
+                                        <span>新規 ${Number(session.newCount) || 0}</span><span>復習 ${Number(session.reviewCount) || 0}</span>
+                                        <span>✓ ${Number(session.stats?.known) || 0}</span><span>? ${Number(session.stats?.unsure) || 0}</span><span>✕ ${Number(session.stats?.wrong) || 0}</span>
+                                    </div>
+                                    <div class="study-center-history-words">
+                                        ${(Array.isArray(session.words) ? session.words : []).map(item => `<div><strong>${escapeHtml(item.word || '—')}</strong><span>${escapeHtml(item.meaning || '')}</span><b class="result-${escapeHtml(item.finalResult || '')}">${resultMark(item.finalResult)}</b></div>`).join('') || '<span>単語詳細はありません。</span>'}
+                                    </div>
+                                </details>
+                            `).join('')}
+                        </section>
+                    `;
+                }).join('')}
+            </section>
+        `;
+    }
+
+    function consecutiveStudyDays(sessions) {
+        const keys = new Set(sessions.map(item => localDateKey(item.completedAt || item.startedAt)));
+        let count = 0;
+        let cursor = startOfLocalDay();
+        while (keys.has(localDateKey(cursor))) {
+            count += 1;
+            cursor = localDayAfter(-count);
+        }
+        return count;
+    }
+
+    function renderStudyActivityBars(sessions) {
+        const days = Array.from({ length: 7 }, (_, index) => {
+            const offset = index - 6;
+            const start = localDayAfter(offset);
+            const end = localDayAfter(offset + 1);
+            const matching = sessions.filter(item => {
+                const stamp = Number(item.completedAt || item.startedAt) || 0;
+                return stamp >= start && stamp < end;
+            });
+            const count = matching.reduce((sum, item) => sum + (Number(item.uniqueCount) || 0), 0);
+            return { offset, count, start };
+        });
+        const max = Math.max(1, ...days.map(item => item.count));
+        return `<div class="study-center-activity-bars">${days.map(day => {
+            const date = new Date(day.start);
+            const height = Math.max(day.count ? 10 : 2, Math.round((day.count / max) * 68));
+            return `<div><strong>${day.count}</strong><span class="bar"><i style="height:${height}px"></i></span><small>${date.getMonth() + 1}/${date.getDate()}</small></div>`;
+        }).join('')}</div>`;
+    }
+
+    function renderStats(model) {
+        const sessions = historySessions();
+        const now = Date.now();
+        const last7 = sessions.filter(item => Number(item.completedAt || item.startedAt) >= now - 7 * DAY_MS);
+        const last30 = sessions.filter(item => Number(item.completedAt || item.startedAt) >= now - 30 * DAY_MS);
+        const responses7 = last7.reduce((sum, item) => sum + (Number(item.stats?.responses) || 0), 0);
+        const known7 = last7.reduce((sum, item) => sum + (Number(item.stats?.known) || 0), 0);
+        const words7 = last7.reduce((sum, item) => sum + (Number(item.uniqueCount) || 0), 0);
+        const words30 = last30.reduce((sum, item) => sum + (Number(item.uniqueCount) || 0), 0);
+        const streak = consecutiveStudyDays(sessions);
+        return `
+            <section class="study-center-stats">
+                <div class="study-center-stat-grid">
+                    <div><span>7日間</span><strong>${words7}</strong><small>学習した語</small></div>
+                    <div><span>正解率</span><strong>${responses7 ? Math.round(known7 / responses7 * 100) : 0}%</strong><small>直近7日</small></div>
+                    <div><span>30日間</span><strong>${words30}</strong><small>学習した語</small></div>
+                    <div><span>連続学習</span><strong>${streak}</strong><small>日</small></div>
+                    <div><span>苦手</span><strong>${model.difficult.length}</strong><small>現在</small></div>
+                    <div><span>保留</span><strong>${model.held.length}</strong><small>自動出題から除外</small></div>
+                </div>
+                <div class="study-center-panel">
+                    <div class="study-center-panel-heading"><div><span class="study-center-eyebrow">ACTIVITY</span><h3>直近7日間</h3></div></div>
+                    ${renderStudyActivityBars(sessions)}
+                </div>
+                <div class="study-center-panel">
+                    <div class="study-center-panel-heading"><div><span class="study-center-eyebrow">CURRENT</span><h3>今の復習状況</h3></div></div>
+                    <div class="study-center-current-stats"><span>未解決 <b>${model.unresolved.length}</b></span><span>期限超過 <b>${model.overdue.length}</b></span><span>今日 <b>${model.todayDue.length}</b></span><span>明日 <b>${model.tomorrowDue.length}</b></span></div>
+                </div>
             </section>
         `;
     }
@@ -492,7 +620,8 @@
         if (activeTab === 'home') content.innerHTML = renderHome(model);
         else if (activeTab === 'review') content.innerHTML = renderReview(model);
         else if (activeTab === 'words') content.innerHTML = renderWords(model);
-        else content.innerHTML = renderPlaceholder(activeTab);
+        else if (activeTab === 'history') content.innerHTML = renderHistory();
+        else if (activeTab === 'stats') content.innerHTML = renderStats(model);
         updateNavBadge(model);
     }
 
@@ -603,6 +732,12 @@
         if (!section) return;
         section.style.display = 'block';
         render();
+        const historyLoad = window.SmartReaderStudy?.loadHistory?.();
+        if (historyLoad && typeof historyLoad.then === 'function') {
+            historyLoad.then(() => {
+                if (section.style.display !== 'none' && (activeTab === 'history' || activeTab === 'stats' || activeTab === 'home')) render();
+            });
+        }
         window.scrollTo?.({ top: 0, behavior: 'instant' });
     }
 
@@ -753,6 +888,9 @@
 
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) updateNavBadge();
+        });
+        window.addEventListener('smartreader:study-history-updated', () => {
+            if (document.getElementById(SECTION_ID)?.style.display !== 'none') render();
         });
     }
 
