@@ -1,0 +1,130 @@
+name: Apply swipe undo fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-swipe-undo-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create savepoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag='save/2026-09-14-before-swipe-undo-fix'
+          target='271bb2b55e21b8b491e152c37ab4a2955e7c6616'
+          git tag -f "$tag" "$target"
+          git push origin -f "refs/tags/$tag"
+
+      - name: Patch swipe pointer cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('flashcard-study.js')
+          text = path.read_text()
+
+          old_pointerup = """        card.addEventListener('pointerup', event => {
+            if (!dragState || dragState.pointerId !== event.pointerId) return;
+            const state = dragState;
+            dragState = null;
+            const result = resultDirection(state.dx, state.dy);
+            const distance = dragDistanceFor(result, state.dx, state.dy);
+            if (result && distance >= state.threshold) {
+                commitResult(result);
+                return;
+            }
+            resetCardPosition(card);
+            if (!state.moved && !hasActiveTextSelection()) card.classList.toggle('flipped');
+        });
+
+        card.addEventListener('pointercancel', () => {
+            dragState = null;
+            resetCardPosition(card);
+        });
+"""
+
+          new_pointerup = """        card.addEventListener('pointerup', event => {
+            if (!dragState || dragState.pointerId !== event.pointerId) return;
+            const state = dragState;
+            dragState = null;
+
+            // iOS Safari can keep the card's pointer capture alive long enough for the
+            // next tap to be swallowed after a swipe. Release it explicitly before
+            // committing the judgement so the header undo button receives the next tap.
+            if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
+                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
+            card.classList.remove('is-dragging');
+
+            const result = resultDirection(state.dx, state.dy);
+            const distance = dragDistanceFor(result, state.dx, state.dy);
+            if (result && distance >= state.threshold) {
+                event.preventDefault();
+                commitResult(result);
+                return;
+            }
+            resetCardPosition(card);
+            if (!state.moved && !hasActiveTextSelection()) card.classList.toggle('flipped');
+        });
+
+        card.addEventListener('pointercancel', event => {
+            if (dragState?.captured && dragState.pointerId === event.pointerId && card.hasPointerCapture?.(event.pointerId)) {
+                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
+            dragState = null;
+            resetCardPosition(card);
+        });
+
+        card.addEventListener('lostpointercapture', event => {
+            if (dragState?.pointerId !== event.pointerId) return;
+            dragState = null;
+            card.classList.remove('is-dragging');
+        });
+"""
+
+          if old_pointerup not in text:
+              raise SystemExit('pointerup/pointercancel anchor not found')
+          text = text.replace(old_pointerup, new_pointerup, 1)
+          path.write_text(text)
+
+          index = Path('index.html')
+          html = index.read_text()
+          old_version = 'flashcard-study.js?v=1.3'
+          new_version = 'flashcard-study.js?v=1.4'
+          if old_version not in html:
+              raise SystemExit('flashcard cache version anchor not found')
+          index.write_text(html.replace(old_version, new_version, 1))
+          PY
+
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check flashcard-study.js
+          grep -Fq 'card.releasePointerCapture(event.pointerId)' flashcard-study.js
+          grep -Fq "card.addEventListener('lostpointercapture'" flashcard-study.js
+          grep -Fq 'flashcard-study.js?v=1.4' index.html
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add flashcard-study.js index.html
+          git commit -m 'Fix undo tap after swiping flashcards'
+          git push origin HEAD:main
