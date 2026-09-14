@@ -948,9 +948,18 @@
             if (!dragState || dragState.pointerId !== event.pointerId) return;
             const state = dragState;
             dragState = null;
+
+            // Explicitly release pointer capture before committing a swipe.
+            // iOS Safari can otherwise swallow the next tap on the header undo button.
+            if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
+                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
+            card.classList.remove('is-dragging');
+
             const result = resultDirection(state.dx, state.dy);
             const distance = dragDistanceFor(result, state.dx, state.dy);
             if (result && distance >= state.threshold) {
+                event.preventDefault();
                 commitResult(result);
                 return;
             }
@@ -958,9 +967,18 @@
             if (!state.moved && !hasActiveTextSelection()) card.classList.toggle('flipped');
         });
 
-        card.addEventListener('pointercancel', () => {
+        card.addEventListener('pointercancel', event => {
+            if (dragState?.captured && dragState.pointerId === event.pointerId && card.hasPointerCapture?.(event.pointerId)) {
+                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
             dragState = null;
             resetCardPosition(card);
+        });
+
+        card.addEventListener('lostpointercapture', event => {
+            if (dragState?.pointerId !== event.pointerId) return;
+            dragState = null;
+            card.classList.remove('is-dragging');
         });
 
         card.addEventListener('keydown', event => {
