@@ -1,0 +1,165 @@
+name: Roll back flashcard session to pre-feedback baseline
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/rollback-flashcard-session-to-prefeedback.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rollback-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+
+      - name: Restore known-good session pipeline
+        run: python .github/scripts/rollback-flashcard-session-to-prefeedback.py
+
+      - name: Verify restored functions against baseline
+        run: |
+          set -euo pipefail
+          node --check flashcard-study.js
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          current = Path('flashcard-study.js').read_text()
+          baseline = subprocess.check_output(['git','show','save/2026-09-14-before-study-feedback:flashcard-study.js'], text=True)
+
+          def function_block(text, name):
+              marker = f'    function {name}('
+              start = text.index(marker)
+              end = text.find('\n    function ', start + len(marker))
+              return text[start:] if end < 0 else text[start:end]
+
+          restored = [
+              'applyStudyResult', 'sessionSnapshot', 'restoreSnapshot', 'answerCurrent',
+              'undoLast', 'closeSession', 'renderCardContent', 'renderSessionHeader',
+              'renderSessionSummary', 'renderSession', 'commitResult', 'startSession'
+          ]
+          for name in restored:
+              if function_block(current, name) != function_block(baseline, name):
+                  raise SystemExit(f'{name} does not match the known-good baseline')
+
+          bind = function_block(current, 'bindCardInteractions')
+          if "card.addEventListener('touchmove'" not in bind:
+              raise SystemExit('iPhone touch tracking was lost')
+          if "event.pointerType === 'touch'" not in bind:
+              raise SystemExit('touch/pointer deduplication was lost')
+          if 'showAnswerFeedback' in current[current.index('    function applyStudyResult'):current.index('\n    function updateHubCounts')]:
+              raise SystemExit('feedback-phase execution code remains in session pipeline')
+          PY
+          grep -Fq 'flashcard-study.js?v=1.11' index.html
+
+      - name: Exercise answer and transition control flow
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync('flashcard-study.js', 'utf8');
+          function block(name) {
+            const marker = `    function ${name}(`;
+            const start = source.indexOf(marker);
+            if (start < 0) throw new Error(`${name} not found`);
+            const end = source.indexOf('\n    function ', start + marker.length);
+            return source.slice(start, end < 0 ? source.length : end);
+          }
+          function assert(value, message) { if (!value) throw new Error(message); }
+
+          // answerCurrent: known / wrong / unsure must advance state without throwing.
+          let saveCalls = 0;
+          let refreshCalls = 0;
+          let renderCalls = 0;
+          const uiState = { shuffle: false };
+          function shuffleEntries(items) { return [...items]; }
+          function scheduleSave() { saveCalls += 1; }
+          function refreshStudySurfaces() { refreshCalls += 1; }
+          function renderSession() { renderCalls += 1; }
+          function sessionSnapshot(entry) { return { entry }; }
+          function applyStudyResult() { return { promoted: false, demoted: false, lapse: false }; }
+          let session;
+          eval(block('answerCurrent'));
+
+          const makeSession = () => ({
+            finished: false,
+            queue: [{ key: 'a' }, { key: 'b' }],
+            index: 0,
+            history: [],
+            nextRound: [],
+            round: 1,
+            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0 },
+            evaluated: new Set(), answeredUnique: new Set(), attempts: new Map()
+          });
+
+          for (const result of ['known', 'wrong', 'unsure']) {
+            session = makeSession();
+            answerCurrent(result, { deferRender: true });
+            assert(session.index === 1, `${result}: index did not advance`);
+            assert(session.stats.responses === 1, `${result}: response count did not advance`);
+            assert(session.stats[result] === 1, `${result}: judgement count did not advance`);
+            assert(session.history.length === 1, `${result}: undo snapshot missing`);
+            if (result !== 'known') assert(session.nextRound.length === 1, `${result}: retry queue missing`);
+          }
+
+          // commitResult: after the animation timer, refresh and next render must run.
+          let pendingCommit = null;
+          session = { finished: false };
+          let timeoutCallback = null;
+          let answerCalls = 0;
+          refreshCalls = 0;
+          renderCalls = 0;
+          const judge = { textContent: '' };
+          const card = {
+            classList: { add() {} }, dataset: {},
+            style: { transform: '', setProperty() {} },
+            querySelector() { return judge; }
+          };
+          const undo = { disabled: true };
+          const document = { getElementById(id) { return id === 'study-flashcard' ? card : (id === 'study-session-undo' ? undo : null); } };
+          const window = { setTimeout(cb) { timeoutCallback = cb; return 77; } };
+          function resultSymbol(result) { return result === 'known' ? '✓' : result === 'wrong' ? '×' : '?'; }
+          function answerCurrentForCommit() { answerCalls += 1; }
+          // commitResult resolves answerCurrent by name, so alias the mock in an isolated Function.
+          const commitFactory = new Function('document','window','resultSymbol','refreshStudySurfaces','renderSession','getSession','getPending','setPending','answerCurrent', `
+            let session = getSession();
+            let pendingCommit = getPending();
+            ${block('commitResult')}
+            return {
+              run(result) { commitResult(result); setPending(pendingCommit); },
+              sync() { pendingCommit = getPending(); }
+            };
+          `);
+          let externalPending = null;
+          const commit = commitFactory(
+            document, window, resultSymbol,
+            () => { refreshCalls += 1; },
+            () => { renderCalls += 1; },
+            () => session,
+            () => externalPending,
+            value => { externalPending = value; },
+            answerCurrentForCommit
+          );
+          commit.run('known');
+          assert(answerCalls === 1, 'commitResult did not record answer');
+          assert(externalPending?.timerId === 77, 'commitResult did not register transition timer');
+          assert(typeof timeoutCallback === 'function', 'transition callback missing');
+          commit.sync();
+          timeoutCallback();
+          assert(refreshCalls === 1, 'post-answer refresh did not run');
+          assert(renderCalls === 1, 'next card render did not run');
+          NODE
+
+      - name: Commit rollback
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add flashcard-study.js index.html
+          git commit -m 'Restore stable flashcard session pipeline'
+          git push origin HEAD:feature/study-center
