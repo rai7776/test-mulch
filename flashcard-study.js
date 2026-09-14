@@ -125,7 +125,10 @@
             lastSessionWrongCount: 0,
             lastSessionUnsureCount: 0,
             lastSessionFirstResult: null,
-            lastSessionCompletedAt: null
+            lastSessionCompletedAt: null,
+            suspended: false,
+            suspendedAt: null,
+            manualMasteredAt: null
         };
     }
 
@@ -162,6 +165,9 @@
         merged.lastStudiedAt = optionalTimestamp(merged.lastStudiedAt);
         merged.lastReviewAt = optionalTimestamp(merged.lastReviewAt);
         merged.lastSessionCompletedAt = optionalTimestamp(merged.lastSessionCompletedAt);
+        merged.suspended = !!merged.suspended;
+        merged.suspendedAt = optionalTimestamp(merged.suspendedAt);
+        merged.manualMasteredAt = optionalTimestamp(merged.manualMasteredAt);
         return merged;
     }
 
@@ -176,6 +182,29 @@
     function adjustDifficulty(study, delta) {
         study.difficultyScore = clampInteger((study.difficultyScore ?? DEFAULT_DIFFICULTY) + delta, 0, 100, DEFAULT_DIFFICULTY);
         return study.difficultyScore;
+    }
+
+    function weaknessScore(study) {
+        const seen = Math.max(0, Number(study?.seenCount) || 0);
+        const known = Math.max(0, Number(study?.knownCount) || 0);
+        const attempts = Math.max(0, Number(study?.lastSessionAttempts) || 0);
+        const recentWrong = Math.max(0, Number(study?.lastSessionWrongCount) || 0);
+        const recentUnsure = Math.max(0, Number(study?.lastSessionUnsureCount) || 0);
+        const accuracy = seen ? known / seen : null;
+        let score = (Number(study?.difficultyScore) || DEFAULT_DIFFICULTY) * 0.55;
+
+        if (attempts) {
+            score += Math.min(25, (recentWrong / attempts) * 25 + (recentUnsure / attempts) * 12);
+        }
+        const last = String(study?.lastReviewResult || study?.lastResult || '');
+        if (last === 'wrong') score += 18;
+        else if (last === 'unsure') score += 10;
+        else if (last === 'known') score -= 8;
+
+        score += Math.min(18, (Number(study?.lapseCount) || 0) * 6);
+        if (accuracy !== null && seen >= 3 && accuracy < 0.7) score += (0.7 - accuracy) * 30;
+        score -= Math.min(20, (Number(study?.correctStreak) || 0) * 4);
+        return clampInteger(Math.round(score), 0, 100, DEFAULT_DIFFICULTY);
     }
 
     function adaptiveIntervalDays(level, difficultyScore) {
@@ -211,15 +240,14 @@
         const overdue = next !== null && next < today;
         const dueToday = next !== null && next >= today && next < tomorrow;
         const due = next !== null && next < tomorrow;
-        const mastered = !!word?.memorized || study.level >= 4;
-        const learning = !isNew && !mastered;
+        const suspended = !!study.suspended;
+        const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
+        const mastered = manualMastered || !!word?.memorized || study.level >= 4;
+        const learning = !suspended && !isNew && !mastered;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
-        const difficult = study.difficultyScore >= 65
-            || study.lapseCount >= 2
-            || study.wrongCount >= 4
-            || study.lastReviewResult === 'wrong'
-            || (study.seenCount >= 4 && accuracy !== null && accuracy < 0.5);
-        return { study, isNew, overdue, dueToday, due, mastered, learning, difficult, accuracy };
+        const weakScore = weaknessScore(study);
+        const difficult = !suspended && !manualMastered && weakScore >= 65;
+        return { study, isNew, overdue, dueToday, due, mastered, manualMastered, suspended, learning, difficult, weaknessScore: weakScore, accuracy };
     }
 
     function articleTitle(article) {
@@ -269,7 +297,7 @@
     function dedupeEntries(entries) {
         const seen = new Set();
         return (entries || []).filter(entry => {
-            if (!entry?.word || seen.has(entry.key)) return false;
+            if (!entry?.word || studyView(entry.word).suspended || seen.has(entry.key)) return false;
             seen.add(entry.key);
             return true;
         });
@@ -318,6 +346,7 @@
         const summary = { total: 0, overdue: 0, dueToday: 0, due: 0, fresh: 0, difficult: 0, learning: 0, mastered: 0 };
         (entries || []).forEach(entry => {
             const view = studyView(entry.word);
+            if (view.suspended || view.manualMastered) return;
             summary.total += 1;
             if (view.overdue) summary.overdue += 1;
             if (view.dueToday) summary.dueToday += 1;
@@ -369,7 +398,10 @@
     }
 
     function selectTodayEntries() {
-        const all = getAllStudyEntries();
+        const all = getAllStudyEntries().filter(entry => {
+            const view = studyView(entry.word);
+            return !view.suspended && !view.manualMastered;
+        });
         const due = sortDue(all.filter(entry => studyView(entry.word).due)).slice(0, uiState.reviewLimit);
         const dueKeys = new Set(due.map(entry => entry.key));
         const fresh = all.filter(entry => studyView(entry.word).isNew && !dueKeys.has(entry.key)).slice(0, uiState.newLimit);
@@ -377,7 +409,10 @@
     }
 
     function selectPreset(mode) {
-        const all = getAllStudyEntries();
+        const all = getAllStudyEntries().filter(entry => {
+            const view = studyView(entry.word);
+            return !view.suspended && !view.manualMastered;
+        });
         if (mode === 'today') return selectTodayEntries();
         if (mode === 'overdue') return sortDue(all.filter(entry => studyView(entry.word).overdue));
         if (mode === 'due') return sortDue(all.filter(entry => studyView(entry.word).due));
@@ -428,6 +463,11 @@
         const previousSessionCount = study.sessionCount;
         const wasPreviouslyLearned = previousLevel > 0 || !!word.memorized || study.firstKnownCount > 0;
         const attempt = sessionAttemptState(entry.key);
+
+        if (result === 'wrong' && study.manualMasteredAt) {
+            study.manualMasteredAt = null;
+            word.memorized = false;
+        }
 
         attempt.responses += 1;
         attempt[result] += 1;

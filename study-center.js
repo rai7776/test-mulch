@@ -84,8 +84,36 @@
             difficultyScore: Number.isFinite(Number(raw.difficultyScore)) ? Number(raw.difficultyScore) : 45,
             lastResult: raw.lastResult || null,
             lastReviewResult: raw.lastReviewResult || null,
-            lapseCount: Number(raw.lapseCount) || 0
+            lapseCount: Number(raw.lapseCount) || 0,
+            lastSessionAttempts: Number(raw.lastSessionAttempts) || 0,
+            lastSessionWrongCount: Number(raw.lastSessionWrongCount) || 0,
+            lastSessionUnsureCount: Number(raw.lastSessionUnsureCount) || 0,
+            suspended: !!raw.suspended,
+            suspendedAt: Number.isFinite(Number(raw.suspendedAt)) ? Number(raw.suspendedAt) : null,
+            manualMasteredAt: Number.isFinite(Number(raw.manualMasteredAt)) ? Number(raw.manualMasteredAt) : null
         };
+    }
+
+    function localWeaknessScore(study) {
+        const seen = Math.max(0, Number(study?.seenCount) || 0);
+        const known = Math.max(0, Number(study?.knownCount) || 0);
+        const attempts = Math.max(0, Number(study?.lastSessionAttempts) || 0);
+        const accuracy = seen ? known / seen : null;
+        let score = (Number(study?.difficultyScore) || 45) * 0.55;
+        if (attempts) {
+            score += Math.min(25,
+                ((Number(study?.lastSessionWrongCount) || 0) / attempts) * 25
+                + ((Number(study?.lastSessionUnsureCount) || 0) / attempts) * 12
+            );
+        }
+        const last = String(study?.lastReviewResult || study?.lastResult || '');
+        if (last === 'wrong') score += 18;
+        else if (last === 'unsure') score += 10;
+        else if (last === 'known') score -= 8;
+        score += Math.min(18, (Number(study?.lapseCount) || 0) * 6);
+        if (accuracy !== null && seen >= 3 && accuracy < 0.7) score += (0.7 - accuracy) * 30;
+        score -= Math.min(20, (Number(study?.correctStreak) || 0) * 4);
+        return Math.max(0, Math.min(100, Math.round(score)));
     }
 
     function wordView(word) {
@@ -99,13 +127,17 @@
         const overdue = next !== null && next < today;
         const dueToday = next !== null && next >= today && next < tomorrow;
         const due = next !== null && next < tomorrow;
-        const mastered = !!word?.memorized || study.level >= 4;
-        const difficult = study.difficultyScore >= 65 || study.lapseCount >= 2 || study.wrongCount >= 4;
-        return { study, isNew, overdue, dueToday, due, mastered, difficult };
+        const suspended = !!study.suspended;
+        const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
+        const mastered = manualMastered || !!word?.memorized || study.level >= 4;
+        const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
+        const weakScore = localWeaknessScore(study);
+        const difficult = !suspended && !manualMastered && weakScore >= 65;
+        return { study, isNew, overdue, dueToday, due, mastered, manualMastered, suspended, difficult, weaknessScore: weakScore, accuracy };
     }
 
     function isUnresolved(view) {
-        if (!view?.due) return false;
+        if (!view?.due || view?.suspended || view?.manualMastered) return false;
         const last = String(view.study?.lastResult || view.study?.lastReviewResult || '');
         return last === 'wrong' || last === 'unsure';
     }
@@ -121,7 +153,7 @@
         if (isUnresolved(view)) score += 50000;
         if (view.overdue) score += 30000 + Math.min(365, daysOverdue(view.study.nextReviewAt)) * 100;
         else if (view.dueToday) score += 20000;
-        score += (Number(view.study?.difficultyScore) || 0) * 10;
+        score += (Number(view.weaknessScore ?? view.study?.difficultyScore) || 0) * 10;
         score += Math.min(100, Number(view.study?.wrongCount) || 0) * 3;
         return score;
     }
@@ -145,13 +177,19 @@
         const newWords = [];
         const difficult = [];
         const mastered = [];
+        const held = [];
 
         entries.forEach(entry => {
             const view = wordView(entry.word);
             const next = view.study?.nextReviewAt;
+            if (view.suspended) {
+                held.push(entry);
+                return;
+            }
+            if (view.mastered) mastered.push(entry);
+            if (view.manualMastered) return;
             if (view.isNew) newWords.push(entry);
             if (view.difficult) difficult.push(entry);
-            if (view.mastered) mastered.push(entry);
 
             if (isUnresolved(view)) {
                 unresolved.push(entry);
@@ -180,6 +218,7 @@
             newWords: sorted(newWords),
             difficult: sorted(difficult),
             mastered: sorted(mastered),
+            held: sorted(held),
             today,
             tomorrow
         };
@@ -199,6 +238,8 @@
 
     function dueLabel(entry) {
         const view = wordView(entry.word);
+        if (view.suspended) return { text: '保留', tone: 'held' };
+        if (view.manualMastered) return { text: '手動✓', tone: 'mastered' };
         if (isUnresolved(view)) return { text: '未解決', tone: 'danger' };
         if (view.overdue) {
             const days = daysOverdue(view.study.nextReviewAt);
@@ -208,6 +249,20 @@
         const next = view.study.nextReviewAt;
         if (next !== null && next < localDayAfter(2)) return { text: '明日', tone: 'soon' };
         return { text: formatDate(next), tone: 'future' };
+    }
+
+    function weaknessReason(view) {
+        const study = view?.study || {};
+        const last = String(study.lastReviewResult || study.lastResult || '');
+        if (last === 'wrong') return '直近で✕';
+        if (last === 'unsure') return '直近で?';
+        if ((Number(study.lapseCount) || 0) >= 2) return `忘却 ${Number(study.lapseCount)}回`;
+        const attempts = Number(study.lastSessionAttempts) || 0;
+        const recentMiss = (Number(study.lastSessionWrongCount) || 0) + (Number(study.lastSessionUnsureCount) || 0);
+        if (attempts >= 2 && recentMiss / attempts >= 0.5) return '最近のミスが多い';
+        if (view?.accuracy !== null && view?.accuracy !== undefined && Number(view.accuracy) < 0.6) return '正答率が低め';
+        if ((Number(study.correctStreak) || 0) >= 3) return `連続✓ ${Number(study.correctStreak)}`;
+        return '総合判定';
     }
 
     function recentResult(view) {
@@ -221,10 +276,12 @@
     function wordCard(entry) {
         const view = wordView(entry.word);
         const due = dueLabel(entry);
-        const difficulty = Math.round(Number(view.study?.difficultyScore) || 0);
+        const difficulty = Math.round(Number(view.weaknessScore ?? view.study?.difficultyScore) || 0);
         const source = `${entry.articleTitle}${entry.chapterTitle ? ` / ${entry.chapterTitle}` : ''}`;
+        const held = !!view.suspended;
+        const manualMastered = !!view.manualMastered;
         return `
-            <article class="study-center-word-card">
+            <article class="study-center-word-card ${held ? 'is-held' : ''} ${manualMastered ? 'is-manual-mastered' : ''}">
                 <div class="study-center-word-main">
                     <div class="study-center-word-title-row">
                         <strong>${escapeHtml(entry.word.word || entry.word.surfaceText || '—')}</strong>
@@ -233,12 +290,17 @@
                     <div class="study-center-word-meaning">${escapeHtml(entry.word.meaning || '')}</div>
                     <div class="study-center-word-meta">
                         <span>苦手度 ${difficulty}</span>
+                        <span>${escapeHtml(weaknessReason(view))}</span>
                         <span>前回 ${recentResult(view)}</span>
                         <span>✕${Number(view.study?.wrongCount) || 0}</span>
                     </div>
                     <small>${escapeHtml(source)}</small>
                 </div>
-                <button type="button" class="study-center-mini-study" data-study-one="${escapeHtml(entry.key)}">復習</button>
+                <div class="study-center-word-actions">
+                    <button type="button" class="study-center-mini-study" data-study-one="${escapeHtml(entry.key)}" ${held ? 'disabled' : ''}>復習</button>
+                    <button type="button" class="study-center-hold-action ${held ? 'active' : ''}" data-toggle-hold="${escapeHtml(entry.key)}" aria-pressed="${held}">${held ? '保留解除' : '保留'}</button>
+                    <button type="button" class="study-center-master-action ${manualMastered ? 'active' : ''}" data-toggle-mastered="${escapeHtml(entry.key)}" aria-pressed="${manualMastered}" aria-label="手動で暗記済みにする">✓</button>
+                </div>
             </article>
         `;
     }
@@ -370,6 +432,7 @@
         if (wordFilter === 'difficult') return model.difficult;
         if (wordFilter === 'new') return model.newWords;
         if (wordFilter === 'mastered') return model.mastered;
+        if (wordFilter === 'held') return model.held;
         if (wordFilter === 'due') return model.dueNow;
         return sorted(model.entries);
     }
@@ -381,13 +444,13 @@
             ['due', '要復習', model.dueNow.length],
             ['difficult', '苦手', model.difficult.length],
             ['new', '未学習', model.newWords.length],
-            ['mastered', '暗記済み', model.mastered.length]
+            ['mastered', '暗記済み', model.mastered.length],
+            ['held', '保留', model.held.length]
         ];
         return `
             <section class="study-center-words">
                 <div class="study-center-filter-row">
                     ${filters.map(([key, label, count]) => `<button type="button" data-word-filter="${key}" class="${wordFilter === key ? 'active' : ''}">${label} <span>${count}</span></button>`).join('')}
-                    <button type="button" disabled title="保留機能は次の段階で追加します">保留 <span>—</span></button>
                 </div>
                 <div class="study-center-list-heading"><strong>${entries.length}語</strong><span>学習状態を基準に並べています</span></div>
                 <div class="study-center-word-list">
@@ -434,6 +497,47 @@
         if (mode === 'tomorrow') return model.tomorrowDue;
         if (mode === 'week') return model.weekDue;
         return model.dueNow;
+    }
+
+    function persistStudyChanges() {
+        try {
+            const result = typeof saveToDB === 'function' ? saveToDB() : window.saveToDB?.();
+            if (result && typeof result.catch === 'function') result.catch(error => console.error('Study Center save failed', error));
+        } catch (error) {
+            console.error('Study Center save failed', error);
+        }
+    }
+
+    function findEntry(key) {
+        return reviewModel().entries.find(entry => entry.key === key) || null;
+    }
+
+    function toggleHold(entry) {
+        if (!entry?.word) return;
+        const study = { ...fallbackStudy(entry.word), ...(entry.word.study && typeof entry.word.study === 'object' ? entry.word.study : {}) };
+        study.suspended = !study.suspended;
+        study.suspendedAt = study.suspended ? Date.now() : null;
+        entry.word.study = study;
+        persistStudyChanges();
+        render();
+    }
+
+    function toggleManualMastered(entry) {
+        if (!entry?.word) return;
+        const study = { ...fallbackStudy(entry.word), ...(entry.word.study && typeof entry.word.study === 'object' ? entry.word.study : {}) };
+        const currentlyManual = !!study.manualMasteredAt && !!entry.word.memorized;
+        if (currentlyManual) {
+            study.manualMasteredAt = null;
+            entry.word.memorized = Number(study.level) >= 4;
+        } else {
+            study.manualMasteredAt = Date.now();
+            study.suspended = false;
+            study.suspendedAt = null;
+            entry.word.memorized = true;
+        }
+        entry.word.study = study;
+        persistStudyChanges();
+        render();
     }
 
     function openStudy(entries, label) {
@@ -583,6 +687,20 @@
             if (groupButton) {
                 const mode = groupButton.dataset.studyGroup;
                 openStudy(groupEntries(mode), groupButton.textContent.trim());
+                return;
+            }
+
+            const holdButton = event.target.closest('[data-toggle-hold]');
+            if (holdButton) {
+                const entry = findEntry(holdButton.dataset.toggleHold);
+                if (entry) toggleHold(entry);
+                return;
+            }
+
+            const masteredButton = event.target.closest('[data-toggle-mastered]');
+            if (masteredButton) {
+                const entry = findEntry(masteredButton.dataset.toggleMastered);
+                if (entry) toggleManualMastered(entry);
                 return;
             }
 
