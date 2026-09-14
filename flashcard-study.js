@@ -1141,7 +1141,7 @@
     function bindCardInteractions() {
         const card = document.getElementById('study-flashcard');
         if (!card) return;
-        const threshold = Math.max(52, Math.min(96, card.getBoundingClientRect().width * 0.18));
+        const threshold = Math.max(44, Math.min(84, card.getBoundingClientRect().width * 0.15));
 
         card.querySelector('.study-card-copy')?.addEventListener('click', event => {
             event.preventDefault();
@@ -1154,65 +1154,52 @@
             speakCurrentWord();
         });
 
-        card.addEventListener('pointerdown', event => {
-            if (isCardControlTarget(event.target)) return;
-            if (event.button !== undefined && event.button !== 0) return;
-            dragState = {
-                pointerId: event.pointerId,
-                startX: event.clientX,
-                startY: event.clientY,
+        function makeDragState(clientX, clientY, extra = {}) {
+            return {
+                startX: clientX,
+                startY: clientY,
                 dx: 0,
                 dy: 0,
                 moved: false,
+                axis: null,
                 threshold,
                 startedAt: performance.now(),
-                captured: false
+                captured: false,
+                ...extra
             };
-            if (event.pointerType !== 'touch') {
-                card.setPointerCapture?.(event.pointerId);
-                dragState.captured = true;
-            }
-            card.classList.add('is-dragging');
-        });
+        }
 
-        card.addEventListener('pointermove', event => {
-            if (!dragState || dragState.pointerId !== event.pointerId) return;
-            dragState.dx = event.clientX - dragState.startX;
-            dragState.dy = Math.min(0, event.clientY - dragState.startY);
-            if (Math.abs(dragState.dx) > 7 || Math.abs(dragState.dy) > 7) {
-                dragState.moved = true;
-                if (!dragState.captured) {
-                    card.setPointerCapture?.(event.pointerId);
-                    dragState.captured = true;
-                }
-            }
-            const result = resultDirection(dragState.dx, dragState.dy);
-            const distance = dragDistanceFor(result, dragState.dx, dragState.dy);
-            const alpha = Math.min(1, distance / dragState.threshold);
-            card.dataset.direction = result || '';
-            card.style.setProperty('--study-feedback-alpha', String(alpha));
-            card.style.transform = `translate3d(${dragState.dx}px, ${dragState.dy}px, 0) rotate(${dragState.dx * 0.035}deg)`;
-            const judge = card.querySelector('.study-card-judge');
-            if (judge) judge.textContent = resultSymbol(result);
-        });
+        function updateDragPosition(state, clientX, clientY) {
+            if (!state) return;
+            let dx = clientX - state.startX;
+            let dy = clientY - state.startY;
+            const ax = Math.abs(dx);
+            const ay = Math.abs(dy);
 
-        card.addEventListener('pointerup', event => {
-            if (!dragState || dragState.pointerId !== event.pointerId) return;
-            const state = dragState;
-            dragState = null;
-
-            // Safari can coalesce the final pointermove of a quick flick. Use the
-            // pointerup coordinates as the authoritative final drag position.
-            if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
-                state.dx = event.clientX - state.startX;
-                state.dy = Math.min(0, event.clientY - state.startY);
+            if (!state.axis && (ax > 7 || ay > 7)) {
+                state.axis = ax >= ay * 0.8 ? 'x' : 'y';
             }
+            if (state.axis === 'x') dy = 0;
+            if (state.axis === 'y') dx *= 0.18;
+
+            state.dx = dx;
+            state.dy = Math.min(0, dy);
             if (Math.abs(state.dx) > 7 || Math.abs(state.dy) > 7) state.moved = true;
 
-            // Explicitly release pointer capture before committing a swipe.
-            // iOS Safari can otherwise swallow the next tap on the header undo button.
-            if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
-                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            const result = resultDirection(state.dx, state.dy);
+            const distance = dragDistanceFor(result, state.dx, state.dy);
+            const alpha = Math.min(1, distance / state.threshold);
+            card.dataset.direction = result || '';
+            card.style.setProperty('--study-feedback-alpha', String(alpha));
+            card.style.transform = `translate3d(${state.dx}px, ${state.dy}px, 0) rotate(${state.dx * 0.035}deg)`;
+            const judge = card.querySelector('.study-card-judge');
+            if (judge) judge.textContent = resultSymbol(result);
+        }
+
+        function finishDrag(state, clientX, clientY) {
+            if (!state) return;
+            if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+                updateDragPosition(state, clientX, clientY);
             }
             card.classList.remove('is-dragging');
 
@@ -1220,17 +1207,87 @@
             const distance = dragDistanceFor(result, state.dx, state.dy);
             const elapsed = Math.max(1, performance.now() - (state.startedAt || performance.now()));
             const velocity = distance / elapsed;
-            const isQuickFlick = distance >= 34 && velocity >= 0.28;
+            const isQuickFlick = distance >= 30 && velocity >= 0.22;
             if (result && (distance >= state.threshold || isQuickFlick)) {
                 commitResult(result);
                 return;
             }
             resetCardPosition(card);
             if (!state.moved && !hasActiveTextSelection()) card.classList.toggle('flipped');
+        }
+
+        // iOS Safari can interrupt Pointer Events while a touch is moving across a
+        // transformed card. Track fingers with Touch Events directly so the card stays
+        // attached to the finger instead of feeling like it catches or snaps back.
+        card.addEventListener('touchstart', event => {
+            if (isCardControlTarget(event.target) || event.touches.length !== 1 || pendingCommit) return;
+            const touch = event.touches[0];
+            dragState = makeDragState(touch.clientX, touch.clientY, {
+                input: 'touch',
+                touchId: touch.identifier
+            });
+            card.classList.add('is-dragging');
+        }, { passive: true });
+
+        card.addEventListener('touchmove', event => {
+            if (!dragState || dragState.input !== 'touch') return;
+            if (hasActiveTextSelection()) {
+                dragState = null;
+                resetCardPosition(card);
+                return;
+            }
+            const touch = Array.from(event.touches).find(item => item.identifier === dragState.touchId);
+            if (!touch) return;
+            updateDragPosition(dragState, touch.clientX, touch.clientY);
+            if (dragState.moved) event.preventDefault();
+        }, { passive: false });
+
+        card.addEventListener('touchend', event => {
+            if (!dragState || dragState.input !== 'touch') return;
+            const state = dragState;
+            const touch = Array.from(event.changedTouches).find(item => item.identifier === state.touchId);
+            dragState = null;
+            if (state.moved) event.preventDefault();
+            finishDrag(state, touch?.clientX, touch?.clientY);
+        }, { passive: false });
+
+        card.addEventListener('touchcancel', () => {
+            if (dragState?.input !== 'touch') return;
+            dragState = null;
+            resetCardPosition(card);
+        }, { passive: true });
+
+        card.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'touch') return;
+            if (isCardControlTarget(event.target)) return;
+            if (event.button !== undefined && event.button !== 0) return;
+            dragState = makeDragState(event.clientX, event.clientY, {
+                input: 'pointer',
+                pointerId: event.pointerId
+            });
+            card.setPointerCapture?.(event.pointerId);
+            dragState.captured = true;
+            card.classList.add('is-dragging');
+        });
+
+        card.addEventListener('pointermove', event => {
+            if (!dragState || dragState.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            updateDragPosition(dragState, event.clientX, event.clientY);
+        });
+
+        card.addEventListener('pointerup', event => {
+            if (!dragState || dragState.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            const state = dragState;
+            dragState = null;
+            if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
+                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
+            finishDrag(state, event.clientX, event.clientY);
         });
 
         card.addEventListener('pointercancel', event => {
-            if (dragState?.captured && dragState.pointerId === event.pointerId && card.hasPointerCapture?.(event.pointerId)) {
+            if (!dragState || dragState.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            if (dragState.captured && card.hasPointerCapture?.(event.pointerId)) {
                 try { card.releasePointerCapture(event.pointerId); } catch (_) {}
             }
             dragState = null;
@@ -1238,9 +1295,7 @@
         });
 
         card.addEventListener('lostpointercapture', event => {
-            if (dragState?.pointerId !== event.pointerId) return;
-            // Do not discard the gesture here. iOS Safari may drop pointer capture
-            // before pointerup during a fast swipe; pointerup/pointercancel owns cleanup.
+            if (dragState?.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
             dragState.captured = false;
         });
 
@@ -1717,7 +1772,7 @@
             .study-hub-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:16px}.study-preset{display:grid;grid-template-columns:1fr auto;grid-template-areas:'label count' 'hint hint';gap:2px 8px;text-align:left;padding:12px;border:1px solid #e5dbd1;border-radius:12px;background:#fff;color:#51463d}.study-preset.primary{border-color:#cdb59c;background:#fff8f0}.study-preset.context{grid-column:1/-1}.study-preset span{grid-area:label;font-weight:700}.study-preset strong{grid-area:count;font-size:1.35rem}.study-preset small{grid-area:hint;color:#897d71}
             .study-hub-settings{margin-top:12px;padding:9px 11px;border:1px solid #e7ddd3;border-radius:10px;background:#faf7f3}.study-hub-settings summary{cursor:pointer;font-weight:700;color:#6b5c4e}.study-setting-row{display:flex;align-items:center;gap:6px;margin-top:8px}.study-setting-row label{display:flex;align-items:center;gap:7px}.study-setting-row input[type=number]{width:72px;min-height:36px;font-size:16px}.study-setting-row select{min-height:36px;padding:5px 8px;border:1px solid #ded3c9;border-radius:8px;background:#fff;color:#5f5348;font-size:16px}.study-setting-check{display:flex;align-items:center;gap:7px;margin-top:9px}
             .study-swipe-guide{display:flex;justify-content:center;gap:30px;margin-top:14px}.study-swipe-guide span{display:flex;align-items:center;gap:7px;font-weight:800}.study-swipe-guide i{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-style:normal}.study-swipe-guide .wrong i{background:var(--study-red)}.study-swipe-guide .unsure i{background:var(--study-gray)}.study-swipe-guide .known i{background:var(--study-green)}.study-hub-status{min-height:1.2em;margin:10px 0 0;color:var(--study-red);font-size:.85rem}
-            .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
+            .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto;overscroll-behavior:none}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
             .study-session-shell{position:relative;width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap>span{display:inline-block;margin:2px 3px 0;color:#817568;font-size:.78rem}.study-session-streak{padding:2px 7px;border-radius:999px;background:#fff0d5;color:#9b5b08!important;font-weight:850}.study-session-streak[hidden]{display:none!important}.study-session-progress-bar{height:5px;margin:9px 54px 0;border-radius:999px;background:#e9e1d9;overflow:hidden}.study-session-progress-bar span{display:block;width:0;height:100%;border-radius:inherit;background:var(--study-green);transition:width .28s ease}.study-answer-feedback{position:absolute;z-index:20;top:78px;left:50%;transform:translate(-50%,-8px) scale(.94);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:150px;max-width:82%;padding:9px 15px;border:1px solid #dfd5cb;border-radius:14px;background:rgba(255,253,249,.96);box-shadow:0 8px 24px rgba(67,57,48,.13);opacity:0;pointer-events:none}.study-answer-feedback.show{animation:study-feedback-pop .2s ease-out forwards}.study-answer-feedback strong{font-size:1rem;color:#433930}.study-answer-feedback span{font-size:.72rem;color:#76695e}.study-answer-feedback.known{border-color:#b9d9c5}.study-answer-feedback.unsure{border-color:#d4d5da}.study-answer-feedback.wrong{border-color:#e6bbbb}.study-answer-feedback.special{box-shadow:0 10px 28px rgba(150,100,30,.2)}@keyframes study-feedback-pop{from{opacity:0;transform:translate(-50%,-8px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
             .study-session-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:470px}.study-gesture-field{position:relative;width:min(500px,92vw);padding:52px 0 18px}.study-flashcard{--study-feedback-alpha:0;position:relative;width:100%;height:min(350px,58vw);min-height:285px;max-height:390px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:transform .22s ease;transform-origin:center center;outline:none}.study-flashcard.is-dragging{cursor:grabbing;transition:none}.study-flashcard.is-committing{transition:transform .19s ease-out}.study-flashcard:focus-visible{outline:3px solid rgba(141,90,43,.25);outline-offset:5px;border-radius:22px}
             .study-flashcard-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .28s ease}.study-flashcard.flipped .study-flashcard-inner{transform:rotateY(180deg)}.study-card-face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid #dfd3c7;border-radius:22px;background:var(--study-paper);box-shadow:0 15px 38px rgba(79,63,50,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:auto}.study-card-back{transform:rotateY(180deg)}
