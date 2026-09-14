@@ -1,0 +1,27 @@
+name: Create study center savepoint
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/create-study-center-savepoint.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  savepoint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+      - name: Create savepoint tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag='save/2026-09-14-before-study-center'
+          target='7ce7f9939f92fe56242dc1bae85499e3f95e080c'
+          git tag -f "$tag" "$target"
+          git push origin -f "refs/tags/$tag"
