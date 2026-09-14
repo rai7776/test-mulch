@@ -123,7 +123,11 @@
         const today = startOfLocalDay();
         const tomorrow = localDayAfter(1);
         const next = study.nextReviewAt;
-        const isNew = !word?.study && !word?.memorized;
+        const isNew = study.seenCount === 0
+            && study.knownCount === 0
+            && study.unsureCount === 0
+            && study.wrongCount === 0
+            && !word?.memorized;
         const overdue = next !== null && next < today;
         const dueToday = next !== null && next >= today && next < tomorrow;
         const due = next !== null && next < tomorrow;
@@ -315,7 +319,9 @@
             const start = localDayAfter(index);
             const end = localDayAfter(index + 1);
             const count = entries.filter(entry => {
-                const next = wordView(entry.word).study?.nextReviewAt;
+                const view = wordView(entry.word);
+                if (view.suspended || view.manualMastered) return false;
+                const next = view.study?.nextReviewAt;
                 return next !== null && next >= start && next < end;
             }).length;
             return { index, count };

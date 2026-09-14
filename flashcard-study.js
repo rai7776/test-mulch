@@ -232,8 +232,11 @@
 
     function studyView(word) {
         const study = readStudy(word);
-        const hasStudy = !!(word && word.study && typeof word.study === 'object');
-        const isNew = !hasStudy && !word?.memorized;
+        const isNew = study.seenCount === 0
+            && study.knownCount === 0
+            && study.unsureCount === 0
+            && study.wrongCount === 0
+            && !word?.memorized;
         const today = startOfLocalDay();
         const tomorrow = startOfNextLocalDay();
         const next = study.nextReviewAt;
@@ -416,7 +419,13 @@
         if (mode === 'today') return selectTodayEntries();
         if (mode === 'overdue') return sortDue(all.filter(entry => studyView(entry.word).overdue));
         if (mode === 'due') return sortDue(all.filter(entry => studyView(entry.word).due));
-        if (mode === 'difficult') return all.filter(entry => studyView(entry.word).difficult).sort((a, b) => { const left = readStudy(a.word); const right = readStudy(b.word); return (right.difficultyScore - left.difficultyScore) || (right.lapseCount - left.lapseCount) || (right.wrongCount - left.wrongCount); });
+        if (mode === 'difficult') return all.filter(entry => studyView(entry.word).difficult).sort((a, b) => {
+            const left = studyView(a.word);
+            const right = studyView(b.word);
+            return (right.weaknessScore - left.weaknessScore)
+                || (right.study.lapseCount - left.study.lapseCount)
+                || (right.study.wrongCount - left.study.wrongCount);
+        });
         if (mode === 'new') return all.filter(entry => studyView(entry.word).isNew).slice(0, Math.max(uiState.newLimit, 1));
         if (mode === 'context') return dedupeEntries(uiState.contextEntries || []);
         return [];
@@ -462,6 +471,7 @@
         const previousLevel = study.level;
         const previousSessionCount = study.sessionCount;
         const wasPreviouslyLearned = previousLevel > 0 || !!word.memorized || study.firstKnownCount > 0;
+        const manualMasteredBeforeAnswer = !!study.manualMasteredAt && !!word.memorized;
         const attempt = sessionAttemptState(entry.key);
 
         if (result === 'wrong' && study.manualMasteredAt) {
@@ -517,7 +527,9 @@
                 study.nextReviewAt = wasDueBeforeAnswer ? previousNextReviewAt : localDayAfter(1, timestamp);
             }
 
-            word.memorized = study.level >= 4;
+            word.memorized = manualMasteredBeforeAnswer && result !== 'wrong'
+                ? true
+                : study.level >= 4;
             promoted = study.level > previousLevel;
             demoted = study.level < previousLevel;
         } else {
