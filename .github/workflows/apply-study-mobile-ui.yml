@@ -1,0 +1,56 @@
+name: Apply Study mobile UI
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - '.github/workflows/apply-study-mobile-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+
+      - name: Apply mobile UI patch
+        run: python .github/scripts/patch-study-mobile-ui.py
+
+      - name: Verify Study mobile UI
+        run: |
+          set -euo pipefail
+          node --check study-center.js
+          grep -Fq '/* Study Center mobile layout v4 */' study-center.css
+          grep -Fq 'overflow-y:auto' study-center.css
+          grep -Fq 'grid-template-columns:repeat(4,minmax(0,1fr))' study-center.css
+          grep -Fq 'section.scrollTop = 0;' study-center.js
+          grep -Fq 'study-center.css?v=4' index.html
+          grep -Fq 'study-center.js?v=5' index.html
+          python - <<'PY'
+          from pathlib import Path
+          css = Path('study-center.css').read_text()
+          required = [
+              '.study-center-word-card{',
+              'display:block;',
+              '.study-center-word-actions{',
+              'flex-direction:row;',
+              '@media(max-width:340px)'
+          ]
+          for token in required:
+              if token not in css:
+                  raise SystemExit(f'missing mobile token: {token}')
+          PY
+
+      - name: Commit mobile UI
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart Reader Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add study-center.css study-center.js index.html
+          git commit -m 'Optimize Study Center for mobile'
+          git push origin HEAD:feature/study-center
