@@ -730,7 +730,8 @@
         }
         effect.streak = session.stats.currentStreak;
         effect.bestStreak = session.stats.bestStreak;
-        effect.progressCount = session.answeredUnique.size;
+        effect.progressAdvanced = result === 'known' && attempt.known === 1;
+        effect.progressCount = session.initialEntries.filter(item => (session.attempts.get(item.key)?.known || 0) > 0).length;
 
         if (result !== 'known' && !session.nextRound.some(item => item.key === entry.key)) {
             session.nextRound.push(entry);
@@ -792,7 +793,7 @@
             special = true;
         }
 
-        if (effect.progressCount && effect.progressCount % 10 === 0) {
+        if (effect.progressAdvanced && effect.progressCount && effect.progressCount % 10 === 0) {
             detail = `${detail ? `${detail} · ` : ''}${effect.progressCount}語達成`;
             special = true;
         }
@@ -983,7 +984,9 @@
             streak.hidden = current < 2;
         }
         if (fill) {
-            const completed = session?.initialCount ? Math.min(session.initialCount, session.answeredUnique.size) : 0;
+            const completed = session?.initialCount
+                ? session.initialEntries.filter(item => (session.attempts.get(item.key)?.known || 0) > 0).length
+                : 0;
             fill.style.width = `${session?.initialCount ? Math.round(completed / session.initialCount * 100) : 0}%`;
         }
         if (undo) undo.disabled = !(session?.history.length || pendingCommit);
