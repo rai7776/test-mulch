@@ -736,6 +736,7 @@
         const section = document.getElementById(SECTION_ID);
         if (!section) return;
         section.style.display = 'block';
+        section.scrollTop = 0;
         render();
         const historyLoad = window.SmartReaderStudy?.loadHistory?.();
         if (historyLoad && typeof historyLoad.then === 'function') {
@@ -813,6 +814,7 @@
             if (tab) {
                 activeTab = tab.dataset.studyTab;
                 render();
+                section.scrollTop = 0;
                 return;
             }
 
@@ -871,6 +873,7 @@
             if (targetTab) {
                 activeTab = targetTab.dataset.tabTarget;
                 render();
+                section.scrollTop = 0;
                 return;
             }
 
