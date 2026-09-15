@@ -109,31 +109,53 @@
         }
     }
 
-    function resolveStudyMeaning(word) {
+    function resolveStudySenseDisplay(word) {
         const legacy = String(word?.meaning || '').trim();
+        let senses = [];
+        let contextId = null;
         try {
             const api = window.SmartReaderWordSenses;
+            if (api?.getSenseDisplay) {
+                const display = api.getSenseDisplay(word);
+                const meaning = String(display?.context?.meaning || legacy).trim();
+                const otherMeanings = Array.isArray(display?.others)
+                    ? display.others.map(sense => String(sense?.meaning || '').trim()).filter(Boolean)
+                    : [];
+                return { meaning, otherMeanings, contextSenseId: display?.contextSenseId || null };
+            }
             if (api?.getWordSenses && api?.getContextSenseId) {
-                const senses = api.getWordSenses(word);
-                const contextId = api.getContextSenseId(word, senses);
-                const context = Array.isArray(senses)
-                    ? (senses.find(sense => String(sense?.id || '') === String(contextId || '')) || senses[0])
-                    : null;
-                const value = String(context?.meaning || '').trim();
-                if (value) return value;
+                senses = api.getWordSenses(word);
+                contextId = api.getContextSenseId(word, senses);
             }
         } catch (_) {}
 
-        const senses = Array.isArray(word?.senses) ? word.senses : [];
-        if (senses.length) {
-            const contextId = String(word?.contextSenseId || '');
-            const context = senses.find(sense => String(sense?.id || '') === contextId)
-                || senses.find(sense => String(sense?.meaning || '').trim())
-                || null;
-            const value = String(context?.meaning || '').trim();
-            if (value) return value;
+        if (!Array.isArray(senses) || !senses.length) {
+            senses = Array.isArray(word?.senses)
+                ? word.senses.filter(sense => sense && String(sense.meaning || '').trim())
+                : [];
+            contextId = String(word?.contextSenseId || '');
         }
-        return legacy;
+
+        const context = senses.find(sense => String(sense?.id || '') === String(contextId || ''))
+            || senses[0]
+            || null;
+        const meaning = String(context?.meaning || legacy).trim();
+        const seen = new Set(meaning ? [meaning.toLocaleLowerCase()] : []);
+        const otherMeanings = [];
+        senses.forEach(sense => {
+            if (!sense || sense === context || String(sense?.id || '') === String(context?.id || '')) return;
+            const value = String(sense.meaning || '').trim();
+            if (!value) return;
+            const key = value.toLocaleLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            otherMeanings.push(value);
+        });
+        return { meaning, otherMeanings, contextSenseId: context?.id || contextId || null };
+    }
+
+    function resolveStudyMeaning(word) {
+        return resolveStudySenseDisplay(word).meaning;
     }
 
     async function recordStudySession(current) {
@@ -872,7 +894,9 @@
         const study = readStudy(word);
         const surface = String(word.surfaceText || '').trim();
         const wordText = String(word.word || '').trim() || surface || '—';
-        const meaning = resolveStudyMeaning(word) || '意味未登録';
+        const senseDisplay = resolveStudySenseDisplay(word);
+        const meaning = senseDisplay.meaning || '意味未登録';
+        const otherMeanings = senseDisplay.otherMeanings;
         const memo = String(word.memo || '').trim();
         const context = String(word.context || '').trim();
         const showContextFront = !!context && uiState.exampleMode === 'always';
@@ -900,6 +924,7 @@
             back.innerHTML = `
                 <div class="study-card-back-word study-card-selectable">${escapeHtml(wordText)}</div>
                 <div class="study-card-meaning study-card-selectable">${escapeHtml(meaning)}</div>
+                ${otherMeanings.length ? `<div class="study-card-other-meanings study-card-selectable" aria-label="その他の意味">${otherMeanings.map(item => `<div>${escapeHtml(item)}</div>`).join('')}</div>` : ''}
                 ${memo ? `<div class="study-card-memo study-card-selectable">${escapeHtml(memo)}</div>` : ''}
                 ${showContextBack ? `<div class="study-card-context study-card-selectable">${escapeHtml(context)}</div>` : ''}
                 <div class="study-card-source study-card-selectable">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
@@ -1688,7 +1713,7 @@
             .study-card-corner-action{position:absolute;z-index:9;top:14px;width:40px;height:40px;border:1px solid #ded3c9;border-radius:50%;background:rgba(255,253,249,.94);color:#65594d;display:flex;align-items:center;justify-content:center;font-size:1rem;line-height:1;box-shadow:0 3px 10px rgba(70,55,44,.08);user-select:none;-webkit-user-select:none;touch-action:manipulation}.study-card-copy{left:14px}.study-card-speak{right:14px;font-size:.9rem}
             .study-card-judge{position:absolute;z-index:5;top:62px;right:20px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.1rem;font-weight:900;opacity:var(--study-feedback-alpha);pointer-events:none}.study-flashcard[data-direction=wrong] .study-card-judge{background:var(--study-red)}.study-flashcard[data-direction=known] .study-card-judge{background:var(--study-green)}.study-flashcard[data-direction=unsure] .study-card-judge{background:var(--study-gray)}
             .study-flashcard[data-direction=wrong] .study-card-face{border-color:color-mix(in srgb,var(--study-red) 60%,#fff);box-shadow:0 15px 38px rgba(160,55,55,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=known] .study-card-face{border-color:color-mix(in srgb,var(--study-green) 60%,#fff);box-shadow:0 15px 38px rgba(50,130,85,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=unsure] .study-card-face{border-color:color-mix(in srgb,var(--study-gray) 60%,#fff)}
-            .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-context-front{margin-top:14px;max-height:38%;overflow:auto;font-size:.82rem}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{max-width:100%;margin-top:5px;color:#8c7c6d;font-size:.72rem;line-height:1.45;text-align:center}
+            .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-other-meanings{display:grid;gap:2px;margin-top:7px;color:#8b7f74;font-size:clamp(.8rem,2.5vw,.95rem);font-weight:500;line-height:1.4}.study-card-other-meanings>div::before{content:'・'}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-context-front{margin-top:14px;max-height:38%;overflow:auto;font-size:.82rem}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{max-width:100%;margin-top:5px;color:#8c7c6d;font-size:.72rem;line-height:1.45;text-align:center}
             .study-direction-hint{position:absolute;z-index:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.45rem;font-weight:900;opacity:.78}.hint-wrong{left:-8px;top:50%;background:var(--study-red)}.hint-known{right:-8px;top:50%;background:var(--study-green)}.hint-unsure{left:50%;top:3px;transform:translateX(-50%);background:var(--study-gray)}
             .study-touch-actions{display:flex;justify-content:center;align-items:flex-start;gap:26px;margin-top:14px}.study-judge-control{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:48px}.study-judge-button{width:48px;height:48px;border:0;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.12)}.study-judge-button.wrong{background:var(--study-red)}.study-judge-button.unsure{background:var(--study-gray)}.study-judge-button.known{background:var(--study-green)}.study-judge-count{display:block;min-height:1em;color:#8a7c70;font-size:.7rem;font-weight:700;line-height:1}.study-session-source{text-align:center;color:#8a7c70;font-size:.75rem;min-height:1.2em}
             .study-session-summary{width:min(560px,94vw);padding:24px;border:1px solid #e1d7cd;border-radius:20px;background:#fff;text-align:center;box-shadow:0 14px 38px rgba(70,55,44,.12)}.study-summary-mark{width:56px;height:56px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--study-green);color:#fff;font-size:1.8rem}.study-session-summary h2{margin:8px 0;color:#433930}.study-summary-main{display:flex;align-items:baseline;justify-content:center;gap:7px}.study-summary-main strong{font-size:2.4rem}.study-summary-main span{color:#7b6e62}.study-summary-judges{display:flex;justify-content:center;gap:18px;margin:18px 0}.study-judge-stat{display:flex;align-items:center;gap:7px}.study-judge-stat span{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900}.study-judge-stat.wrong span{background:var(--study-red)}.study-judge-stat.unsure span{background:var(--study-gray)}.study-judge-stat.known span{background:var(--study-green)}.study-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}.study-summary-grid>div{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:9px;background:#f7f3ef}.study-summary-grid span{color:#75685c;font-size:.82rem}.study-summary-actions{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px}

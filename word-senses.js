@@ -59,6 +59,26 @@
         return matching?.id || senses[0]?.id || null;
     }
 
+    function getSenseDisplay(word) {
+        const senses = getWordSenses(word);
+        const contextSenseId = getContextSenseId(word, senses);
+        const context = senses.find(sense => sense.id === contextSenseId) || senses[0] || null;
+        const seen = new Set();
+        const contextMeaning = normalizeText(context?.meaning);
+        if (contextMeaning) seen.add(contextMeaning.toLocaleLowerCase());
+        const others = [];
+        senses.forEach(sense => {
+            if (!sense || sense.id === context?.id) return;
+            const meaning = normalizeText(sense.meaning);
+            if (!meaning) return;
+            const key = meaning.toLocaleLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            others.push({ ...clone(sense), meaning });
+        });
+        return { senses, contextSenseId: context?.id || contextSenseId || null, context, others };
+    }
+
     function resolveCurrentWord() {
         try {
             if (typeof globalVocabularyEditRef !== 'undefined' && globalVocabularyEditRef) {
@@ -463,6 +483,33 @@
         return Array.from(map.values());
     }
 
+    function enhanceVocabularyCard(card, entry) {
+        if (!card || !entry?.word) return card;
+        const display = getSenseDisplay(entry.word);
+        if (!display.context) return card;
+        const meaning = card.querySelector('.global-vocabulary-summary .meaning-right');
+        if (!meaning) return card;
+
+        meaning.replaceChildren();
+        const primary = document.createElement('div');
+        primary.className = 'global-vocabulary-primary-sense';
+        primary.textContent = display.context.meaning;
+        meaning.appendChild(primary);
+
+        if (display.others.length) {
+            const secondary = document.createElement('div');
+            secondary.className = 'global-vocabulary-secondary-senses';
+            secondary.setAttribute('aria-label', 'その他の意味');
+            display.others.forEach(sense => {
+                const row = document.createElement('span');
+                row.textContent = sense.meaning;
+                secondary.appendChild(row);
+            });
+            meaning.appendChild(secondary);
+        }
+        return card;
+    }
+
     function enhanceGroupCard(card, group) {
         if (!card || !group) return card;
         const senses = collectGroupSenses(group);
@@ -498,6 +545,16 @@
             entries.insertAdjacentElement('beforebegin', section);
         }
         return card;
+    }
+
+    function wrapGlobalVocabularyCard() {
+        const original = window.createGlobalVocabularyCard;
+        if (typeof original !== 'function' || original.__wordSensesWrapped) return;
+        const wrapped = function (entry) {
+            return enhanceVocabularyCard(original.apply(this, arguments), entry);
+        };
+        wrapped.__wordSensesWrapped = true;
+        window.createGlobalVocabularyCard = wrapped;
     }
 
     function wrapGlobalGroupCard() {
@@ -539,6 +596,9 @@
             .word-senses-empty, .word-senses-existing-empty { padding:9px; color:#8a929a; font-size:.78rem; }
             .word-senses-status { min-height:1.1em; margin-top:6px; color:#6d7780; font-size:.72rem; }
             .word-senses-status.is-error { color:#ad3f3f; }
+            .global-vocabulary-primary-sense { font-weight:700; line-height:1.35; }
+            .global-vocabulary-secondary-senses { display:grid; gap:1px; margin-top:3px; color:#8a929a; font-size:.72rem; font-weight:500; line-height:1.35; }
+            .global-vocabulary-secondary-senses span::before { content:'・'; }
             .global-vocabulary-senses-summary { margin:10px 0; padding:10px; border:1px solid #e4e7ea; border-radius:10px; background:#fafafa; }
             .global-vocabulary-senses-title { margin-bottom:6px; font-weight:800; }
             .global-vocabulary-sense-item { padding:7px 4px; border-top:1px solid #eceeef; }
@@ -560,6 +620,7 @@
         installStyles();
         ensureEditor();
         wrapSave();
+        wrapGlobalVocabularyCard();
         wrapGlobalGroupCard();
         wrapGlobal('showUnifiedModal', () => loadFromContext(true));
         wrapGlobal('switchModalType', () => loadFromContext(false));
@@ -584,6 +645,7 @@
     window.SmartReaderWordSenses = {
         getWordSenses,
         getContextSenseId,
+        getSenseDisplay,
         collectGroupSenses,
         refresh: () => loadFromContext(true)
     };
