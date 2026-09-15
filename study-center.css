@@ -207,3 +207,54 @@
     .study-center-metric span{font-size:.58rem}
     .study-center-start-actions button{font-size:.68rem}
 }
+
+
+/* Study Center mobile scroll v5 */
+#main-reader.study-center-active{
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+    touch-action:pan-y;
+}
+#main-reader.study-center-active > .study-center-section{
+    flex:0 0 auto;
+    width:100%;
+    min-height:100%;
+    max-height:none;
+    height:auto;
+    overflow:visible;
+}
+
+@media(max-width:700px){
+    #main-reader.study-center-active{min-width:0;width:100%}
+    .study-center-section,
+    .study-center-shell,
+    .study-center-content,
+    .study-center-words,
+    .study-center-word-list,
+    .study-center-word-card,
+    .study-center-word-main{min-width:0;max-width:100%;width:100%}
+    .study-center-section,.study-center-content,.study-center-words{overflow-x:hidden}
+    .study-center-word-card{display:block!important}
+    .study-center-word-actions{
+        display:grid!important;
+        grid-template-columns:minmax(0,1fr) minmax(0,1fr) 38px;
+        width:100%!important;
+        max-width:100%;
+        margin-top:8px;
+        gap:5px;
+    }
+    .study-center-word-actions button{
+        width:100%!important;
+        min-width:0!important;
+        max-width:100%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+    }
+    .study-center-word-actions .study-center-master-action{width:38px!important;min-width:38px!important}
+    .study-center-word-main small{max-width:100%}
+    .study-center-tabs{width:auto;max-width:none;overflow:hidden}
+    .study-center-tabs button{min-width:0!important}
+}

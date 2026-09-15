@@ -708,6 +708,7 @@
     function hideStudySection() {
         const section = document.getElementById(SECTION_ID);
         if (section) section.style.display = 'none';
+        document.getElementById('main-reader')?.classList.remove('study-center-active');
     }
 
     function wrapHideAllSections() {
@@ -735,6 +736,9 @@
         if (fab) fab.style.display = 'none';
         const section = document.getElementById(SECTION_ID);
         if (!section) return;
+        const main = document.getElementById('main-reader');
+        main?.classList.add('study-center-active');
+        if (main) main.scrollTop = 0;
         section.style.display = 'block';
         section.scrollTop = 0;
         render();
@@ -815,6 +819,8 @@
                 activeTab = tab.dataset.studyTab;
                 render();
                 section.scrollTop = 0;
+                const main = document.getElementById('main-reader');
+                if (main) main.scrollTop = 0;
                 return;
             }
 
@@ -874,6 +880,8 @@
                 activeTab = targetTab.dataset.tabTarget;
                 render();
                 section.scrollTop = 0;
+                const main = document.getElementById('main-reader');
+                if (main) main.scrollTop = 0;
                 return;
             }
 
