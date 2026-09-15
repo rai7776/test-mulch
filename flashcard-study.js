@@ -109,6 +109,33 @@
         }
     }
 
+    function resolveStudyMeaning(word) {
+        const legacy = String(word?.meaning || '').trim();
+        try {
+            const api = window.SmartReaderWordSenses;
+            if (api?.getWordSenses && api?.getContextSenseId) {
+                const senses = api.getWordSenses(word);
+                const contextId = api.getContextSenseId(word, senses);
+                const context = Array.isArray(senses)
+                    ? (senses.find(sense => String(sense?.id || '') === String(contextId || '')) || senses[0])
+                    : null;
+                const value = String(context?.meaning || '').trim();
+                if (value) return value;
+            }
+        } catch (_) {}
+
+        const senses = Array.isArray(word?.senses) ? word.senses : [];
+        if (senses.length) {
+            const contextId = String(word?.contextSenseId || '');
+            const context = senses.find(sense => String(sense?.id || '') === contextId)
+                || senses.find(sense => String(sense?.meaning || '').trim())
+                || null;
+            const value = String(context?.meaning || '').trim();
+            if (value) return value;
+        }
+        return legacy;
+    }
+
     async function recordStudySession(current) {
         if (!current || !current.stats || current.stats.responses <= 0) return;
         await ensureStudyHistoryLoaded();
@@ -127,7 +154,7 @@
                 chapterId: entry.chapterId ?? null,
                 chapterTitle: String(entry.chapterTitle || ''),
                 word: String(entry.word.word || entry.word.surfaceText || ''),
-                meaning: String(entry.word.meaning || ''),
+                meaning: resolveStudyMeaning(entry.word),
                 responses: Number(attempt.responses) || 0,
                 known: Number(attempt.known) || 0,
                 unsure: Number(attempt.unsure) || 0,
@@ -845,7 +872,7 @@
         const study = readStudy(word);
         const surface = String(word.surfaceText || '').trim();
         const wordText = String(word.word || '').trim() || surface || '—';
-        const meaning = String(word.meaning || '').trim() || '意味未登録';
+        const meaning = resolveStudyMeaning(word) || '意味未登録';
         const memo = String(word.memo || '').trim();
         const context = String(word.context || '').trim();
         const showContextFront = !!context && uiState.exampleMode === 'always';
@@ -1702,6 +1729,7 @@
             getSummary: () => summarizeEntries(),
             getWordStudy: word => readStudy(word),
             getWordView: word => studyView(word),
+            getWordMeaning: word => resolveStudyMeaning(word),
             getHistory: () => studyHistoryCache.map(item => ({ ...item, stats: { ...(item.stats || {}) }, words: Array.isArray(item.words) ? item.words.map(word => ({ ...word })) : [] })),
             loadHistory: () => ensureStudyHistoryLoaded(),
             isHistoryLoaded: () => studyHistoryLoaded,

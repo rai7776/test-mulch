@@ -24,6 +24,14 @@
         }[char]));
     }
 
+    function studyMeaning(word) {
+        try {
+            const resolved = window.SmartReaderStudy?.getWordMeaning?.(word);
+            if (String(resolved || '').trim()) return String(resolved).trim();
+        } catch (_) {}
+        return String(word?.meaning || '').trim();
+    }
+
     function library() {
         if (Array.isArray(window.libraryItems)) return window.libraryItems;
         try {
@@ -291,7 +299,7 @@
                         <strong>${escapeHtml(entry.word.word || entry.word.surfaceText || '—')}</strong>
                         <span class="study-center-due-badge ${due.tone}">${escapeHtml(due.text)}</span>
                     </div>
-                    <div class="study-center-word-meaning">${escapeHtml(entry.word.meaning || '')}</div>
+                    <div class="study-center-word-meaning">${escapeHtml(studyMeaning(entry.word))}</div>
                     <div class="study-center-word-meta">
                         <span>苦手度 ${difficulty}</span>
                         <span>${escapeHtml(weaknessReason(view))}</span>
