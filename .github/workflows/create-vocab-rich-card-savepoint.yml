@@ -1,0 +1,24 @@
+name: Create vocabulary rich card savepoint
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - .github/workflows/create-vocab-rich-card-savepoint.yml
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create savepoint tag
+        run: |
+          tag="save/2026-09-16-before-vocab-rich-card-ui"
+          target="0be4bbf822b105c4bab0dee184d9058b077e7bc3"
+          git tag -f "$tag" "$target"
+          git push origin -f "refs/tags/$tag"
