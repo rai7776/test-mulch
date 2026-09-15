@@ -24,12 +24,44 @@
         }[char]));
     }
 
-    function studyMeaning(word) {
+    function studySenseDisplay(word) {
+        const legacy = String(word?.meaning || '').trim();
         try {
-            const resolved = window.SmartReaderStudy?.getWordMeaning?.(word);
-            if (String(resolved || '').trim()) return String(resolved).trim();
+            const display = window.SmartReaderWordSenses?.getSenseDisplay?.(word);
+            if (display?.context) {
+                return {
+                    meaning: String(display.context.meaning || legacy).trim(),
+                    otherMeanings: Array.isArray(display.others)
+                        ? display.others.map(sense => String(sense?.meaning || '').trim()).filter(Boolean)
+                        : []
+                };
+            }
         } catch (_) {}
-        return String(word?.meaning || '').trim();
+
+        const senses = Array.isArray(word?.senses)
+            ? word.senses.filter(sense => sense && String(sense.meaning || '').trim())
+            : [];
+        const contextId = String(word?.contextSenseId || '');
+        const context = senses.find(sense => String(sense?.id || '') === contextId)
+            || senses.find(sense => String(sense?.meaning || '').trim() === legacy)
+            || senses[0]
+            || null;
+        const meaning = String(context?.meaning || legacy).trim();
+        const seen = new Set(meaning ? [meaning.toLocaleLowerCase()] : []);
+        const otherMeanings = [];
+        senses.forEach(sense => {
+            if (!sense || String(sense?.id || '') === String(context?.id || '')) return;
+            const value = String(sense.meaning || '').trim();
+            const key = value.toLocaleLowerCase();
+            if (!value || seen.has(key)) return;
+            seen.add(key);
+            otherMeanings.push(value);
+        });
+        return { meaning, otherMeanings };
+    }
+
+    function studyMeaning(word) {
+        return studySenseDisplay(word).meaning;
     }
 
     function library() {
@@ -292,6 +324,7 @@
         const source = `${entry.articleTitle}${entry.chapterTitle ? ` / ${entry.chapterTitle}` : ''}`;
         const held = !!view.suspended;
         const manualMastered = !!view.manualMastered;
+        const senses = studySenseDisplay(entry.word);
         return `
             <article class="study-center-word-card ${held ? 'is-held' : ''} ${manualMastered ? 'is-manual-mastered' : ''}">
                 <div class="study-center-word-main">
@@ -299,7 +332,8 @@
                         <strong>${escapeHtml(entry.word.word || entry.word.surfaceText || '—')}</strong>
                         <span class="study-center-due-badge ${due.tone}">${escapeHtml(due.text)}</span>
                     </div>
-                    <div class="study-center-word-meaning">${escapeHtml(studyMeaning(entry.word))}</div>
+                    <div class="study-center-word-meaning">${escapeHtml(senses.meaning)}</div>
+                    ${senses.otherMeanings.length ? `<div class="study-center-word-other-meanings" aria-label="その他の意味">${senses.otherMeanings.map(item => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : ''}
                     <div class="study-center-word-meta">
                         <span>苦手度 ${difficulty}</span>
                         <span>${escapeHtml(weaknessReason(view))}</span>

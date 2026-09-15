@@ -513,10 +513,14 @@
         if (!card || !entry?.word) return card;
         const display = getSenseDisplay(entry.word);
         if (!display.context) return card;
-        const meaning = card.querySelector('.global-vocabulary-summary .meaning-right');
-        if (!meaning) return card;
+        const summary = card.querySelector('.global-vocabulary-summary');
+        const meaning = summary?.querySelector('.meaning-right');
+        if (!summary || !meaning) return card;
 
+        card.classList.add('global-vocabulary-sense-rich');
+        meaning.classList.add('global-vocabulary-meaning-stack');
         meaning.replaceChildren();
+
         const primary = document.createElement('div');
         primary.className = 'global-vocabulary-primary-sense';
         primary.textContent = display.context.meaning;
@@ -532,6 +536,21 @@
                 secondary.appendChild(row);
             });
             meaning.appendChild(secondary);
+        }
+
+        card.querySelector(':scope > .global-vocabulary-card-memo-preview')?.remove();
+        const memoText = normalizeText(entry.word?.memo || entry.memo);
+        if (memoText) {
+            const memo = document.createElement('div');
+            memo.className = 'global-vocabulary-card-memo-preview';
+            const label = document.createElement('div');
+            label.className = 'global-vocabulary-card-memo-label';
+            label.textContent = 'メモ';
+            const body = document.createElement('div');
+            body.className = 'global-vocabulary-card-memo-text';
+            body.textContent = memoText;
+            memo.append(label, body);
+            summary.insertAdjacentElement('afterend', memo);
         }
         return card;
     }
@@ -629,9 +648,16 @@
             .word-senses-empty, .word-senses-existing-empty { padding:9px; color:#8a929a; font-size:.78rem; }
             .word-senses-status { min-height:1.1em; margin-top:6px; color:#6d7780; font-size:.72rem; }
             .word-senses-status.is-error { color:#ad3f3f; }
-            .global-vocabulary-primary-sense { font-weight:700; line-height:1.35; }
-            .global-vocabulary-secondary-senses { display:grid; gap:1px; margin-top:3px; color:#8a929a; font-size:.72rem; font-weight:500; line-height:1.35; }
-            .global-vocabulary-secondary-senses span::before { content:'・'; }
+            .global-vocabulary-sense-rich .global-vocabulary-summary { align-items:flex-start; min-height:48px; }
+            .global-vocabulary-sense-rich .word-left { align-items:flex-start; padding-top:1px; }
+            .global-vocabulary-meaning-stack { display:grid; align-content:start; gap:2px; min-width:0; padding-top:1px; text-align:left; }
+            .global-vocabulary-primary-sense { color:var(--primary,#8d5a2b); font-size:1.02rem; font-weight:800; line-height:1.35; overflow-wrap:anywhere; }
+            .global-vocabulary-secondary-senses { display:grid; gap:1px; margin-top:4px; color:#555f68; font-size:.86rem; font-weight:600; line-height:1.4; }
+            .global-vocabulary-secondary-senses span { display:block; overflow-wrap:anywhere; }
+            .global-vocabulary-secondary-senses span::before { content:'・'; margin-right:2px; }
+            .global-vocabulary-card-memo-preview { margin:12px 0 2px 54px; padding-top:10px; border-top:1px solid #edf0f2; }
+            .global-vocabulary-card-memo-label { margin-bottom:4px; color:#30363b; font-size:.78rem; font-weight:800; }
+            .global-vocabulary-card-memo-text { color:#535b62; font-size:.88rem; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
             .global-vocabulary-senses-summary { margin:10px 0; padding:10px; border:1px solid #e4e7ea; border-radius:10px; background:#fafafa; }
             .global-vocabulary-senses-title { margin-bottom:6px; font-weight:800; }
             .global-vocabulary-sense-item { padding:7px 4px; border-top:1px solid #eceeef; }
@@ -644,6 +670,12 @@
                 .word-sense-remove { grid-column:3; grid-row:1 / span 2; }
                 .word-senses-actions { display:grid; grid-template-columns:1fr; }
                 .word-senses-actions button { width:100%; text-align:left; }
+                .global-vocabulary-sense-rich .global-vocabulary-summary { gap:10px; }
+                .global-vocabulary-sense-rich .word-left { min-width:40%; }
+                .global-vocabulary-meaning-stack { min-width:42%; }
+                .global-vocabulary-primary-sense { font-size:.98rem; }
+                .global-vocabulary-secondary-senses { font-size:.8rem; }
+                .global-vocabulary-card-memo-preview { margin-left:43px; }
             }
         `;
         document.head.appendChild(style);

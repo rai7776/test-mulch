@@ -436,3 +436,5 @@
     .study-center-stats .study-center-stat-grid strong{font-size:1.08rem}
     .study-center-stats .study-center-current-stats span{font-size:.6rem}
 }
+
+.study-center-word-other-meanings{display:grid;gap:1px;margin-top:3px;color:#87909a;font-size:.78rem;font-weight:600;line-height:1.4}.study-center-word-other-meanings span{display:block;overflow-wrap:anywhere}.study-center-word-other-meanings span::before{content:'・';margin-right:2px}@media(max-width:700px){.study-center-word-other-meanings{font-size:.74rem}}
