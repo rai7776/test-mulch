@@ -186,15 +186,41 @@
             empty.className = 'word-senses-empty';
             empty.textContent = '意味を追加してください。';
             list.appendChild(empty);
+            syncLegacyMeaning();
+            return;
         }
-        state.rows.forEach((row, index) => {
+
+        const orderedRows = state.rows
+            .map((row, sourceIndex) => ({ row, sourceIndex }))
+            .sort((left, right) => {
+                const leftContext = left.row.id === state.contextSenseId ? 0 : 1;
+                const rightContext = right.row.id === state.contextSenseId ? 0 : 1;
+                return leftContext - rightContext || left.sourceIndex - right.sourceIndex;
+            });
+        let secondaryHeadingAdded = false;
+
+        orderedRows.forEach(({ row, sourceIndex }, visualIndex) => {
+            const isContext = row.id === state.contextSenseId;
+            if (isContext) {
+                const heading = document.createElement('div');
+                heading.className = 'word-senses-section-label word-senses-context-label';
+                heading.textContent = '文脈の意味';
+                list.appendChild(heading);
+            } else if (!secondaryHeadingAdded) {
+                const heading = document.createElement('div');
+                heading.className = 'word-senses-section-label word-senses-other-label';
+                heading.textContent = 'その他の意味';
+                list.appendChild(heading);
+                secondaryHeadingAdded = true;
+            }
+
             const card = document.createElement('div');
-            card.className = 'word-sense-row';
+            card.className = `word-sense-row ${isContext ? 'is-context' : 'is-secondary'}`;
             const contextButton = document.createElement('button');
             contextButton.type = 'button';
             contextButton.className = 'word-sense-context-toggle';
-            contextButton.setAttribute('aria-label', 'この文脈の意味にする');
-            contextButton.textContent = row.id === state.contextSenseId ? '●' : '○';
+            contextButton.setAttribute('aria-label', isContext ? '現在の文脈の意味' : 'この文脈の意味にする');
+            contextButton.textContent = isContext ? '●' : '○';
             contextButton.addEventListener('click', () => {
                 state.contextSenseId = row.id;
                 state.dirty = true;
@@ -205,7 +231,7 @@
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'word-sense-meaning';
-            input.placeholder = '意味を入力';
+            input.placeholder = isContext ? 'この文脈での意味' : 'その他の意味';
             input.value = row.meaning || '';
             input.addEventListener('input', () => {
                 row.meaning = input.value;
@@ -217,16 +243,16 @@
             const badge = document.createElement('span');
             badge.className = 'word-sense-context-badge';
             badge.textContent = 'この文脈';
-            badge.hidden = row.id !== state.contextSenseId;
+            badge.hidden = !isContext;
 
             const remove = document.createElement('button');
             remove.type = 'button';
             remove.className = 'word-sense-remove';
             remove.textContent = '×';
-            remove.setAttribute('aria-label', `${index + 1}番目の意味を外す`);
+            remove.setAttribute('aria-label', `${visualIndex + 1}番目の意味を外す`);
             remove.addEventListener('click', () => {
                 const wasContext = row.id === state.contextSenseId;
-                state.rows.splice(index, 1);
+                state.rows.splice(sourceIndex, 1);
                 if (wasContext) state.contextSenseId = state.rows[0]?.id || null;
                 state.dirty = true;
                 syncLegacyMeaning();
@@ -575,12 +601,19 @@
             .word-senses-legacy-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
             #word-senses-editor { margin: 4px 0 14px; }
             .word-senses-title { margin: 0 0 8px; font-weight: 700; color: #3f454b; }
-            .word-senses-list { display: grid; gap: 8px; }
+            .word-senses-list { display: grid; gap: 7px; }
+            .word-senses-section-label { margin:3px 2px 0; color:#7c858d; font-size:.72rem; font-weight:800; letter-spacing:.02em; }
+            .word-senses-other-label { margin-top:7px; color:#939ba2; }
             .word-sense-row { display:grid; grid-template-columns: 34px minmax(0,1fr) auto 36px; gap:8px; align-items:center; padding:8px 9px; border:1px solid #dfe3e7; border-radius:10px; background:#fff; }
+            .word-sense-row.is-context { border-color:#d8cabd; background:#fffdf9; box-shadow:0 2px 8px rgba(84,66,48,.05); }
+            .word-sense-row.is-secondary { padding-top:6px; padding-bottom:6px; border-color:#e7eaed; background:#fafbfc; }
             .word-sense-context-toggle, .word-sense-remove { border:0; background:transparent; min-height:36px; font-size:1.25rem; line-height:1; padding:0; }
             .word-sense-context-toggle { color:#30363b; }
             .word-sense-remove { color:#8a5550; font-size:1.1rem; }
             .word-sense-meaning { min-width:0; width:100%; border:0!important; padding:7px 4px!important; margin:0!important; background:transparent!important; box-shadow:none!important; font-size:1rem; }
+            .word-sense-row.is-context .word-sense-meaning { font-size:1.04rem; font-weight:700; color:#343a40; }
+            .word-sense-row.is-secondary .word-sense-meaning { padding-top:5px!important; padding-bottom:5px!important; color:#727b83; font-size:.88rem; font-weight:500; }
+            .word-sense-row.is-secondary .word-sense-context-toggle { color:#9ba2a8; font-size:1.05rem; }
             .word-sense-context-badge { white-space:nowrap; padding:4px 7px; border-radius:999px; background:#f3eee8; color:#805a33; font-size:.72rem; font-weight:700; }
             .word-senses-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
             .word-senses-actions button { border:1px solid #d8dde2; background:#fff; color:#47515a; border-radius:9px; padding:8px 10px; font-weight:700; }
