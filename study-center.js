@@ -572,8 +572,8 @@
         const max = Math.max(1, ...days.map(item => item.count));
         return `<div class="study-center-activity-bars">${days.map(day => {
             const date = new Date(day.start);
-            const height = Math.max(day.count ? 10 : 2, Math.round((day.count / max) * 68));
-            return `<div><strong>${day.count}</strong><span class="bar"><i style="height:${height}px"></i></span><small>${date.getMonth() + 1}/${date.getDate()}</small></div>`;
+            const height = Math.max(day.count ? 14 : 2, Math.round((day.count / max) * 100));
+            return `<div><strong>${day.count}</strong><span class="bar"><i style="height:${height}%"></i></span><small>${date.getMonth() + 1}/${date.getDate()}</small></div>`;
         }).join('')}</div>`;
     }
 
