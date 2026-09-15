@@ -577,7 +577,7 @@
                                         <span>🔥 ${Number(session.stats?.bestStreak) || 0}</span><span>苦手克服 ${Number(session.stats?.weakCleared) || 0}</span>
                                     </div>
                                     <div class="study-center-history-words">
-                                        ${(Array.isArray(session.words) ? session.words : []).map(item => `<div><strong>${escapeHtml(item.word || '—')}</strong><span>${escapeHtml(item.meaning || '')}</span><b class="result-${escapeHtml(item.finalResult || '')}">${resultMark(item.finalResult)}</b></div>`).join('') || '<span>単語詳細はありません。</span>'}
+                                        ${(Array.isArray(session.words) ? session.words : []).map(item => `<div><strong>${escapeHtml(item.word || '—')}</strong><span class="study-center-history-meaning-stack"><em>${escapeHtml(item.meaning || '')}</em>${Array.isArray(item.otherMeanings) && item.otherMeanings.length ? `<small>${item.otherMeanings.map(value => `・${escapeHtml(value)}`).join('<br>')}</small>` : ''}</span><b class="result-${escapeHtml(item.finalResult || '')}">${resultMark(item.finalResult)}</b></div>`).join('') || '<span>単語詳細はありません。</span>'}
                                     </div>
                                 </details>
                             `).join('')}

@@ -169,6 +169,7 @@
             const entry = initialByKey.get(key);
             if (!entry?.word) return;
             const initial = current.initialStates instanceof Map ? current.initialStates.get(key) : null;
+            const senseDisplay = resolveStudySenseDisplay(entry.word);
             words.push({
                 key,
                 articleId: entry.articleId ?? entry.article?.id ?? null,
@@ -176,7 +177,8 @@
                 chapterId: entry.chapterId ?? null,
                 chapterTitle: String(entry.chapterTitle || ''),
                 word: String(entry.word.word || entry.word.surfaceText || ''),
-                meaning: resolveStudyMeaning(entry.word),
+                meaning: senseDisplay.meaning,
+                otherMeanings: [...senseDisplay.otherMeanings],
                 responses: Number(attempt.responses) || 0,
                 known: Number(attempt.known) || 0,
                 unsure: Number(attempt.unsure) || 0,

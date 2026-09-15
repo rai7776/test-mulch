@@ -152,6 +152,69 @@
         return root;
     }
 
+    function fieldLabel(input) {
+        if (!input) return null;
+        const explicit = document.querySelector(`label[for="${input.id}"]`);
+        if (explicit) return explicit;
+        const previous = input.previousElementSibling;
+        return previous?.tagName === 'LABEL' ? previous : null;
+    }
+
+    function moveField(container, inputId, className = '') {
+        const input = byId(inputId);
+        if (!input || !container) return null;
+        const field = document.createElement('div');
+        field.className = `word-modal-field ${className}`.trim();
+        const label = fieldLabel(input);
+        if (label) field.appendChild(label);
+        field.appendChild(input);
+        container.appendChild(field);
+        return field;
+    }
+
+    function ensureModalLayout() {
+        const section = byId('form-word-section');
+        const editor = ensureEditor();
+        if (!section || !editor) return;
+        if (section.querySelector('.word-modal-hero')) return;
+
+        section.classList.add('word-modal-rich');
+
+        const hero = document.createElement('div');
+        hero.className = 'word-modal-hero';
+
+        const wordPane = document.createElement('section');
+        wordPane.className = 'word-modal-word-pane';
+        const wordEyebrow = document.createElement('div');
+        wordEyebrow.className = 'word-modal-eyebrow';
+        wordEyebrow.textContent = 'WORD';
+        wordPane.appendChild(wordEyebrow);
+        moveField(wordPane, 'input-word-text', 'word-modal-word-field');
+
+        const meaningPane = document.createElement('section');
+        meaningPane.className = 'word-modal-meaning-pane';
+        const meaningEyebrow = document.createElement('div');
+        meaningEyebrow.className = 'word-modal-eyebrow';
+        meaningEyebrow.textContent = 'MEANING';
+        meaningPane.append(meaningEyebrow, editor);
+
+        hero.append(wordPane, meaningPane);
+        section.insertBefore(hero, section.firstChild);
+
+        const memoBlock = document.createElement('section');
+        memoBlock.className = 'word-modal-memo-block';
+        moveField(memoBlock, 'input-word-memo', 'word-modal-memo-field');
+        hero.insertAdjacentElement('afterend', memoBlock);
+
+        const metadata = document.createElement('section');
+        metadata.className = 'word-modal-meta-grid';
+        moveField(metadata, 'input-word-surface-text');
+        moveField(metadata, 'input-word-part-of-speech');
+        moveField(metadata, 'input-word-tags');
+        moveField(metadata, 'input-word-context', 'word-modal-context-field');
+        memoBlock.insertAdjacentElement('afterend', metadata);
+    }
+
     function setStatus(message, error = false) {
         const status = byId('word-senses-status');
         if (!status) return;
@@ -362,6 +425,7 @@
 
     function loadFromContext(force = false) {
         ensureEditor();
+        ensureModalLayout();
         const section = byId('form-word-section');
         if (!section || getComputedStyle(section).display === 'none') return;
         const key = modalKey();
@@ -619,6 +683,40 @@
         style.textContent = `
             .word-senses-legacy-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
             #word-senses-editor { margin: 4px 0 14px; }
+            #form-word-section.word-modal-rich { display:block; }
+            .word-modal-hero { display:grid; grid-template-columns:minmax(180px,.78fr) minmax(300px,1.35fr); gap:24px; align-items:start; padding:10px 0 18px; border-bottom:1px solid #e9ecef; }
+            .word-modal-eyebrow { margin-bottom:7px; color:#9a7b60; font-size:.66rem; font-weight:850; letter-spacing:.16em; }
+            .word-modal-field { min-width:0; }
+            .word-modal-field>label { display:block; margin:0 0 5px; color:#687078; font-size:.72rem; font-weight:750; }
+            .word-modal-word-field>label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+            .word-modal-word-field #input-word-text { width:100%; margin:0!important; padding:4px 2px 8px!important; border:0!important; border-bottom:2px solid #e0e3e6!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; color:#25292d; font-size:clamp(1.6rem,4.5vw,2.25rem)!important; font-weight:850; line-height:1.15; }
+            .word-modal-word-field #input-word-text:focus { border-bottom-color:var(--primary,#8d5a2b)!important; outline:none; }
+            .word-modal-meaning-pane #word-senses-editor { margin:0; }
+            .word-modal-meaning-pane .word-senses-title { display:none; }
+            .word-modal-meaning-pane .word-senses-list { gap:4px; }
+            .word-modal-meaning-pane .word-senses-section-label { margin:0 0 1px; font-size:.67rem; letter-spacing:.04em; }
+            .word-modal-meaning-pane .word-senses-other-label { margin-top:7px; }
+            .word-modal-meaning-pane .word-sense-row { grid-template-columns:28px minmax(0,1fr) auto 30px; gap:5px; padding:2px 0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+            .word-modal-meaning-pane .word-sense-row.is-context { background:transparent; }
+            .word-modal-meaning-pane .word-sense-row.is-secondary { padding:1px 0; background:transparent; }
+            .word-modal-meaning-pane .word-sense-context-toggle { min-height:30px; color:#6d7278; font-size:1.05rem; }
+            .word-modal-meaning-pane .word-sense-row.is-context .word-sense-context-toggle { color:var(--primary,#8d5a2b); }
+            .word-modal-meaning-pane .word-sense-remove { min-height:30px; font-size:.95rem; }
+            .word-modal-meaning-pane .word-sense-context-badge { padding:2px 6px; font-size:.62rem; }
+            .word-modal-meaning-pane .word-sense-meaning { padding:3px 2px!important; border:0!important; background:transparent!important; box-shadow:none!important; }
+            .word-modal-meaning-pane .word-sense-row.is-context .word-sense-meaning { color:var(--primary,#8d5a2b); font-size:1.2rem; font-weight:850; line-height:1.35; }
+            .word-modal-meaning-pane .word-sense-row.is-secondary .word-sense-meaning { color:#2f3439; font-size:.93rem; font-weight:650; line-height:1.4; }
+            .word-modal-meaning-pane .word-sense-row.is-secondary .word-sense-meaning::placeholder { color:#a2a8ae; }
+            .word-modal-meaning-pane .word-senses-actions { margin-top:8px; }
+            .word-modal-meaning-pane .word-senses-actions button { padding:6px 8px; border:0; background:transparent; color:#65707a; font-size:.76rem; text-align:left; }
+            .word-modal-memo-block { padding:15px 0 13px; border-bottom:1px solid #eceff1; }
+            .word-modal-memo-field>label { margin-bottom:6px; color:#25292d; font-size:.92rem; font-weight:850; }
+            .word-modal-memo-field #input-word-memo { width:100%; min-height:72px; margin:0!important; padding:10px 12px!important; border:1px solid #e4e7ea!important; border-radius:10px!important; background:#fafbfc!important; color:#2f3439; font-size:.92rem; line-height:1.55; resize:vertical; }
+            .word-modal-meta-grid { display:grid; grid-template-columns:1.15fr .85fr 1fr; gap:10px 12px; padding-top:13px; }
+            .word-modal-meta-grid input, .word-modal-meta-grid select, .word-modal-meta-grid textarea { width:100%; margin:0!important; box-sizing:border-box; }
+            .word-modal-meta-grid input, .word-modal-meta-grid select { min-height:38px; }
+            .word-modal-context-field { grid-column:1/-1; }
+            .word-modal-context-field textarea { min-height:78px; }
             .word-senses-title { margin: 0 0 8px; font-weight: 700; color: #3f454b; }
             .word-senses-list { display: grid; gap: 7px; }
             .word-senses-section-label { margin:3px 2px 0; color:#7c858d; font-size:.72rem; font-weight:800; letter-spacing:.02em; }
@@ -670,6 +768,16 @@
                 .word-sense-remove { grid-column:3; grid-row:1 / span 2; }
                 .word-senses-actions { display:grid; grid-template-columns:1fr; }
                 .word-senses-actions button { width:100%; text-align:left; }
+                .word-modal-hero { grid-template-columns:1fr; gap:14px; padding-top:4px; }
+                .word-modal-word-field #input-word-text { font-size:1.7rem!important; }
+                .word-modal-meaning-pane .word-sense-row { grid-template-columns:26px minmax(0,1fr) 30px; }
+                .word-modal-meaning-pane .word-sense-context-badge { grid-column:2; justify-self:start; margin-top:-2px; }
+                .word-modal-meaning-pane .word-sense-remove { grid-column:3; grid-row:1 / span 2; }
+                .word-modal-meaning-pane .word-sense-row.is-context .word-sense-meaning { font-size:1.08rem; }
+                .word-modal-meaning-pane .word-sense-row.is-secondary .word-sense-meaning { font-size:.88rem; }
+                .word-modal-memo-block { padding-top:12px; }
+                .word-modal-meta-grid { grid-template-columns:1fr 1fr; }
+                .word-modal-context-field { grid-column:1/-1; }
                 .global-vocabulary-sense-rich .global-vocabulary-summary { gap:10px; }
                 .global-vocabulary-sense-rich .word-left { min-width:40%; }
                 .global-vocabulary-meaning-stack { min-width:42%; }
@@ -684,6 +792,7 @@
     function init() {
         installStyles();
         ensureEditor();
+        ensureModalLayout();
         wrapSave();
         wrapGlobalVocabularyCard();
         wrapGlobalGroupCard();

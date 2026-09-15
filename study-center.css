@@ -438,3 +438,5 @@
 }
 
 .study-center-word-other-meanings{display:grid;gap:1px;margin-top:3px;color:#87909a;font-size:.78rem;font-weight:600;line-height:1.4}.study-center-word-other-meanings span{display:block;overflow-wrap:anywhere}.study-center-word-other-meanings span::before{content:'・';margin-right:2px}@media(max-width:700px){.study-center-word-other-meanings{font-size:.74rem}}
+
+.study-center-history-meaning-stack{display:grid;gap:2px;min-width:0}.study-center-history-meaning-stack em{font-style:normal;color:#4a545d}.study-center-history-meaning-stack small{color:#8a949d;font-size:.72rem;line-height:1.35}
