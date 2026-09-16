@@ -1,0 +1,112 @@
+/* Library toolbar visual polish.
+   Keep the existing control sizing/layout; only unify surfaces, borders and states. */
+
+#library-section .library-actions > button.btn-sub,
+#library-section .library-actions > button.start-btn,
+#library-section .library-actions > button.study-center-entry-button {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid #ded5cc;
+    border-radius: 10px;
+    background: rgba(255, 253, 249, 0.94);
+    color: #4b423a;
+    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.05);
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+/* Article creation is the one constructive action in this row, so give it a quiet warm tint. */
+#library-section .library-actions > button.start-btn {
+    border-color: #d9c7b5;
+    background: #f5ede4;
+    color: #634a35;
+}
+
+#library-section .library-actions > button:active {
+    background: #f1e9df;
+    border-color: #cfbfae;
+    box-shadow: none;
+}
+
+#library-section .study-center-entry-button {
+    align-items: center;
+    gap: 6px;
+}
+
+#library-section .study-center-entry-button .study-center-nav-badge {
+    margin-left: 1px;
+    border: 0;
+    box-shadow: none;
+    background: #c96357;
+    color: #fff;
+}
+
+#library-section .study-center-entry-button .study-center-nav-badge.urgent {
+    background: #c55449;
+}
+
+/* Treat the search field and clear button as one control instead of two separate boxes. */
+#library-section .library-search-control {
+    overflow: hidden;
+    border: 1px solid #cec4ba;
+    border-radius: 10px;
+    background: rgba(255, 253, 249, 0.96);
+    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.04);
+}
+
+#library-section .library-search-control input,
+#library-section #global-search-input {
+    border: 0 !important;
+    border-radius: 0 !important;
+    outline: none;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+#library-section .library-search-control:focus-within {
+    border-color: #a9896d;
+    box-shadow: 0 0 0 2px rgba(139, 87, 42, 0.10);
+}
+
+#library-section #global-search-clear-btn {
+    border: 0 !important;
+    border-left: 1px solid #e2d9d0 !important;
+    border-radius: 0 !important;
+    background: #faf6f1 !important;
+    color: #74685d !important;
+    box-shadow: none !important;
+}
+
+#library-section #global-search-clear-btn:active {
+    background: #f0e8df !important;
+}
+
+#library-section .library-search-options {
+    color: #74695f;
+}
+
+#library-section .library-search-options label {
+    font-weight: 600;
+}
+
+#library-section .library-search-options input[type='checkbox'] {
+    accent-color: #8b572a;
+}
+
+@media (hover: hover) {
+    #library-section .library-actions > button.btn-sub:hover,
+    #library-section .library-actions > button.study-center-entry-button:hover {
+        border-color: #cfc2b6;
+        background: #fff;
+    }
+
+    #library-section .library-actions > button.start-btn:hover {
+        border-color: #cdb59f;
+        background: #f1e5d8;
+    }
+
+    #library-section #global-search-clear-btn:hover {
+        background: #f4eee7 !important;
+    }
+}
