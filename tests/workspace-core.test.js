@@ -65,6 +65,18 @@ test('invalid active workspace falls back to the first workspace', async () => {
   assert.equal(await db.getItem(workspace.ACTIVE_WORKSPACE_KEY), custom.id);
 });
 
+test('workspace state self-repairs after restoring a legacy backup without workspace metadata', async () => {
+  const legacyLibrary = [{ id: 9, type: 'article', name: 'Restored legacy article' }];
+  const db = createFakeDb({ library_items: legacyLibrary });
+  const state = await workspace.readWorkspaceState(db);
+
+  assert.equal(state.workspaces.length, 1);
+  assert.equal(state.activeWorkspaceId, workspace.DEFAULT_WORKSPACE_ID);
+  assert.equal(state.activeWorkspace.libraryKey, 'library_items');
+  assert.equal(state.globalSettings.explanationLanguage, 'ja');
+  assert.deepEqual(await db.getItem('library_items'), legacyLibrary);
+});
+
 test('language workspace requires contentLanguage', () => {
   assert.throws(() => workspace.createWorkspace({
     id: 'workspace-x',
