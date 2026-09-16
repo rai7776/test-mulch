@@ -98,7 +98,23 @@
         };
     }
 
+    async function ensureWorkspaceMetadata(database) {
+        const workspaces = normalizeWorkspaceList(await database.getItem(WORKSPACES_KEY));
+        const settings = await database.getItem(GLOBAL_SETTINGS_KEY);
+        const activeId = await database.getItem(ACTIVE_WORKSPACE_KEY);
+        const needsRepair = workspaces.length === 0
+            || !getWorkspaceById(workspaces, activeId)
+            || !settings
+            || typeof settings !== 'object'
+            || Array.isArray(settings)
+            || !normalizeLanguageCode(settings.explanationLanguage);
+        if (needsRepair) {
+            await migrateToWorkspaceMetadata(database, WORKSPACE_SCHEMA_VERSION, WORKSPACE_SCHEMA_VERSION);
+        }
+    }
+
     async function readWorkspaceState(database) {
+        await ensureWorkspaceMetadata(database);
         const workspaces = normalizeWorkspaceList(await database.getItem(WORKSPACES_KEY));
         const activeWorkspaceId = await database.getItem(ACTIVE_WORKSPACE_KEY);
         const activeWorkspace = getWorkspaceById(workspaces, activeWorkspaceId) || workspaces[0] || null;
@@ -122,6 +138,7 @@
         normalizeWorkspaceList,
         getWorkspaceById,
         migrateToWorkspaceMetadata,
+        ensureWorkspaceMetadata,
         readWorkspaceState
     });
 });
