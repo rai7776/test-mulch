@@ -118,24 +118,25 @@
             recap.insertAdjacentElement('beforebegin', celebrate);
         }
 
+        const wrongEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.wrong) > 0);
         const unsureEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.unsure) > 0);
         const missedEntries = (snapshot.entries || []).filter(entry => (Number(entry.attempt?.wrong) || 0) + (Number(entry.attempt?.unsure) || 0) > 0);
-        if (unsureEntries.length || missedEntries.length) {
+        if (wrongEntries.length || unsureEntries.length) {
             const retry = document.createElement('div');
             retry.className = 'study-reward-retry-actions';
-            if (unsureEntries.length) {
-                const unsure = document.createElement('button');
-                unsure.type = 'button';
-                unsure.className = 'study-reward-retry unsure';
-                unsure.textContent = `？をもう一度 · ${unsureEntries.length}語`;
-                unsure.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('unsure'));
-                retry.appendChild(unsure);
+            if (wrongEntries.length) {
+                const wrong = document.createElement('button');
+                wrong.type = 'button';
+                wrong.className = 'study-reward-retry wrong';
+                wrong.textContent = `×のみもう一度 · ${wrongEntries.length}語`;
+                wrong.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('wrong'));
+                retry.appendChild(wrong);
             }
-            if (missedEntries.length) {
+            if (unsureEntries.length && missedEntries.length) {
                 const missed = document.createElement('button');
                 missed.type = 'button';
                 missed.className = 'study-reward-retry missed';
-                missed.textContent = `？と×両方 · ${missedEntries.length}語`;
+                missed.textContent = `×と？もう一度 · ${missedEntries.length}語`;
                 missed.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('missed'));
                 retry.appendChild(missed);
             }
