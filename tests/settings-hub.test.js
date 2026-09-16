@@ -24,8 +24,8 @@ test('explanation language and theme are saved through global workspace settings
 });
 
 test('loader cache-busts updated workspace modules and loads settings hub', () => {
-  assert.match(loader, /workspace-core\.js\?v=3/);
-  assert.match(loader, /workspace-ui\.js\?v=2/);
+  assert.match(loader, /workspace-core\.js\?v=4/);
+  assert.match(loader, /workspace-ui\.js\?v=3/);
   assert.match(loader, /settings-hub\.js\?v=1/);
   assert.match(loader, /settings-hub\.css\?v=1/);
 });
