@@ -66,7 +66,7 @@
     }
 
     const workspaceReady = loadScriptPromise(
-        'workspace-core.js?v=2',
+        'workspace-core.js?v=3',
         'smart-reader-workspace-core-loader'
     );
     const foundationReady = loadScriptPromise(
@@ -119,10 +119,13 @@
         window.onload = wrappedOnload;
     }
 
-    // Library/global navigation polish is loaded last so it can consistently override legacy styles.
+    // Library/global navigation polish and application-level controls are loaded last
+    // so they can consistently override legacy styles without rewriting app.js.
     loadStyle('library-toolbar-polish.css?v=2', 'library-toolbar-polish-style');
     loadStyle('workspace-ui.css?v=1', 'smart-reader-workspace-ui-style');
-    loadScript('workspace-ui.js?v=1', 'smart-reader-workspace-ui-loader');
+    loadStyle('settings-hub.css?v=1', 'smart-reader-settings-hub-style');
+    loadScript('workspace-ui.js?v=2', 'smart-reader-workspace-ui-loader');
+    loadScript('settings-hub.js?v=1', 'smart-reader-settings-hub-loader');
 
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
