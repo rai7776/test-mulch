@@ -10,6 +10,22 @@
         document.head.appendChild(script);
     }
 
+    // app.js loads libraryItems asynchronously on window.load. Flashcard Study renders
+    // earlier on DOMContentLoaded, so refresh its home counters after app initialization
+    // has actually finished instead of leaving the initial 0 values on screen.
+    const previousOnload = window.onload;
+    if (typeof previousOnload === 'function' && !previousOnload.__studyRefreshWrapped) {
+        const wrappedOnload = async function (event) {
+            const result = previousOnload.call(this, event);
+            if (result && typeof result.then === 'function') await result;
+            try { window.SmartReaderStudy?.refresh?.(); } catch (error) {
+                console.warn('Study home refresh after library load failed', error);
+            }
+        };
+        wrappedOnload.__studyRefreshWrapped = true;
+        window.onload = wrappedOnload;
+    }
+
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
     style.id = 'note-structure-sample-v2-style';
