@@ -1,5 +1,4 @@
-/* Library toolbar visual polish.
-   Keep the existing control sizing/layout; only unify surfaces, borders and states. */
+/* Shared visual polish for the Library and global section navigation. */
 
 #library-section .library-actions > button.btn-sub,
 #library-section .library-actions > button.start-btn,
@@ -94,9 +93,143 @@
     accent-color: #8b572a;
 }
 
+/* Global Vocabulary / Problems use the same compact navigation language. */
+#vocabulary-section .vocabulary-header,
+#problems-section .problems-header {
+    padding-top: 12px;
+}
+
+#vocabulary-section .vocabulary-title-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch !important;
+    gap: 7px !important;
+}
+
+#vocabulary-section .vocabulary-title-row > button {
+    min-width: 0;
+    min-height: 36px;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid #ded5cc;
+    border-radius: 10px;
+    background: rgba(255, 253, 249, 0.94);
+    color: #4b423a;
+    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.05);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+/* Keep navigation order consistent: Library → Vocabulary → Study → Problems. */
+#vocabulary-section .vocabulary-title-row > button[onclick*='showLibrary'] { order: 1; }
+#vocabulary-section .vocabulary-title-row > .study-center-entry-button { order: 3; }
+#vocabulary-section .vocabulary-title-row > button[onclick*='showGlobalProblems'] { order: 4; }
+
+#vocabulary-section .vocabulary-title-row > div {
+    order: 10;
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding: 3px 2px 0;
+}
+
+#problems-section .problems-title-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start !important;
+    gap: 9px !important;
+}
+
+#problems-section .problems-navigation {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px !important;
+    width: 100%;
+}
+
+#problems-section .problems-navigation > button {
+    min-width: 0;
+    min-height: 36px;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid #ded5cc;
+    border-radius: 10px;
+    background: rgba(255, 253, 249, 0.94);
+    color: #4b423a;
+    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.05);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+#vocabulary-section .vocabulary-title-row h2,
+#problems-section .problems-title-row h2 {
+    margin: 0 !important;
+    color: #342e29;
+    font-size: clamp(1.55rem, 5.6vw, 2rem) !important;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+}
+
+#vocabulary-section .vocabulary-count,
+#problems-section .vocabulary-count {
+    display: block;
+    margin-top: 4px;
+    color: #736a63;
+    font-size: .98rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+#problems-section #global-problems-statistics {
+    margin: 10px 0 8px;
+    padding: 8px 10px;
+    border: 1px solid #e5ddd5;
+    border-radius: 10px;
+    background: rgba(255, 253, 249, 0.72);
+    color: #635a53;
+    font-size: .82rem;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+#vocabulary-section .study-center-entry-button .study-center-nav-badge,
+#problems-section .study-center-entry-button .study-center-nav-badge {
+    margin-left: 5px;
+    border: 0;
+    background: #c96357;
+    color: #fff;
+    box-shadow: none;
+}
+
+#vocabulary-section .study-center-entry-button .study-center-nav-badge.urgent,
+#problems-section .study-center-entry-button .study-center-nav-badge.urgent {
+    background: #c55449;
+}
+
+@media (max-width: 420px) {
+    #vocabulary-section .vocabulary-title-row,
+    #problems-section .problems-navigation {
+        gap: 5px !important;
+    }
+
+    #vocabulary-section .vocabulary-title-row > button,
+    #problems-section .problems-navigation > button {
+        min-height: 34px;
+        padding: 5px 7px;
+        font-size: .78rem;
+    }
+
+    #vocabulary-section .vocabulary-title-row h2,
+    #problems-section .problems-title-row h2 {
+        font-size: 1.65rem !important;
+    }
+}
+
 @media (hover: hover) {
     #library-section .library-actions > button.btn-sub:hover,
-    #library-section .library-actions > button.study-center-entry-button:hover {
+    #library-section .library-actions > button.study-center-entry-button:hover,
+    #vocabulary-section .vocabulary-title-row > button:hover,
+    #problems-section .problems-navigation > button:hover {
         border-color: #cfc2b6;
         background: #fff;
     }
