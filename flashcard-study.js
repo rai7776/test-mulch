@@ -1815,10 +1815,13 @@
             const attempt = attempts.get(entry.key);
             if (!attempt) return false;
             if (mode === 'wrong') return (Number(attempt.wrong) || 0) > 0;
+            if (mode === 'unsure') return (Number(attempt.unsure) || 0) > 0;
             return (Number(attempt.wrong) || 0) + (Number(attempt.unsure) || 0) > 0;
         });
         if (!selected.length) return false;
-        const label = mode === 'wrong' ? `✕だけ再挑戦 · ${selected.length}語` : `?・✕を再挑戦 · ${selected.length}語`;
+        const label = mode === 'wrong'
+            ? `×だけ再挑戦 · ${selected.length}語`
+            : (mode === 'unsure' ? `？をもう一度 · ${selected.length}語` : `？と×両方 · ${selected.length}語`);
         closeSession(true);
         window.setTimeout(() => startSession(selected, label), 0);
         return true;

@@ -90,6 +90,7 @@
         const snapshot = sessionSnapshot();
         if (!snapshot?.stats) return;
         summary.dataset.rewardEnhanced = '1';
+        syncSummaryLayout();
         const stats = snapshot.stats;
         const responses = Number(stats.responses) || 0;
         const known = Number(stats.known) || 0;
@@ -117,29 +118,39 @@
             recap.insertAdjacentElement('beforebegin', celebrate);
         }
 
-        const wrongEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.wrong) > 0);
+        const unsureEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.unsure) > 0);
         const missedEntries = (snapshot.entries || []).filter(entry => (Number(entry.attempt?.wrong) || 0) + (Number(entry.attempt?.unsure) || 0) > 0);
-        if (wrongEntries.length || missedEntries.length) {
+        if (unsureEntries.length || missedEntries.length) {
             const retry = document.createElement('div');
             retry.className = 'study-reward-retry-actions';
-            if (wrongEntries.length) {
-                const wrong = document.createElement('button');
-                wrong.type = 'button';
-                wrong.className = 'study-reward-retry wrong';
-                wrong.textContent = `✕だけもう一度 · ${wrongEntries.length}語`;
-                wrong.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('wrong'));
-                retry.appendChild(wrong);
+            if (unsureEntries.length) {
+                const unsure = document.createElement('button');
+                unsure.type = 'button';
+                unsure.className = 'study-reward-retry unsure';
+                unsure.textContent = `？をもう一度 · ${unsureEntries.length}語`;
+                unsure.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('unsure'));
+                retry.appendChild(unsure);
             }
             if (missedEntries.length) {
                 const missed = document.createElement('button');
                 missed.type = 'button';
                 missed.className = 'study-reward-retry missed';
-                missed.textContent = `?・✕を復習 · ${missedEntries.length}語`;
+                missed.textContent = `？と×両方 · ${missedEntries.length}語`;
                 missed.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('missed'));
                 retry.appendChild(missed);
             }
             summary.querySelector('.study-summary-actions')?.insertAdjacentElement('beforebegin', retry);
         }
+    }
+
+    function syncSummaryLayout() {
+        const stage = document.getElementById('study-session-stage');
+        const shell = stage?.closest('.study-session-shell') || document.querySelector('.study-session-shell');
+        const overlay = shell?.closest('.study-session-overlay') || document.getElementById('study-session-overlay');
+        const active = !!stage?.querySelector('.study-session-summary');
+        stage?.classList.toggle('study-summary-active', active);
+        shell?.classList.toggle('study-summary-mode', active);
+        overlay?.classList.toggle('study-summary-mode', active);
     }
 
     function scanSummary(root = document) {
@@ -162,9 +173,28 @@
             .study-reward-summary-recap{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0}
             .study-reward-summary-recap>div{padding:9px 7px;border:1px solid #e8ded3;border-radius:11px;background:#fffaf5}
             .study-reward-summary-recap span,.study-reward-summary-recap strong{display:block}.study-reward-summary-recap span{color:#837468;font-size:.7rem}.study-reward-summary-recap strong{margin-top:3px;color:#433930;font-size:1.05rem}
-            .study-reward-retry-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-            .study-reward-retry{min-height:42px;border:1px solid #ddd1c6;border-radius:11px;background:#fff;color:#5f5146;font-weight:850}.study-reward-retry.wrong{border-color:#e7c1bc;color:#9b4c45}.study-reward-retry.missed{border-color:#d6d4d1}
-            @media(max-width:520px){.study-reward-summary-recap{grid-template-columns:1fr 1fr}.study-reward-retry-actions{grid-template-columns:1fr}}
+            .study-reward-retry-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+            .study-reward-retry{min-height:54px;padding:10px 12px;border:1px solid #ddd1c6;border-radius:13px;background:#fff;color:#5f5146;font-size:.94rem;font-weight:850;line-height:1.2}.study-reward-retry.unsure{border-color:#cfd0d5;color:#666975}.study-reward-retry.missed{border-color:#e0c7c1;color:#8d514a}
+            .study-session-overlay.study-summary-mode{overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+            .study-session-shell.study-summary-mode{min-height:auto!important;padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom))}
+            .study-session-stage.study-summary-active{flex:0 0 auto;align-items:flex-start;justify-content:center;min-height:0!important;padding:4px 0 10px}
+            .study-session-stage.study-summary-active .study-session-summary{width:min(520px,94vw);margin:0 auto;padding:15px 16px 13px;border-radius:18px}
+            .study-session-stage.study-summary-active .study-summary-mark{width:43px;height:43px;margin-bottom:3px;font-size:1.35rem}
+            .study-session-stage.study-summary-active .study-session-summary h2{margin:4px 0 2px;font-size:1.28rem}
+            .study-session-stage.study-summary-active .study-summary-main strong{font-size:2rem}
+            .study-session-stage.study-summary-active .study-summary-main span{font-size:.82rem}
+            .study-session-stage.study-summary-active .study-summary-judges{gap:13px;margin:9px 0}
+            .study-session-stage.study-summary-active .study-judge-stat{gap:5px;font-size:.88rem}.study-session-stage.study-summary-active .study-judge-stat span{width:29px;height:29px;font-size:.9rem}
+            .study-session-stage.study-summary-active .study-reward-summary-celebrate{margin:7px 0 5px;padding:7px 9px;font-size:.84rem}
+            .study-session-stage.study-summary-active .study-reward-summary-recap{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:7px 0}
+            .study-session-stage.study-summary-active .study-reward-summary-recap>div{padding:6px 4px;border-radius:9px}
+            .study-session-stage.study-summary-active .study-reward-summary-recap span{font-size:.6rem;white-space:nowrap}.study-session-stage.study-summary-active .study-reward-summary-recap strong{margin-top:1px;font-size:.9rem}
+            .study-session-stage.study-summary-active .study-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px;margin-top:6px}
+            .study-session-stage.study-summary-active .study-summary-grid>div{min-width:0;flex-direction:column;justify-content:center;gap:1px;padding:6px 4px;text-align:center}
+            .study-session-stage.study-summary-active .study-summary-grid span{font-size:.62rem;line-height:1.2}.study-session-stage.study-summary-active .study-summary-grid strong{font-size:.9rem}
+            .study-session-stage.study-summary-active .study-summary-actions{margin-top:9px;gap:9px}.study-session-stage.study-summary-active .study-summary-actions .study-primary-action{padding:9px 18px;font-size:.9rem}
+            @media(max-width:520px){.study-reward-retry-actions{grid-template-columns:1fr 1fr}.study-session-stage.study-summary-active .study-session-summary{width:96vw;padding:12px 12px 11px}.study-session-stage.study-summary-active .study-reward-summary-recap{grid-template-columns:repeat(4,minmax(0,1fr))}}
+            @media(max-width:360px){.study-reward-retry{padding:9px 6px;font-size:.82rem}.study-session-stage.study-summary-active .study-reward-summary-recap span{font-size:.54rem}.study-session-stage.study-summary-active .study-summary-grid span{font-size:.56rem}}
             @media(prefers-reduced-motion:reduce){.study-reward-burst{display:none}.study-session-stage.reward-known .study-card-face,.study-session-stage.reward-special .study-card-face{box-shadow:0 15px 38px rgba(79,63,50,.14)}}
         `;
         document.head.appendChild(style);
@@ -181,9 +211,11 @@
                     else scanSummary(node);
                 }
             }
+            window.requestAnimationFrame(syncSummaryLayout);
         });
         observer.observe(document.body, { childList: true, subtree: true });
         scanSummary();
+        syncSummaryLayout();
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
