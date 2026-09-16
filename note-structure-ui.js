@@ -10,29 +10,6 @@
         document.head.appendChild(script);
     }
 
-    function loadScriptPromise(src, id) {
-        const existing = document.getElementById(id);
-        if (existing) {
-            if (existing.dataset.smartReaderLoaded === 'true') return Promise.resolve(existing);
-            return new Promise((resolve, reject) => {
-                existing.addEventListener('load', () => resolve(existing), { once: true });
-                existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
-            });
-        }
-
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.id = id;
-            script.src = src;
-            script.onload = () => {
-                script.dataset.smartReaderLoaded = 'true';
-                resolve(script);
-            };
-            script.onerror = () => reject(new Error(`Failed to load ${src}`));
-            document.head.appendChild(script);
-        });
-    }
-
     function loadStyle(href, id) {
         if (document.getElementById(id)) return;
         const link = document.createElement('link');
@@ -43,32 +20,13 @@
         document.head.appendChild(link);
     }
 
-    // Load the commercial-safety/storage foundation before app.js init runs.
-    // app.js assigns window.onload = init; this wrapper waits for the foundation,
-    // installs schema/version guards on the existing LocalForage instance, and only
-    // then lets the normal app initialization continue.
-    const foundationReady = loadScriptPromise(
-        'smart-reader-foundation-core.js?v=1',
-        'smart-reader-foundation-core-loader'
-    );
-
     // app.js loads libraryItems asynchronously on window.load. Flashcard Study renders
     // earlier on DOMContentLoaded, so refresh its home counters after app initialization
     // has actually finished instead of leaving the initial 0 values on screen.
+    // Storage/workspace readiness is handled centrally by smart-reader-bootstrap.js.
     const previousOnload = window.onload;
     if (typeof previousOnload === 'function' && !previousOnload.__studyRefreshWrapped) {
         const wrappedOnload = async function (event) {
-            try {
-                await foundationReady;
-                if (window.SmartReaderFoundation?.install && typeof db !== 'undefined') {
-                    await window.SmartReaderFoundation.install(db, document);
-                }
-            } catch (error) {
-                // Foundation failure must be visible to developers, but should not make
-                // existing local data inaccessible. Continue with the legacy init path.
-                console.error('Smart Reader safety/storage foundation failed to initialize', error);
-            }
-
             const result = previousOnload.call(this, event);
             if (result && typeof result.then === 'function') await result;
             try { window.SmartReaderStudy?.refresh?.(); } catch (error) {
