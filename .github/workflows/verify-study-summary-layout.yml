@@ -1,0 +1,38 @@
+name: Verify Study summary layout
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - .github/workflows/verify-study-summary-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+      - name: Bump reward UI cache
+        run: sed -i 's/study-reward-ui.js?v=2/study-reward-ui.js?v=3/' index.html
+      - name: Check JavaScript syntax
+        run: node --check study-reward-ui.js
+      - name: Check intended summary layout
+        run: |
+          grep -q 'grid-template-columns:repeat(2,minmax(0,1fr))' study-reward-ui.js
+          grep -q 'grid-template-columns:1fr!important' study-reward-ui.js
+          grep -q 'study-reward-retry-actions{display:grid;grid-template-columns:1fr' study-reward-ui.js
+          grep -q '？をもう一度' study-reward-ui.js
+          grep -q '？と×両方' study-reward-ui.js
+          grep -q 'study-reward-ui.js?v=3' index.html
+      - name: Commit cache bump
+        run: |
+          git config user.name "Smart Reader Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Bump Study reward UI cache" || exit 0
+          git push origin HEAD:feature/study-center
