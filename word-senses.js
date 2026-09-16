@@ -649,13 +649,10 @@
             const memoText = normalizeText(word.memo);
             memo.classList.add('article-vocabulary-memo');
             memo.replaceChildren();
-            const label = document.createElement('strong');
-            label.className = 'article-vocabulary-memo-label';
-            label.textContent = 'メモ';
             const body = document.createElement('span');
             body.className = 'article-vocabulary-memo-text';
             appendHighlightedText(body, memoText, filter);
-            memo.append(label, body);
+            memo.append(body);
         }
     }
 
@@ -760,8 +757,7 @@
             .article-vocabulary-secondary-senses { display:grid; gap:2px; margin-top:3px; color:#444b52; font-size:.84rem; font-weight:600; line-height:1.45; }
             .article-vocabulary-secondary-senses span { display:block; overflow-wrap:anywhere; }
             .article-vocabulary-secondary-senses span::before { content:'・'; margin-right:3px; }
-            .article-vocabulary-memo { display:grid; gap:4px; margin:12px 0 0 42px; padding:10px 0 0; border-top:1px solid #eceff1; }
-            .article-vocabulary-memo-label { color:#30363b; font-size:.76rem; font-weight:850; }
+            .article-vocabulary-memo { display:block; margin:7px 0 0 42px; padding:6px 0 0; border-top:1px solid #eceff1; }
             .article-vocabulary-memo-text { color:#626a72; font-size:.84rem; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
             .article-vocabulary-sense-rich .action-group { margin-top:8px; }
             .global-vocabulary-sense-rich .global-vocabulary-summary { align-items:flex-start; min-height:48px; }
@@ -791,7 +787,7 @@
                 .article-vocabulary-sense-rich .word-text { font-size:1rem; }
                 .article-vocabulary-primary-sense { font-size:.98rem; }
                 .article-vocabulary-secondary-senses { font-size:.78rem; }
-                .article-vocabulary-memo { margin-left:38px; padding-top:8px; }
+                .article-vocabulary-memo { margin-top:6px; margin-left:38px; padding-top:5px; }
                 .article-vocabulary-memo-text { font-size:.8rem; }
                 .global-vocabulary-sense-rich .global-vocabulary-summary { gap:10px; }
                 .global-vocabulary-sense-rich .word-left { min-width:40%; }
