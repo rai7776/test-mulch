@@ -141,14 +141,16 @@ async function main() {
       await sleep(POLL_MS);
     }
 
-    const error = new Error(`Browser smoke timed out.\nFailures: ${lastFailures.join('; ')}\nState: ${JSON.stringify(lastState, null, 2)}${cdp.exceptions.length ? `\nExceptions:\n${cdp.exceptions.join('\n')}` : ''}`);
-    throw error;
+    throw new Error(`Browser smoke timed out.\nFailures: ${lastFailures.join('; ')}\nState: ${JSON.stringify(lastState, null, 2)}${cdp.exceptions.length ? `\nExceptions:\n${cdp.exceptions.join('\n')}` : ''}`);
   } finally {
     cdp.close();
   }
 }
 
-main().catch(error => {
-  console.error(error?.stack || error);
-  process.exitCode = 1;
-});
+main().then(
+  () => process.exit(0),
+  error => {
+    console.error(error?.stack || error);
+    process.exit(1);
+  }
+);
