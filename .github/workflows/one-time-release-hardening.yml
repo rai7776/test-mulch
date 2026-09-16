@@ -1,0 +1,55 @@
+name: One-time release hardening
+
+on:
+  push:
+    branches:
+      - feature/release-hardening-final
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/release-hardening-final
+          fetch-depth: 0
+      - name: Pin LocalForage and fix viewport
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          old_dep = 'https://unpkg.com/localforage/dist/localforage.min.js'
+          new_dep = 'https://unpkg.com/localforage@1.10.0/dist/localforage.min.js'
+          if old_dep in text:
+              text = text.replace(old_dep, new_dep)
+          viewport_old = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+          viewport_new = 'width=device-width, initial-scale=1.0'
+          if viewport_old in text:
+              text = text.replace(viewport_old, viewport_new)
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify exact replacements
+        run: |
+          grep -F 'https://unpkg.com/localforage@1.10.0/dist/localforage.min.js' index.html
+          ! grep -F 'https://unpkg.com/localforage/dist/localforage.min.js' index.html
+          ! grep -F 'user-scalable=no' index.html
+      - name: Run tests
+        run: |
+          npm run check:foundation
+          npm test
+      - name: Commit hardened index
+        run: |
+          if git diff --quiet -- index.html; then
+            echo 'No index changes needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Pin LocalForage and restore browser zoom'
+          git push origin HEAD:feature/release-hardening-final
