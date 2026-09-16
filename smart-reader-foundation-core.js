@@ -57,9 +57,6 @@
             throw new Error(`Smart Reader data schema ${version} is newer than this app supports (${currentVersion}).`);
         }
 
-        // Version 1 is the baseline for the existing ProjectA_DB_v3 data shape.
-        // No user data is rewritten here; we only mark the schema so future
-        // migrations can be explicit and reversible.
         while (version < currentVersion) {
             const nextVersion = version + 1;
             const migration = migrations[nextVersion];
@@ -119,9 +116,6 @@
             if (key === SCHEMA_VERSION_KEY) return undefined;
             return raw.removeItem(key, ...args);
         });
-        // Keep the schema marker internal. Existing backup/restore code performs
-        // exact key comparisons, so exposing this metadata key would make legacy
-        // backups fail verification even though user data is valid.
         wrap('keys', async (...args) => {
             await ensureSchema();
             const keys = await raw.keys(...args);
@@ -208,8 +202,8 @@
         return observer;
     }
 
-    async function install(database, documentRef) {
-        const storage = installStorageFoundation(database);
+    async function install(database, documentRef, options = {}) {
+        const storage = installStorageFoundation(database, options);
         await storage.ensureSchema();
         if (documentRef) {
             reportDependencyStatus(documentRef);
