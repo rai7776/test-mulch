@@ -9,6 +9,7 @@
     const ACTIVE_WORKSPACE_KEY = 'smart_reader_active_workspace_id';
     const GLOBAL_SETTINGS_KEY = 'smart_reader_global_settings_v1';
     const DEFAULT_WORKSPACE_ID = 'workspace-english';
+    const INITIAL_WORKSPACE_ID = 'workspace-main';
     const DEFAULT_EXPLANATION_LANGUAGE = 'ja';
     const WORKSPACE_SCHEMA_VERSION = 2;
     const WORKSPACE_KINDS = Object.freeze(['language', 'general']);
@@ -53,6 +54,21 @@
         };
     }
 
+    function createInitialSetupWorkspace(now = Date.now()) {
+        return {
+            id: INITIAL_WORKSPACE_ID,
+            name: '学習スペース',
+            kind: 'general',
+            contentLanguage: '',
+            explanationLanguageOverride: null,
+            libraryKey: ACTIVE_LIBRARY_KEY,
+            studyHistoryKey: ACTIVE_STUDY_HISTORY_KEY,
+            createdAt: Number.isFinite(now) ? now : Date.now(),
+            migratedFromLegacy: false,
+            setupPending: true
+        };
+    }
+
     function createWorkspace(input = {}, now = Date.now()) {
         const id = String(input.id || '').trim();
         const name = String(input.name || '').trim();
@@ -65,7 +81,7 @@
         if (kind === 'language' && !contentLanguage) {
             throw new Error('Language workspaces require contentLanguage.');
         }
-        return {
+        const workspace = {
             id,
             name,
             kind,
@@ -76,6 +92,8 @@
             createdAt: Number.isFinite(now) ? now : Date.now(),
             migratedFromLegacy: !!input.migratedFromLegacy
         };
+        if (input.setupPending === true) workspace.setupPending = true;
+        return workspace;
     }
 
     function normalizeWorkspaceList(value) {
@@ -133,7 +151,10 @@
     async function migrateToWorkspaceMetadata(raw, _fromVersion, _toVersion, now = Date.now()) {
         let workspaces = normalizeWorkspaceList(await raw.getItem(WORKSPACES_KEY));
         if (workspaces.length === 0) {
-            workspaces = [createDefaultWorkspace(now)];
+            const legacyLibrary = await raw.getItem(ACTIVE_LIBRARY_KEY);
+            const legacyStudyHistory = await raw.getItem(ACTIVE_STUDY_HISTORY_KEY);
+            const hasLegacyData = legacyLibrary !== null || legacyStudyHistory !== null;
+            workspaces = [hasLegacyData ? createDefaultWorkspace(now) : createInitialSetupWorkspace(now)];
             await raw.setItem(WORKSPACES_KEY, workspaces);
         }
 
@@ -185,6 +206,27 @@
             explanationLanguage: DEFAULT_EXPLANATION_LANGUAGE
         };
         return { workspaces, activeWorkspaceId: activeWorkspace?.id || null, activeWorkspace, globalSettings };
+    }
+
+    async function completeInitialWorkspaceSetup(database, input = {}, now = Date.now()) {
+        const state = await readWorkspaceState(database);
+        const current = state.activeWorkspace;
+        if (!current || current.setupPending !== true) {
+            throw new Error('Initial workspace setup is not pending.');
+        }
+        const completed = createWorkspace({
+            id: current.id,
+            name: input.name,
+            kind: input.kind,
+            contentLanguage: input.contentLanguage,
+            explanationLanguageOverride: current.explanationLanguageOverride || null,
+            libraryKey: current.libraryKey,
+            studyHistoryKey: current.studyHistoryKey,
+            migratedFromLegacy: false
+        }, Number.isFinite(current.createdAt) ? current.createdAt : now);
+        const updated = state.workspaces.map(item => item.id === current.id ? completed : item);
+        await database.setItem(WORKSPACES_KEY, updated);
+        return completed;
     }
 
     async function addWorkspace(database, input, now = Date.now()) {
@@ -290,6 +332,7 @@
         ACTIVE_WORKSPACE_KEY,
         GLOBAL_SETTINGS_KEY,
         DEFAULT_WORKSPACE_ID,
+        INITIAL_WORKSPACE_ID,
         DEFAULT_EXPLANATION_LANGUAGE,
         WORKSPACE_SCHEMA_VERSION,
         WORKSPACE_KINDS,
@@ -301,6 +344,7 @@
         dedicatedStudyHistoryKey,
         dedicatedLocalSettingKey,
         createDefaultWorkspace,
+        createInitialSetupWorkspace,
         createWorkspace,
         normalizeWorkspaceList,
         getWorkspaceById,
@@ -311,6 +355,7 @@
         migrateToWorkspaceMetadata,
         ensureWorkspaceMetadata,
         readWorkspaceState,
+        completeInitialWorkspaceSetup,
         addWorkspace,
         switchWorkspace,
         updateGlobalSettings
