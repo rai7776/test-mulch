@@ -8,6 +8,7 @@
     const DB_NAME = 'ProjectA_DB_v3';
     const SCHEMA_VERSION_KEY = 'smart_reader_schema_version';
     const CURRENT_SCHEMA_VERSION = 1;
+    const EXPECTED_LOCALFORAGE_VERSION = '1.10.0';
     const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:']);
 
     function normalizeSchemaVersion(value) {
@@ -26,6 +27,23 @@
         } catch (_) {
             return null;
         }
+    }
+
+    function inspectLocalForageDependency(documentRef) {
+        const scripts = Array.from(documentRef?.querySelectorAll?.('script[src]') || []);
+        const script = scripts.find(node => /localforage/i.test(node.getAttribute('src') || ''));
+        if (!script) return { found: false, pinned: false, src: '' };
+        const src = String(script.getAttribute('src') || '');
+        const pinned = new RegExp(`localforage@${EXPECTED_LOCALFORAGE_VERSION.replace(/\./g, '\\.')}(?:/|$)`, 'i').test(src);
+        return { found: true, pinned, src };
+    }
+
+    function reportDependencyStatus(documentRef) {
+        const status = inspectLocalForageDependency(documentRef);
+        if (status.found && !status.pinned && typeof console !== 'undefined' && console.warn) {
+            console.warn(`Smart Reader: LocalForage is not pinned to ${EXPECTED_LOCALFORAGE_VERSION}.`, status.src);
+        }
+        return status;
     }
 
     async function migrateSchema(raw, options = {}) {
@@ -194,6 +212,7 @@
         const storage = installStorageFoundation(database);
         await storage.ensureSchema();
         if (documentRef) {
+            reportDependencyStatus(documentRef);
             applyAccessibilityBaseline(documentRef);
             applyBackupCopyBaseline(documentRef);
             protectExternalSourceLink(documentRef);
@@ -205,8 +224,11 @@
         DB_NAME,
         SCHEMA_VERSION_KEY,
         CURRENT_SCHEMA_VERSION,
+        EXPECTED_LOCALFORAGE_VERSION,
         normalizeSchemaVersion,
         sanitizeExternalUrl,
+        inspectLocalForageDependency,
+        reportDependencyStatus,
         migrateSchema,
         installStorageFoundation,
         applyAccessibilityBaseline,
