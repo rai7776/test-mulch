@@ -226,7 +226,7 @@
 (function loadStudyPresetSettings() {
     if (document.querySelector('script[data-study-preset-settings]')) return;
     const script = document.createElement('script');
-    script.src = 'study-preset-settings.js?v=2';
+    script.src = 'study-preset-settings.js?v=3';
     script.async = false;
     script.dataset.studyPresetSettings = '1';
     document.head.appendChild(script);
