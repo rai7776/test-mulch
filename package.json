@@ -3,6 +3,6 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check:foundation": "node --check smart-reader-foundation-core.js && node --check note-structure-ui.js"
+    "check:foundation": "node --check smart-reader-foundation-core.js && node --check workspace-core.js && node --check note-structure-ui.js"
   }
 }
