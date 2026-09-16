@@ -4,9 +4,41 @@
     const SECTION_ID = 'study-center-section';
     const NAV_BUTTON_ID = 'study-center-library-button';
     const DAY_MS = 86400000;
+    const SETTINGS_KEY = 'smart-reader-study-center-settings-v1';
+    const DEFAULT_QUICK_REVIEW_LIMIT = 20;
     let activeTab = 'home';
     let wordFilter = 'all';
     let originalHideAllSections = null;
+    let activityCalendarMonth = null;
+    let studyCenterSettings = loadStudyCenterSettings();
+
+    function normalizeQuickReviewLimit(value) {
+        const number = Math.round(Number(value));
+        if (!Number.isFinite(number)) return DEFAULT_QUICK_REVIEW_LIMIT;
+        return Math.max(1, Math.min(999, number));
+    }
+
+    function loadStudyCenterSettings() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+            return { quickReviewLimit: normalizeQuickReviewLimit(raw.quickReviewLimit) };
+        } catch (_) {
+            return { quickReviewLimit: DEFAULT_QUICK_REVIEW_LIMIT };
+        }
+    }
+
+    function saveStudyCenterSettings() {
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(studyCenterSettings));
+        } catch (error) {
+            console.warn('Study Center settings could not be saved', error);
+        }
+    }
+
+    function setQuickReviewLimit(value) {
+        studyCenterSettings = { ...studyCenterSettings, quickReviewLimit: normalizeQuickReviewLimit(value) };
+        saveStudyCenterSettings();
+    }
 
     function startOfLocalDay(timestamp = Date.now()) {
         const date = new Date(timestamp);
@@ -385,6 +417,7 @@
     function renderHome(model) {
         const dueCount = model.dueNow.length;
         const urgentCount = model.urgent.length;
+        const quickLimit = studyCenterSettings.quickReviewLimit;
         const headline = urgentCount
             ? `まず ${urgentCount}語を優先して復習`
             : (dueCount ? `今日中に ${dueCount}語を復習` : '今日の復習は完了です');
@@ -418,7 +451,10 @@
                     </div>
                     <div class="study-center-start-actions">
                         <button type="button" data-study-limit="10" ${dueCount ? '' : 'disabled'}>10語だけ</button>
-                        <button type="button" data-study-limit="20" ${dueCount ? '' : 'disabled'}>20語</button>
+                        <div class="study-center-quick-custom">
+                            <button type="button" data-study-limit="custom" ${dueCount ? '' : 'disabled'}>${quickLimit}語</button>
+                            <button type="button" class="study-center-limit-edit" data-edit-study-limit aria-label="クイック復習の語数を変更">変更</button>
+                        </div>
                         <button type="button" class="primary" data-study-limit="all" ${dueCount ? '' : 'disabled'}>全部 ${dueCount}語</button>
                     </div>
                 </div>
@@ -619,6 +655,133 @@
         }).join('')}</div>`;
     }
 
+    function startOfLocalMonth(timestamp = Date.now()) {
+        const date = new Date(Number(timestamp) || Date.now());
+        return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+    }
+
+    function shiftLocalMonth(timestamp, delta) {
+        const date = new Date(startOfLocalMonth(timestamp));
+        return new Date(date.getFullYear(), date.getMonth() + Number(delta || 0), 1).getTime();
+    }
+
+    function activityMonthModel(sessions, monthTimestamp) {
+        const start = startOfLocalMonth(monthTimestamp);
+        const end = shiftLocalMonth(start, 1);
+        const date = new Date(start);
+        const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        const days = Array.from({ length: daysInMonth }, (_, index) => ({
+            day: index + 1,
+            words: 0,
+            responses: 0,
+            sessions: 0
+        }));
+        (sessions || []).forEach(session => {
+            const stamp = Number(session.completedAt || session.startedAt) || 0;
+            if (stamp < start || stamp >= end) return;
+            const day = new Date(stamp).getDate();
+            const item = days[day - 1];
+            if (!item) return;
+            item.words += Number(session.uniqueCount) || 0;
+            item.responses += Number(session.stats?.responses) || 0;
+            item.sessions += 1;
+        });
+        const totalWords = days.reduce((sum, item) => sum + item.words, 0);
+        const totalResponses = days.reduce((sum, item) => sum + item.responses, 0);
+        const activeDays = days.filter(item => item.sessions > 0).length;
+        const maxWords = Math.max(1, ...days.map(item => item.words));
+        return { start, end, days, totalWords, totalResponses, activeDays, maxWords };
+    }
+
+    function activityMonthLabel(timestamp) {
+        return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long' }).format(new Date(startOfLocalMonth(timestamp)));
+    }
+
+    function renderActivityCalendar() {
+        const overlay = document.getElementById('study-activity-calendar-overlay');
+        const body = overlay?.querySelector('[data-activity-calendar-body]');
+        if (!overlay || !body) return;
+        const sessions = historySessions();
+        const currentMonth = startOfLocalMonth();
+        if (!Number.isFinite(Number(activityCalendarMonth))) activityCalendarMonth = currentMonth;
+        activityCalendarMonth = Math.min(startOfLocalMonth(activityCalendarMonth), currentMonth);
+        const model = activityMonthModel(sessions, activityCalendarMonth);
+        const firstWeekday = new Date(model.start).getDay();
+        const todayKey = localDateKey(Date.now());
+        const cells = [];
+        for (let index = 0; index < firstWeekday; index += 1) {
+            cells.push('<div class="study-center-calendar-day is-empty" aria-hidden="true"></div>');
+        }
+        model.days.forEach(item => {
+            const stamp = new Date(new Date(model.start).getFullYear(), new Date(model.start).getMonth(), item.day).getTime();
+            const isToday = localDateKey(stamp) === todayKey;
+            const level = item.words ? Math.max(1, Math.min(4, Math.ceil(item.words / model.maxWords * 4))) : 0;
+            cells.push(`
+                <div class="study-center-calendar-day ${isToday ? 'is-today' : ''}" data-level="${level}" title="${item.words}語・${item.responses}回答・${item.sessions}セッション">
+                    <span>${item.day}</span>
+                    <strong>${item.words ? `${item.words}語` : '—'}</strong>
+                    <small>${item.responses ? `${item.responses}回答` : ''}</small>
+                </div>
+            `);
+        });
+        while (cells.length % 7) cells.push('<div class="study-center-calendar-day is-empty" aria-hidden="true"></div>');
+        body.innerHTML = `
+            <div class="study-center-calendar-head">
+                <button type="button" data-activity-month="-1" aria-label="前の月">‹</button>
+                <div><strong>${escapeHtml(activityMonthLabel(activityCalendarMonth))}</strong><span>${model.activeDays}日学習・合計 ${model.totalWords}語</span></div>
+                <button type="button" data-activity-month="1" aria-label="次の月" ${activityCalendarMonth >= currentMonth ? 'disabled' : ''}>›</button>
+            </div>
+            <div class="study-center-calendar-weekdays" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+            <div class="study-center-calendar-grid">${cells.join('')}</div>
+            <div class="study-center-calendar-summary"><span>学習日 <b>${model.activeDays}</b>日</span><span>学習した語 <b>${model.totalWords}</b>語</span><span>回答 <b>${model.totalResponses}</b>回</span></div>
+        `;
+    }
+
+    function openActivityCalendar() {
+        const overlay = document.getElementById('study-activity-calendar-overlay');
+        if (!overlay) return;
+        activityCalendarMonth = startOfLocalMonth(activityCalendarMonth || Date.now());
+        renderActivityCalendar();
+        overlay.hidden = false;
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('study-center-calendar-open');
+    }
+
+    function closeActivityCalendar() {
+        const overlay = document.getElementById('study-activity-calendar-overlay');
+        if (!overlay) return;
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('study-center-calendar-open');
+    }
+
+    function injectActivityCalendar() {
+        if (document.getElementById('study-activity-calendar-overlay')) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'study-activity-calendar-overlay';
+        overlay.className = 'study-center-calendar-overlay';
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.innerHTML = `
+            <section class="study-center-calendar-modal" role="dialog" aria-modal="true" aria-label="学習Activity詳細">
+                <div class="study-center-calendar-titlebar"><div><span class="study-center-eyebrow">ACTIVITY</span><h2>学習カレンダー</h2></div><button type="button" data-activity-calendar-close aria-label="閉じる">×</button></div>
+                <div data-activity-calendar-body></div>
+            </section>
+        `;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', event => {
+            if (event.target === overlay || event.target.closest('[data-activity-calendar-close]')) {
+                closeActivityCalendar();
+                return;
+            }
+            const move = event.target.closest('[data-activity-month]');
+            if (move && !move.disabled) {
+                activityCalendarMonth = shiftLocalMonth(activityCalendarMonth || Date.now(), Number(move.dataset.activityMonth));
+                renderActivityCalendar();
+            }
+        });
+    }
+
     function renderStats(model) {
         const sessions = historySessions();
         const now = Date.now();
@@ -644,7 +807,7 @@
                     <div><span>苦手克服</span><strong>${weakCleared30}</strong><small>直近30日</small></div>
                 </div>
                 <div class="study-center-panel">
-                    <div class="study-center-panel-heading"><div><span class="study-center-eyebrow">ACTIVITY</span><h3>直近7日間</h3></div></div>
+                    <div class="study-center-panel-heading"><div><span class="study-center-eyebrow">ACTIVITY</span><h3>直近7日間</h3></div><button type="button" class="study-center-link" data-open-activity-calendar>詳細</button></div>
                     ${renderStudyActivityBars(sessions)}
                 </div>
                 <div class="study-center-panel">
@@ -871,11 +1034,34 @@
                 return;
             }
 
+            const editLimit = event.target.closest('[data-edit-study-limit]');
+            if (editLimit) {
+                const current = studyCenterSettings.quickReviewLimit;
+                const next = window.prompt('クイック復習の語数を入力してください（1〜999）', String(current));
+                if (next === null) return;
+                const parsed = Math.round(Number(next));
+                if (!Number.isFinite(parsed) || parsed < 1 || parsed > 999) {
+                    window.alert('1〜999の数字を入力してください。');
+                    return;
+                }
+                setQuickReviewLimit(parsed);
+                render();
+                return;
+            }
+
             const limitButton = event.target.closest('[data-study-limit]');
             if (limitButton) {
                 const model = reviewModel();
-                const limit = limitButton.dataset.studyLimit === 'all' ? model.dueNow.length : Number(limitButton.dataset.studyLimit);
+                const mode = limitButton.dataset.studyLimit;
+                const limit = mode === 'all'
+                    ? model.dueNow.length
+                    : (mode === 'custom' ? studyCenterSettings.quickReviewLimit : Number(mode));
                 openStudy(model.dueNow.slice(0, limit), `今日の復習 · ${Math.min(limit, model.dueNow.length)}語`);
+                return;
+            }
+
+            if (event.target.closest('[data-open-activity-calendar]')) {
+                openActivityCalendar();
                 return;
             }
 
@@ -947,6 +1133,9 @@
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) updateNavBadge();
         });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !document.getElementById('study-activity-calendar-overlay')?.hidden) closeActivityCalendar();
+        });
         window.addEventListener('smartreader:study-history-updated', () => {
             if (document.getElementById(SECTION_ID)?.style.display !== 'none') render();
         });
@@ -956,13 +1145,16 @@
         wrapHideAllSections();
         injectSection();
         injectNavigation();
+        injectActivityCalendar();
         bindEvents();
         updateNavBadge();
         window.showStudyCenter = showStudyCenter;
         window.SmartReaderStudyCenter = {
             show: showStudyCenter,
             refresh: render,
-            getReviewModel: reviewModel
+            getReviewModel: reviewModel,
+            openActivityCalendar,
+            getSettings: () => ({ ...studyCenterSettings })
         };
     }
 
