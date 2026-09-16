@@ -10,6 +10,16 @@
         document.head.appendChild(script);
     }
 
+    function loadStyle(href, id) {
+        if (document.getElementById(id)) return;
+        const link = document.createElement('link');
+        link.id = id;
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.onerror = () => console.error(`Failed to load ${href}`);
+        document.head.appendChild(link);
+    }
+
     // app.js loads libraryItems asynchronously on window.load. Flashcard Study renders
     // earlier on DOMContentLoaded, so refresh its home counters after app initialization
     // has actually finished instead of leaving the initial 0 values on screen.
@@ -25,6 +35,9 @@
         wrappedOnload.__studyRefreshWrapped = true;
         window.onload = wrappedOnload;
     }
+
+    // Library toolbar polish is loaded last so it can consistently override legacy button styles.
+    loadStyle('library-toolbar-polish.css?v=1', 'library-toolbar-polish-style');
 
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
