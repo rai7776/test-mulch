@@ -1,0 +1,35 @@
+name: Apply side panel memo compact
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - .github/workflows/apply-side-panel-memo-compact.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+      - name: Apply patch
+        run: python .github/scripts/patch-side-panel-memo-compact.py
+      - name: Check JavaScript syntax
+        run: node --check word-senses.js
+      - name: Check compact memo UI
+        run: |
+          ! grep -q "article-vocabulary-memo-label" word-senses.js
+          grep -q "word-senses.js?v=7" index.html
+          grep -q "margin:7px 0 0 42px" word-senses.js
+      - name: Commit changes
+        run: |
+          git config user.name "Smart Reader Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add word-senses.js index.html
+          git commit -m "Tighten side panel memo spacing" || exit 0
+          git push origin HEAD:feature/study-center
