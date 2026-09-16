@@ -439,9 +439,15 @@
     }
 
     function startConfiguredSession() {
-        if (!pending || !originalStudyOpen) return;
+        if (!pending) return;
         const count = currentCount();
         if (count <= 0) return;
+
+        wrapStudyOpen();
+        const api = window.SmartReaderStudy;
+        const openStudy = originalStudyOpen || (api?.open ? api.open.bind(api) : null);
+        if (!openStudy) return;
+
         applyCompactOptions();
         const selected = pending.entries.slice(0, count);
         const label = pending.label;
@@ -450,15 +456,22 @@
         overlay?.classList.remove('show');
         overlay?.setAttribute('aria-hidden', 'true');
 
-        originalStudyOpen(selected, label);
-        const contextButton = document.getElementById('study-hub-context');
-        if (!contextButton || contextButton.hidden) {
-            pending = null;
-            return;
-        }
-        allowNativeContextStart = true;
-        try { contextButton.click(); } finally { allowNativeContextStart = false; }
-        pending = null;
+        openStudy(selected, label);
+
+        // iOS Safari can be unreliable when a synthetic button click is nested inside
+        // the original tap handler. Start the native context preset on the next task.
+        window.setTimeout(() => {
+            const contextButton = document.getElementById('study-hub-context');
+            if (!contextButton || contextButton.hidden) {
+                pending = null;
+                return;
+            }
+            allowNativeContextStart = true;
+            try { contextButton.click(); } finally {
+                allowNativeContextStart = false;
+                pending = null;
+            }
+        }, 0);
     }
 
     function wrapStudyOpen() {
