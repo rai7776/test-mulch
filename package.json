@@ -3,6 +3,6 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check:foundation": "node --check smart-reader-foundation-core.js && node --check workspace-core.js && node --check workspace-ui.js && node --check settings-hub.js && node --check article-copy-core.js && node --check article-copy-ui.js && node --check workspace-backup-core.js && node --check workspace-backup-ui.js && node --check note-structure-ui.js"
+    "check:foundation": "node --check smart-reader-foundation-core.js && node --check workspace-core.js && node --check workspace-ui.js && node --check settings-hub.js && node --check article-copy-core.js && node --check article-copy-ui.js && node --check workspace-backup-core.js && node --check workspace-backup-ui.js && node --check workspace-management-core.js && node --check workspace-management-ui.js && node --check note-structure-ui.js"
   }
 }
