@@ -124,8 +124,12 @@
     loadStyle('library-toolbar-polish.css?v=2', 'library-toolbar-polish-style');
     loadStyle('workspace-ui.css?v=1', 'smart-reader-workspace-ui-style');
     loadStyle('settings-hub.css?v=1', 'smart-reader-settings-hub-style');
+    loadStyle('article-copy-ui.css?v=1', 'smart-reader-article-copy-ui-style');
     loadScript('workspace-ui.js?v=2', 'smart-reader-workspace-ui-loader');
     loadScript('settings-hub.js?v=1', 'smart-reader-settings-hub-loader');
+    loadScriptPromise('article-copy-core.js?v=1', 'smart-reader-article-copy-core-loader')
+        .then(() => loadScript('article-copy-ui.js?v=1', 'smart-reader-article-copy-ui-loader'))
+        .catch(error => console.error('Failed to load article copy feature', error));
 
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
