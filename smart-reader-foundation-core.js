@@ -101,21 +101,30 @@
             if (key === SCHEMA_VERSION_KEY) return undefined;
             return raw.removeItem(key, ...args);
         });
+        // Keep the schema marker internal. Existing backup/restore code performs
+        // exact key comparisons, so exposing this metadata key would make legacy
+        // backups fail verification even though user data is valid.
         wrap('keys', async (...args) => {
             await ensureSchema();
-            return raw.keys(...args);
+            const keys = await raw.keys(...args);
+            return keys.filter(key => key !== SCHEMA_VERSION_KEY);
         });
-        wrap('iterate', async (...args) => {
+        wrap('iterate', async (iterator, ...args) => {
             await ensureSchema();
-            return raw.iterate(...args);
+            return raw.iterate((value, key, iterationNumber) => {
+                if (key === SCHEMA_VERSION_KEY) return undefined;
+                return iterator(value, key, iterationNumber);
+            }, ...args);
         });
         wrap('length', async (...args) => {
             await ensureSchema();
-            return raw.length(...args);
+            const keys = await raw.keys(...args);
+            return keys.filter(key => key !== SCHEMA_VERSION_KEY).length;
         });
-        wrap('key', async (...args) => {
+        wrap('key', async (index, ...args) => {
             await ensureSchema();
-            return raw.key(...args);
+            const keys = (await raw.keys(...args)).filter(key => key !== SCHEMA_VERSION_KEY);
+            return keys[index] ?? null;
         });
         wrap('clear', async (...args) => {
             await ensureSchema();
