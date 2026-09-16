@@ -126,14 +126,24 @@
     loadStyle('settings-hub.css?v=1', 'smart-reader-settings-hub-style');
     loadStyle('article-copy-ui.css?v=1', 'smart-reader-article-copy-ui-style');
     loadStyle('workspace-backup-ui.css?v=1', 'smart-reader-workspace-backup-ui-style');
+    loadStyle('workspace-management-ui.css?v=1', 'smart-reader-workspace-management-ui-style');
     loadScript('workspace-ui.js?v=2', 'smart-reader-workspace-ui-loader');
     loadScript('settings-hub.js?v=1', 'smart-reader-settings-hub-loader');
     loadScriptPromise('article-copy-core.js?v=1', 'smart-reader-article-copy-core-loader')
         .then(() => loadScript('article-copy-ui.js?v=1', 'smart-reader-article-copy-ui-loader'))
         .catch(error => console.error('Failed to load article copy feature', error));
-    loadScriptPromise('workspace-backup-core.js?v=1', 'smart-reader-workspace-backup-core-loader')
+
+    const backupFeatureReady = loadScriptPromise('workspace-backup-core.js?v=1', 'smart-reader-workspace-backup-core-loader');
+    backupFeatureReady
         .then(() => loadScript('workspace-backup-ui.js?v=1', 'smart-reader-workspace-backup-ui-loader'))
         .catch(error => console.error('Failed to load workspace backup feature', error));
+
+    Promise.all([
+        backupFeatureReady,
+        loadScriptPromise('workspace-management-core.js?v=1', 'smart-reader-workspace-management-core-loader')
+    ])
+        .then(() => loadScript('workspace-management-ui.js?v=1', 'smart-reader-workspace-management-ui-loader'))
+        .catch(error => console.error('Failed to load workspace management feature', error));
 
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
