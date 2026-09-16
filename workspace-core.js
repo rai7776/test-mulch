@@ -14,6 +14,12 @@
     const WORKSPACE_KINDS = Object.freeze(['language', 'general']);
     const ACTIVE_LIBRARY_KEY = 'library_items';
     const ACTIVE_STUDY_HISTORY_KEY = 'study_history_v1';
+    const WORKSPACE_LOCAL_SETTING_KEYS = Object.freeze([
+        'smart-reader-study-settings-v1',
+        'smart-reader-study-example-mode',
+        'smart-reader-study-center-settings-v1',
+        'smart-reader-folder-study-limit-v1'
+    ]);
 
     function normalizeLanguageCode(value, fallback = '') {
         const text = String(value ?? '').trim();
@@ -27,6 +33,10 @@
 
     function dedicatedStudyHistoryKey(id) {
         return `workspace:${id}:study_history_v1`;
+    }
+
+    function dedicatedLocalSettingKey(id, key) {
+        return `smart-reader-workspace:${id}:local:${key}`;
     }
 
     function createDefaultWorkspace(now = Date.now()) {
@@ -75,6 +85,49 @@
 
     function getWorkspaceById(workspaces, id) {
         return normalizeWorkspaceList(workspaces).find(item => item.id === id) || null;
+    }
+
+    function captureActiveLocalSettings(localStore) {
+        if (!localStore || typeof localStore.getItem !== 'function') return null;
+        const snapshot = {};
+        for (const key of WORKSPACE_LOCAL_SETTING_KEYS) {
+            snapshot[key] = localStore.getItem(key);
+        }
+        return snapshot;
+    }
+
+    function readArchivedLocalSettings(localStore, workspaceId) {
+        if (!localStore || typeof localStore.getItem !== 'function') return null;
+        const snapshot = {};
+        for (const key of WORKSPACE_LOCAL_SETTING_KEYS) {
+            snapshot[key] = localStore.getItem(dedicatedLocalSettingKey(workspaceId, key));
+        }
+        return snapshot;
+    }
+
+    function applyActiveLocalSettings(localStore, snapshot) {
+        if (!localStore || !snapshot) return;
+        for (const key of WORKSPACE_LOCAL_SETTING_KEYS) {
+            const value = snapshot[key];
+            if (value === null || value === undefined) {
+                if (typeof localStore.removeItem === 'function') localStore.removeItem(key);
+            } else {
+                localStore.setItem(key, value);
+            }
+        }
+    }
+
+    function archiveActiveLocalSettings(localStore, workspaceId, snapshot) {
+        if (!localStore || !snapshot) return;
+        for (const key of WORKSPACE_LOCAL_SETTING_KEYS) {
+            const archiveKey = dedicatedLocalSettingKey(workspaceId, key);
+            const value = snapshot[key];
+            if (value === null || value === undefined) {
+                if (typeof localStore.removeItem === 'function') localStore.removeItem(archiveKey);
+            } else {
+                localStore.setItem(archiveKey, value);
+            }
+        }
     }
 
     async function migrateToWorkspaceMetadata(raw, _fromVersion, _toVersion, now = Date.now()) {
@@ -147,7 +200,7 @@
         return workspace;
     }
 
-    async function switchWorkspace(database, targetId) {
+    async function switchWorkspace(database, targetId, localStore = null) {
         if (!database || typeof database.getItem !== 'function' || typeof database.setItem !== 'function') {
             throw new TypeError('A LocalForage-compatible database instance is required.');
         }
@@ -161,6 +214,8 @@
         const originalActiveId = state.activeWorkspaceId;
         const currentLibrary = await database.getItem(ACTIVE_LIBRARY_KEY) || [];
         const currentHistory = await database.getItem(ACTIVE_STUDY_HISTORY_KEY) || [];
+        const currentLocalSettings = captureActiveLocalSettings(localStore);
+        const targetLocalSettings = readArchivedLocalSettings(localStore, target.id);
         const targetLibrarySourceKey = target.libraryKey === ACTIVE_LIBRARY_KEY
             ? dedicatedLibraryKey(target.id)
             : target.libraryKey;
@@ -176,10 +231,12 @@
             // Persist the workspace we are leaving before replacing the active aliases.
             await database.setItem(currentLibraryArchiveKey, currentLibrary);
             await database.setItem(currentHistoryArchiveKey, currentHistory);
+            archiveActiveLocalSettings(localStore, current.id, currentLocalSettings);
 
-            // The legacy app continues to use these two keys as the active workspace aliases.
+            // The legacy app continues to use these active aliases.
             await database.setItem(ACTIVE_LIBRARY_KEY, targetLibrary);
             await database.setItem(ACTIVE_STUDY_HISTORY_KEY, targetHistory);
+            applyActiveLocalSettings(localStore, targetLocalSettings);
 
             const updatedWorkspaces = state.workspaces.map(item => {
                 if (item.id === current.id) {
@@ -201,17 +258,14 @@
             await database.setItem(WORKSPACES_KEY, updatedWorkspaces);
             await database.setItem(ACTIVE_WORKSPACE_KEY, target.id);
 
-            // Once metadata points to the active aliases, old target archives are redundant.
-            if (typeof database.removeItem === 'function') {
-                if (targetLibrarySourceKey !== ACTIVE_LIBRARY_KEY) await database.removeItem(targetLibrarySourceKey);
-                if (targetHistorySourceKey !== ACTIVE_STUDY_HISTORY_KEY) await database.removeItem(targetHistorySourceKey);
-            }
-
+            // Keep target archive copies as a safety snapshot. They are overwritten
+            // with the latest active data when that workspace is left again.
             return readWorkspaceState(database);
         } catch (error) {
-            // Roll back the visible aliases and metadata. Archive copies may remain, which is safe.
+            // Roll back the visible aliases/settings and metadata. Archive copies may remain safely.
             try { await database.setItem(ACTIVE_LIBRARY_KEY, currentLibrary); } catch (_) {}
             try { await database.setItem(ACTIVE_STUDY_HISTORY_KEY, currentHistory); } catch (_) {}
+            try { applyActiveLocalSettings(localStore, currentLocalSettings); } catch (_) {}
             try { await database.setItem(WORKSPACES_KEY, originalWorkspaces); } catch (_) {}
             try { await database.setItem(ACTIVE_WORKSPACE_KEY, originalActiveId); } catch (_) {}
             throw error;
@@ -241,13 +295,19 @@
         WORKSPACE_KINDS,
         ACTIVE_LIBRARY_KEY,
         ACTIVE_STUDY_HISTORY_KEY,
+        WORKSPACE_LOCAL_SETTING_KEYS,
         normalizeLanguageCode,
         dedicatedLibraryKey,
         dedicatedStudyHistoryKey,
+        dedicatedLocalSettingKey,
         createDefaultWorkspace,
         createWorkspace,
         normalizeWorkspaceList,
         getWorkspaceById,
+        captureActiveLocalSettings,
+        readArchivedLocalSettings,
+        applyActiveLocalSettings,
+        archiveActiveLocalSettings,
         migrateToWorkspaceMetadata,
         ensureWorkspaceMetadata,
         readWorkspaceState,
