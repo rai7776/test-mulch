@@ -43,8 +43,30 @@
         document.head.appendChild(link);
     }
 
+    async function runWorkspaceAwareAppInit(previousOnload, event, workspaceState) {
+        const active = workspaceState?.activeWorkspace;
+        const isNewWorkspace = !!active && !active.migratedFromLegacy;
+        if (!isNewWorkspace) {
+            const result = previousOnload.call(window, event);
+            if (result && typeof result.then === 'function') await result;
+            return;
+        }
+
+        // app.js normally injects the English tutorial whenever library_items is empty.
+        // New non-legacy workspaces should start truly empty instead.
+        libraryItems = await db.getItem('library_items') || [];
+        const savedSet = await db.getItem('reader_settings');
+        if (savedSet) {
+            readerSettings = savedSet;
+            applySettings();
+        }
+        showLibrary();
+        renderList('words');
+        setupEventListeners();
+    }
+
     const workspaceReady = loadScriptPromise(
-        'workspace-core.js?v=1',
+        'workspace-core.js?v=2',
         'smart-reader-workspace-core-loader'
     );
     const foundationReady = loadScriptPromise(
@@ -58,6 +80,7 @@
     const previousOnload = window.onload;
     if (typeof previousOnload === 'function' && !previousOnload.__studyRefreshWrapped) {
         const wrappedOnload = async function (event) {
+            let workspaceState = null;
             try {
                 await Promise.all([workspaceReady, foundationReady]);
                 if (window.SmartReaderFoundation?.install && window.SmartReaderWorkspace && typeof db !== 'undefined') {
@@ -67,14 +90,15 @@
                             2: window.SmartReaderWorkspace.migrateToWorkspaceMetadata
                         }
                     });
+                    workspaceState = await window.SmartReaderWorkspace.readWorkspaceState(db);
+                    window.SmartReaderWorkspaceState = workspaceState;
                 }
             } catch (error) {
                 // Keep legacy local data accessible even if the new metadata layer fails.
                 console.error('Smart Reader workspace/storage foundation failed to initialize', error);
             }
 
-            const result = previousOnload.call(this, event);
-            if (result && typeof result.then === 'function') await result;
+            await runWorkspaceAwareAppInit(previousOnload, event, workspaceState);
 
             try {
                 if (window.SmartReaderWorkspace?.readWorkspaceState && typeof db !== 'undefined') {
@@ -97,6 +121,8 @@
 
     // Library/global navigation polish is loaded last so it can consistently override legacy styles.
     loadStyle('library-toolbar-polish.css?v=2', 'library-toolbar-polish-style');
+    loadStyle('workspace-ui.css?v=1', 'smart-reader-workspace-ui-style');
+    loadScript('workspace-ui.js?v=1', 'smart-reader-workspace-ui-loader');
 
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
