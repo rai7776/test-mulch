@@ -1842,6 +1842,7 @@
 
         window.SmartReaderStudy = {
             open: openStudyHub,
+            startEntries: (entries, label = '学習') => startSession(entries, label),
             startToday: () => startSession(selectTodayEntries(), '今日の学習'),
             startCurrentRange: () => openStudyHub(currentRangeEntries(), currentRangeLabel()),
             startFiltered: () => openStudyHub(entriesFromGlobalFiltered(), '現在の絞り込み結果'),
