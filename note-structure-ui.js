@@ -36,8 +36,8 @@
         window.onload = wrappedOnload;
     }
 
-    // Library toolbar polish is loaded last so it can consistently override legacy button styles.
-    loadStyle('library-toolbar-polish.css?v=1', 'library-toolbar-polish-style');
+    // Library/global navigation polish is loaded last so it can consistently override legacy styles.
+    loadStyle('library-toolbar-polish.css?v=2', 'library-toolbar-polish-style');
 
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
