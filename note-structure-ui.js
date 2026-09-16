@@ -43,34 +43,50 @@
         document.head.appendChild(link);
     }
 
-    // Load the commercial-safety/storage foundation before app.js init runs.
-    // app.js assigns window.onload = init; this wrapper waits for the foundation,
-    // installs schema/version guards on the existing LocalForage instance, and only
-    // then lets the normal app initialization continue.
+    const workspaceReady = loadScriptPromise(
+        'workspace-core.js?v=1',
+        'smart-reader-workspace-core-loader'
+    );
     const foundationReady = loadScriptPromise(
-        'smart-reader-foundation-core.js?v=1',
+        'smart-reader-foundation-core.js?v=2',
         'smart-reader-foundation-core-loader'
     );
 
-    // app.js loads libraryItems asynchronously on window.load. Flashcard Study renders
-    // earlier on DOMContentLoaded, so refresh its home counters after app initialization
-    // has actually finished instead of leaving the initial 0 values on screen.
+    // app.js loads libraryItems asynchronously on window.load. Install schema v2
+    // before legacy initialization so the old library remains readable while the
+    // workspace metadata is created around it.
     const previousOnload = window.onload;
     if (typeof previousOnload === 'function' && !previousOnload.__studyRefreshWrapped) {
         const wrappedOnload = async function (event) {
             try {
-                await foundationReady;
-                if (window.SmartReaderFoundation?.install && typeof db !== 'undefined') {
-                    await window.SmartReaderFoundation.install(db, document);
+                await Promise.all([workspaceReady, foundationReady]);
+                if (window.SmartReaderFoundation?.install && window.SmartReaderWorkspace && typeof db !== 'undefined') {
+                    await window.SmartReaderFoundation.install(db, document, {
+                        currentVersion: window.SmartReaderWorkspace.WORKSPACE_SCHEMA_VERSION,
+                        migrations: {
+                            2: window.SmartReaderWorkspace.migrateToWorkspaceMetadata
+                        }
+                    });
                 }
             } catch (error) {
-                // Foundation failure must be visible to developers, but should not make
-                // existing local data inaccessible. Continue with the legacy init path.
-                console.error('Smart Reader safety/storage foundation failed to initialize', error);
+                // Keep legacy local data accessible even if the new metadata layer fails.
+                console.error('Smart Reader workspace/storage foundation failed to initialize', error);
             }
 
             const result = previousOnload.call(this, event);
             if (result && typeof result.then === 'function') await result;
+
+            try {
+                if (window.SmartReaderWorkspace?.readWorkspaceState && typeof db !== 'undefined') {
+                    window.SmartReaderWorkspaceState = await window.SmartReaderWorkspace.readWorkspaceState(db);
+                    window.dispatchEvent(new CustomEvent('smartreader:workspace-ready', {
+                        detail: window.SmartReaderWorkspaceState
+                    }));
+                }
+            } catch (error) {
+                console.warn('Workspace state refresh failed', error);
+            }
+
             try { window.SmartReaderStudy?.refresh?.(); } catch (error) {
                 console.warn('Study home refresh after library load failed', error);
             }
