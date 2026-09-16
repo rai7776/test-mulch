@@ -1,0 +1,61 @@
+name: Browser smoke
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  chrome-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Start static server
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/smart-reader-http.log 2>&1 &
+          echo $! > /tmp/smart-reader-http.pid
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/smart-reader-http.log
+          exit 1
+      - name: Load clean first-run app in Chrome
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME_BIN"
+          "$CHROME_BIN" \
+            --headless \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --user-data-dir=/tmp/smart-reader-chrome-profile \
+            --virtual-time-budget=8000 \
+            --dump-dom \
+            http://127.0.0.1:4173/ \
+            > /tmp/smart-reader-dom.html \
+            2> /tmp/smart-reader-chrome.log
+      - name: Verify rendered app
+        run: |
+          grep -F 'id="smart-reader-workspace-create-overlay"' /tmp/smart-reader-dom.html
+          grep -F '最初の学習スペースを作成' /tmp/smart-reader-dom.html
+          grep -F 'id="workspace-create-name"' /tmp/smart-reader-dom.html
+          grep -F 'https://unpkg.com/localforage@1.10.0/dist/localforage.min.js' /tmp/smart-reader-dom.html
+          ! grep -F 'user-scalable=no' /tmp/smart-reader-dom.html
+          ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)|Smart Reader workspace/storage foundation failed to initialize' /tmp/smart-reader-chrome.log
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-diagnostics
+          path: |
+            /tmp/smart-reader-dom.html
+            /tmp/smart-reader-chrome.log
+            /tmp/smart-reader-http.log
