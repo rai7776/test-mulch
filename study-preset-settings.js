@@ -443,10 +443,8 @@
         const count = currentCount();
         if (count <= 0) return;
 
-        wrapStudyOpen();
         const api = window.SmartReaderStudy;
-        const openStudy = originalStudyOpen || (api?.open ? api.open.bind(api) : null);
-        if (!openStudy) return;
+        if (!api?.startEntries) return;
 
         applyCompactOptions();
         const selected = pending.entries.slice(0, count);
@@ -456,22 +454,8 @@
         overlay?.classList.remove('show');
         overlay?.setAttribute('aria-hidden', 'true');
 
-        openStudy(selected, label);
-
-        // iOS Safari can be unreliable when a synthetic button click is nested inside
-        // the original tap handler. Start the native context preset on the next task.
-        window.setTimeout(() => {
-            const contextButton = document.getElementById('study-hub-context');
-            if (!contextButton || contextButton.hidden) {
-                pending = null;
-                return;
-            }
-            allowNativeContextStart = true;
-            try { contextButton.click(); } finally {
-                allowNativeContextStart = false;
-                pending = null;
-            }
-        }, 0);
+        api.startEntries(selected, label);
+        pending = null;
     }
 
     function wrapStudyOpen() {
