@@ -8,6 +8,7 @@
     }
     function workspaceApi() { return window.SmartReaderWorkspace || null; }
     function managementApi() { return window.SmartReaderWorkspaceManagement || null; }
+    function backupApi() { return window.SmartReaderWorkspaceBackup || null; }
 
     async function refreshWorkspaceState() {
         const api = workspaceApi();
@@ -31,6 +32,35 @@
         option.value = item.id;
         option.textContent = item.name || 'スペース';
         return option;
+    }
+
+    function safeFilename(value) {
+        return String(value || 'workspace').replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').trim() || 'workspace';
+    }
+
+    function downloadJson(data, filename) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function createSafetyBackup(target) {
+        const api = backupApi();
+        const workspaces = workspaceApi();
+        const dbRef = database();
+        if (!api?.createWorkspaceBackup || !workspaces || !dbRef) {
+            throw new Error('バックアップ機能を読み込めないため削除できません。');
+        }
+        const backup = await api.createWorkspaceBackup(dbRef, workspaces, target.id, window.localStorage);
+        const stamp = String(backup.exportedAt || '').replace(/[:.]/g, '-');
+        downloadJson(backup, `smart-reader-space-${safeFilename(target.name)}-before-delete-${stamp}.json`);
+        return backup;
     }
 
     function updateDeleteState(section) {
@@ -68,12 +98,15 @@
             setStatus(section, '使用中のスペースは削除できません。先に別のスペースへ切り替えてください。', true);
             return;
         }
-        const confirmed = confirm(`「${target.name}」を削除しますか？\nこのスペースの教材・単語・Study履歴も削除されます。必要なら先にバックアップしてください。`);
+        const confirmed = confirm(`「${target.name}」を削除しますか？\n削除前にこのスペースのバックアップファイルを自動保存します。`);
         if (!confirmed) return;
         try {
+            setStatus(section, '削除前のバックアップを作成しています…');
+            await createSafetyBackup(target);
+            setStatus(section, 'バックアップを保存しました。スペースを削除しています…');
             await managementApi().deleteWorkspace(database(), workspaceApi(), target.id, window.localStorage);
             await refreshWorkspaceState();
-            setStatus(section, `「${target.name}」を削除しました。`);
+            setStatus(section, `「${target.name}」を削除しました。削除前バックアップも保存済みです。`);
         } catch (error) {
             console.error('Workspace delete failed', error);
             setStatus(section, error?.message || '削除に失敗しました。', true);
@@ -101,7 +134,7 @@
         heading.textContent = 'スペース管理';
         const description = document.createElement('p');
         description.className = 'settings-hub-section-description';
-        description.textContent = '学習スペースの名前変更や削除ができます。使用中のスペースは削除できません。';
+        description.textContent = '学習スペースの名前変更や削除ができます。使用中のスペースは削除できません。削除前にはバックアップを自動保存します。';
 
         const select = document.createElement('select');
         select.dataset.workspaceManagementSelect = '';
