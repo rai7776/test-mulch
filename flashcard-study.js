@@ -8,6 +8,8 @@
     const DEFAULT_DIFFICULTY = 45;
     const EXAMPLE_MODE_KEY = 'smart-reader-study-example-mode';
     const STUDY_SETTINGS_KEY = 'smart-reader-study-settings-v1';
+    const STUDY_HISTORY_KEY = 'study_history_v1';
+    const STUDY_HISTORY_LIMIT = 500;
 
     function clampInteger(value, min, max, fallback = 0) {
         const number = Number(value);
@@ -63,6 +65,148 @@
     let originalRenderList = null;
     let dragState = null;
     let pendingCommit = null;
+    let feedbackTimer = null;
+    let studyHistoryCache = [];
+    let studyHistoryLoaded = false;
+    let studyHistoryLoadPromise = null;
+
+    function studyHistoryStore() {
+        try {
+            if (typeof db !== 'undefined' && db?.getItem && db?.setItem) return db;
+        } catch (_) {}
+        try {
+            if (window.localforage?.createInstance) return window.localforage.createInstance({ name: 'ProjectA_DB_v3' });
+        } catch (_) {}
+        return null;
+    }
+
+    async function ensureStudyHistoryLoaded() {
+        if (studyHistoryLoaded) return studyHistoryCache;
+        if (studyHistoryLoadPromise) return studyHistoryLoadPromise;
+        studyHistoryLoadPromise = (async () => {
+            try {
+                const store = studyHistoryStore();
+                const raw = store ? await store.getItem(STUDY_HISTORY_KEY) : [];
+                studyHistoryCache = Array.isArray(raw) ? raw.filter(item => item && typeof item === 'object').slice(0, STUDY_HISTORY_LIMIT) : [];
+            } catch (error) {
+                console.error('Study history load failed', error);
+                studyHistoryCache = [];
+            }
+            studyHistoryLoaded = true;
+            studyHistoryLoadPromise = null;
+            window.dispatchEvent(new CustomEvent('smartreader:study-history-updated'));
+            return studyHistoryCache;
+        })();
+        return studyHistoryLoadPromise;
+    }
+
+    async function persistStudyHistory() {
+        try {
+            const store = studyHistoryStore();
+            if (store) await store.setItem(STUDY_HISTORY_KEY, studyHistoryCache.slice(0, STUDY_HISTORY_LIMIT));
+        } catch (error) {
+            console.error('Study history save failed', error);
+        }
+    }
+
+    function resolveStudySenseDisplay(word) {
+        const legacy = String(word?.meaning || '').trim();
+        let senses = [];
+        let contextId = null;
+        try {
+            const api = window.SmartReaderWordSenses;
+            if (api?.getSenseDisplay) {
+                const display = api.getSenseDisplay(word);
+                const meaning = String(display?.context?.meaning || legacy).trim();
+                const otherMeanings = Array.isArray(display?.others)
+                    ? display.others.map(sense => String(sense?.meaning || '').trim()).filter(Boolean)
+                    : [];
+                return { meaning, otherMeanings, contextSenseId: display?.contextSenseId || null };
+            }
+            if (api?.getWordSenses && api?.getContextSenseId) {
+                senses = api.getWordSenses(word);
+                contextId = api.getContextSenseId(word, senses);
+            }
+        } catch (_) {}
+
+        if (!Array.isArray(senses) || !senses.length) {
+            senses = Array.isArray(word?.senses)
+                ? word.senses.filter(sense => sense && String(sense.meaning || '').trim())
+                : [];
+            contextId = String(word?.contextSenseId || '');
+        }
+
+        const context = senses.find(sense => String(sense?.id || '') === String(contextId || ''))
+            || senses[0]
+            || null;
+        const meaning = String(context?.meaning || legacy).trim();
+        const seen = new Set(meaning ? [meaning.toLocaleLowerCase()] : []);
+        const otherMeanings = [];
+        senses.forEach(sense => {
+            if (!sense || sense === context || String(sense?.id || '') === String(context?.id || '')) return;
+            const value = String(sense.meaning || '').trim();
+            if (!value) return;
+            const key = value.toLocaleLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            otherMeanings.push(value);
+        });
+        return { meaning, otherMeanings, contextSenseId: context?.id || contextId || null };
+    }
+
+    function resolveStudyMeaning(word) {
+        return resolveStudySenseDisplay(word).meaning;
+    }
+
+    async function recordStudySession(current) {
+        if (!current || !current.stats || current.stats.responses <= 0) return;
+        await ensureStudyHistoryLoaded();
+        const completedAt = Date.now();
+        const words = [];
+        const initialByKey = new Map((current.initialEntries || []).map(entry => [entry.key, entry]));
+        (current.attempts instanceof Map ? Array.from(current.attempts.entries()) : []).forEach(([key, attempt]) => {
+            if (!attempt || !attempt.responses) return;
+            const entry = initialByKey.get(key);
+            if (!entry?.word) return;
+            const initial = current.initialStates instanceof Map ? current.initialStates.get(key) : null;
+            const senseDisplay = resolveStudySenseDisplay(entry.word);
+            words.push({
+                key,
+                articleId: entry.articleId ?? entry.article?.id ?? null,
+                articleTitle: String(entry.articleTitle || entry.article?.name || ''),
+                chapterId: entry.chapterId ?? null,
+                chapterTitle: String(entry.chapterTitle || ''),
+                word: String(entry.word.word || entry.word.surfaceText || ''),
+                meaning: senseDisplay.meaning,
+                otherMeanings: [...senseDisplay.otherMeanings],
+                responses: Number(attempt.responses) || 0,
+                known: Number(attempt.known) || 0,
+                unsure: Number(attempt.unsure) || 0,
+                wrong: Number(attempt.wrong) || 0,
+                firstResult: attempt.firstResult || null,
+                finalResult: entry.word.study?.lastResult || attempt.firstResult || null,
+                kind: initial?.isNew ? 'new' : 'review'
+            });
+        });
+        const record = {
+            id: `${current.startedAt || completedAt}-${completedAt}-${Math.random().toString(36).slice(2, 8)}`,
+            startedAt: current.startedAt || completedAt,
+            completedAt,
+            finished: !!current.finished,
+            label: String(current.label || '学習'),
+            initialCount: Number(current.initialCount) || 0,
+            round: Number(current.round) || 1,
+            stats: { ...current.stats },
+            newCount: words.filter(item => item.kind === 'new').length,
+            reviewCount: words.filter(item => item.kind !== 'new').length,
+            uniqueCount: words.length,
+            words
+        };
+        studyHistoryCache.unshift(record);
+        studyHistoryCache = studyHistoryCache.slice(0, STUDY_HISTORY_LIMIT);
+        await persistStudyHistory();
+        window.dispatchEvent(new CustomEvent('smartreader:study-history-updated', { detail: record }));
+    }
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -125,7 +269,10 @@
             lastSessionWrongCount: 0,
             lastSessionUnsureCount: 0,
             lastSessionFirstResult: null,
-            lastSessionCompletedAt: null
+            lastSessionCompletedAt: null,
+            suspended: false,
+            suspendedAt: null,
+            manualMasteredAt: null
         };
     }
 
@@ -162,6 +309,9 @@
         merged.lastStudiedAt = optionalTimestamp(merged.lastStudiedAt);
         merged.lastReviewAt = optionalTimestamp(merged.lastReviewAt);
         merged.lastSessionCompletedAt = optionalTimestamp(merged.lastSessionCompletedAt);
+        merged.suspended = !!merged.suspended;
+        merged.suspendedAt = optionalTimestamp(merged.suspendedAt);
+        merged.manualMasteredAt = optionalTimestamp(merged.manualMasteredAt);
         return merged;
     }
 
@@ -176,6 +326,29 @@
     function adjustDifficulty(study, delta) {
         study.difficultyScore = clampInteger((study.difficultyScore ?? DEFAULT_DIFFICULTY) + delta, 0, 100, DEFAULT_DIFFICULTY);
         return study.difficultyScore;
+    }
+
+    function weaknessScore(study) {
+        const seen = Math.max(0, Number(study?.seenCount) || 0);
+        const known = Math.max(0, Number(study?.knownCount) || 0);
+        const attempts = Math.max(0, Number(study?.lastSessionAttempts) || 0);
+        const recentWrong = Math.max(0, Number(study?.lastSessionWrongCount) || 0);
+        const recentUnsure = Math.max(0, Number(study?.lastSessionUnsureCount) || 0);
+        const accuracy = seen ? known / seen : null;
+        let score = (Number(study?.difficultyScore) || DEFAULT_DIFFICULTY) * 0.55;
+
+        if (attempts) {
+            score += Math.min(25, (recentWrong / attempts) * 25 + (recentUnsure / attempts) * 12);
+        }
+        const last = String(study?.lastReviewResult || study?.lastResult || '');
+        if (last === 'wrong') score += 18;
+        else if (last === 'unsure') score += 10;
+        else if (last === 'known') score -= 8;
+
+        score += Math.min(18, (Number(study?.lapseCount) || 0) * 6);
+        if (accuracy !== null && seen >= 3 && accuracy < 0.7) score += (0.7 - accuracy) * 30;
+        score -= Math.min(20, (Number(study?.correctStreak) || 0) * 4);
+        return clampInteger(Math.round(score), 0, 100, DEFAULT_DIFFICULTY);
     }
 
     function adaptiveIntervalDays(level, difficultyScore) {
@@ -203,23 +376,25 @@
 
     function studyView(word) {
         const study = readStudy(word);
-        const hasStudy = !!(word && word.study && typeof word.study === 'object');
-        const isNew = !hasStudy && !word?.memorized;
+        const isNew = study.seenCount === 0
+            && study.knownCount === 0
+            && study.unsureCount === 0
+            && study.wrongCount === 0
+            && !word?.memorized;
         const today = startOfLocalDay();
         const tomorrow = startOfNextLocalDay();
         const next = study.nextReviewAt;
         const overdue = next !== null && next < today;
         const dueToday = next !== null && next >= today && next < tomorrow;
         const due = next !== null && next < tomorrow;
-        const mastered = !!word?.memorized || study.level >= 4;
-        const learning = !isNew && !mastered;
+        const suspended = !!study.suspended;
+        const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
+        const mastered = manualMastered || !!word?.memorized || study.level >= 4;
+        const learning = !suspended && !isNew && !mastered;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
-        const difficult = study.difficultyScore >= 65
-            || study.lapseCount >= 2
-            || study.wrongCount >= 4
-            || study.lastReviewResult === 'wrong'
-            || (study.seenCount >= 4 && accuracy !== null && accuracy < 0.5);
-        return { study, isNew, overdue, dueToday, due, mastered, learning, difficult, accuracy };
+        const weakScore = weaknessScore(study);
+        const difficult = !suspended && !manualMastered && weakScore >= 65;
+        return { study, isNew, overdue, dueToday, due, mastered, manualMastered, suspended, learning, difficult, weaknessScore: weakScore, accuracy };
     }
 
     function articleTitle(article) {
@@ -269,7 +444,7 @@
     function dedupeEntries(entries) {
         const seen = new Set();
         return (entries || []).filter(entry => {
-            if (!entry?.word || seen.has(entry.key)) return false;
+            if (!entry?.word || studyView(entry.word).suspended || seen.has(entry.key)) return false;
             seen.add(entry.key);
             return true;
         });
@@ -318,6 +493,7 @@
         const summary = { total: 0, overdue: 0, dueToday: 0, due: 0, fresh: 0, difficult: 0, learning: 0, mastered: 0 };
         (entries || []).forEach(entry => {
             const view = studyView(entry.word);
+            if (view.suspended || view.manualMastered) return;
             summary.total += 1;
             if (view.overdue) summary.overdue += 1;
             if (view.dueToday) summary.dueToday += 1;
@@ -369,7 +545,10 @@
     }
 
     function selectTodayEntries() {
-        const all = getAllStudyEntries();
+        const all = getAllStudyEntries().filter(entry => {
+            const view = studyView(entry.word);
+            return !view.suspended && !view.manualMastered;
+        });
         const due = sortDue(all.filter(entry => studyView(entry.word).due)).slice(0, uiState.reviewLimit);
         const dueKeys = new Set(due.map(entry => entry.key));
         const fresh = all.filter(entry => studyView(entry.word).isNew && !dueKeys.has(entry.key)).slice(0, uiState.newLimit);
@@ -377,11 +556,20 @@
     }
 
     function selectPreset(mode) {
-        const all = getAllStudyEntries();
+        const all = getAllStudyEntries().filter(entry => {
+            const view = studyView(entry.word);
+            return !view.suspended && !view.manualMastered;
+        });
         if (mode === 'today') return selectTodayEntries();
         if (mode === 'overdue') return sortDue(all.filter(entry => studyView(entry.word).overdue));
         if (mode === 'due') return sortDue(all.filter(entry => studyView(entry.word).due));
-        if (mode === 'difficult') return all.filter(entry => studyView(entry.word).difficult).sort((a, b) => { const left = readStudy(a.word); const right = readStudy(b.word); return (right.difficultyScore - left.difficultyScore) || (right.lapseCount - left.lapseCount) || (right.wrongCount - left.wrongCount); });
+        if (mode === 'difficult') return all.filter(entry => studyView(entry.word).difficult).sort((a, b) => {
+            const left = studyView(a.word);
+            const right = studyView(b.word);
+            return (right.weaknessScore - left.weaknessScore)
+                || (right.study.lapseCount - left.study.lapseCount)
+                || (right.study.wrongCount - left.study.wrongCount);
+        });
         if (mode === 'new') return all.filter(entry => studyView(entry.word).isNew).slice(0, Math.max(uiState.newLimit, 1));
         if (mode === 'context') return dedupeEntries(uiState.contextEntries || []);
         return [];
@@ -427,7 +615,13 @@
         const previousLevel = study.level;
         const previousSessionCount = study.sessionCount;
         const wasPreviouslyLearned = previousLevel > 0 || !!word.memorized || study.firstKnownCount > 0;
+        const manualMasteredBeforeAnswer = !!study.manualMasteredAt && !!word.memorized;
         const attempt = sessionAttemptState(entry.key);
+
+        if (result === 'wrong' && study.manualMasteredAt) {
+            study.manualMasteredAt = null;
+            word.memorized = false;
+        }
 
         attempt.responses += 1;
         attempt[result] += 1;
@@ -477,7 +671,9 @@
                 study.nextReviewAt = wasDueBeforeAnswer ? previousNextReviewAt : localDayAfter(1, timestamp);
             }
 
-            word.memorized = study.level >= 4;
+            word.memorized = manualMasteredBeforeAnswer && result !== 'wrong'
+                ? true
+                : study.level >= 4;
             promoted = study.level > previousLevel;
             demoted = study.level < previousLevel;
         } else {
@@ -602,6 +798,7 @@
             pendingCommit = null;
         }
         flushSave();
+        void recordStudySession(session);
         session = null;
         const overlay = document.getElementById('study-session-overlay');
         if (overlay) overlay.classList.remove('show');
@@ -699,7 +896,9 @@
         const study = readStudy(word);
         const surface = String(word.surfaceText || '').trim();
         const wordText = String(word.word || '').trim() || surface || '—';
-        const meaning = String(word.meaning || '').trim() || '意味未登録';
+        const senseDisplay = resolveStudySenseDisplay(word);
+        const meaning = senseDisplay.meaning || '意味未登録';
+        const otherMeanings = senseDisplay.otherMeanings;
         const memo = String(word.memo || '').trim();
         const context = String(word.context || '').trim();
         const showContextFront = !!context && uiState.exampleMode === 'always';
@@ -727,6 +926,7 @@
             back.innerHTML = `
                 <div class="study-card-back-word study-card-selectable">${escapeHtml(wordText)}</div>
                 <div class="study-card-meaning study-card-selectable">${escapeHtml(meaning)}</div>
+                ${otherMeanings.length ? `<div class="study-card-other-meanings study-card-selectable" aria-label="その他の意味">${otherMeanings.map(item => `<div>${escapeHtml(item)}</div>`).join('')}</div>` : ''}
                 ${memo ? `<div class="study-card-memo study-card-selectable">${escapeHtml(memo)}</div>` : ''}
                 ${showContextBack ? `<div class="study-card-context study-card-selectable">${escapeHtml(context)}</div>` : ''}
                 <div class="study-card-source study-card-selectable">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
@@ -873,8 +1073,49 @@
         if (result === 'unsure') card.style.transform = 'translate3d(0, -110vh, 0)';
 
         // Record the judgement immediately so undo always has one history item to restore.
+        // Reward feedback is deliberately measured outside answerCurrent so the stable
+        // answer / queue transition path stays untouched.
+        const rewardEntry = session.queue[session.index] || null;
+        let rewardBefore = null;
+        try {
+            if (rewardEntry?.word) rewardBefore = studyView(rewardEntry.word);
+        } catch (_) {}
+
         // Only the visual transition to the next card is delayed.
         answerCurrent(result, { deferRender: true });
+
+        try {
+            if (session && rewardEntry?.word) {
+                const rewardAfter = studyView(rewardEntry.word);
+                const currentStreak = result === 'known'
+                    ? (Number(session.stats.currentStreak) || 0) + 1
+                    : 0;
+                session.stats.currentStreak = currentStreak;
+                session.stats.bestStreak = Math.max(Number(session.stats.bestStreak) || 0, currentStreak);
+
+                const beforeWeakness = Number(rewardBefore?.weaknessScore);
+                const afterWeakness = Number(rewardAfter?.weaknessScore);
+                const weakCleared = result === 'known' && !!rewardBefore?.difficult && !rewardAfter?.difficult;
+                if (weakCleared) session.stats.weakCleared = (Number(session.stats.weakCleared) || 0) + 1;
+
+                window.dispatchEvent(new CustomEvent('smartreader:study-answer-feedback', {
+                    detail: {
+                        result,
+                        key: rewardEntry.key || '',
+                        word: String(rewardEntry.word.word || rewardEntry.word.surfaceText || ''),
+                        beforeWeakness: Number.isFinite(beforeWeakness) ? beforeWeakness : null,
+                        afterWeakness: Number.isFinite(afterWeakness) ? afterWeakness : null,
+                        weakCleared,
+                        currentStreak,
+                        bestStreak: Number(session.stats.bestStreak) || 0,
+                        levelUp: Number(rewardAfter?.study?.level) > Number(rewardBefore?.study?.level),
+                        mastered: !!rewardAfter?.mastered
+                    }
+                }));
+            }
+        } catch (error) {
+            console.warn('Study reward feedback skipped', error);
+        }
 
         const timerId = window.setTimeout(() => {
             if (!pendingCommit || pendingCommit.timerId !== timerId) return;
@@ -890,7 +1131,7 @@
     function bindCardInteractions() {
         const card = document.getElementById('study-flashcard');
         if (!card) return;
-        const threshold = Math.max(68, Math.min(120, card.getBoundingClientRect().width * 0.22));
+        const threshold = Math.max(44, Math.min(84, card.getBoundingClientRect().width * 0.15));
 
         card.querySelector('.study-card-copy')?.addEventListener('click', event => {
             event.preventDefault();
@@ -903,72 +1144,140 @@
             speakCurrentWord();
         });
 
-        card.addEventListener('pointerdown', event => {
-            if (isCardControlTarget(event.target)) return;
-            if (event.button !== undefined && event.button !== 0) return;
-            dragState = {
-                pointerId: event.pointerId,
-                startX: event.clientX,
-                startY: event.clientY,
+        function makeDragState(clientX, clientY, extra = {}) {
+            return {
+                startX: clientX,
+                startY: clientY,
                 dx: 0,
                 dy: 0,
                 moved: false,
+                axis: null,
                 threshold,
-                captured: false
+                startedAt: performance.now(),
+                captured: false,
+                ...extra
             };
-            if (event.pointerType !== 'touch') {
-                card.setPointerCapture?.(event.pointerId);
-                dragState.captured = true;
-            }
-            card.classList.add('is-dragging');
-        });
+        }
 
-        card.addEventListener('pointermove', event => {
-            if (!dragState || dragState.pointerId !== event.pointerId) return;
-            dragState.dx = event.clientX - dragState.startX;
-            dragState.dy = Math.min(0, event.clientY - dragState.startY);
-            if (Math.abs(dragState.dx) > 7 || Math.abs(dragState.dy) > 7) {
-                dragState.moved = true;
-                if (!dragState.captured) {
-                    card.setPointerCapture?.(event.pointerId);
-                    dragState.captured = true;
-                }
+        function updateDragPosition(state, clientX, clientY) {
+            if (!state) return;
+            let dx = clientX - state.startX;
+            let dy = clientY - state.startY;
+            const ax = Math.abs(dx);
+            const ay = Math.abs(dy);
+
+            if (!state.axis && (ax > 7 || ay > 7)) {
+                state.axis = ax >= ay * 0.8 ? 'x' : 'y';
             }
-            const result = resultDirection(dragState.dx, dragState.dy);
-            const distance = dragDistanceFor(result, dragState.dx, dragState.dy);
-            const alpha = Math.min(1, distance / dragState.threshold);
+            if (state.axis === 'x') dy = 0;
+            if (state.axis === 'y') dx *= 0.18;
+
+            state.dx = dx;
+            state.dy = Math.min(0, dy);
+            if (Math.abs(state.dx) > 7 || Math.abs(state.dy) > 7) state.moved = true;
+
+            const result = resultDirection(state.dx, state.dy);
+            const distance = dragDistanceFor(result, state.dx, state.dy);
+            const alpha = Math.min(1, distance / state.threshold);
             card.dataset.direction = result || '';
             card.style.setProperty('--study-feedback-alpha', String(alpha));
-            card.style.transform = `translate3d(${dragState.dx}px, ${dragState.dy}px, 0) rotate(${dragState.dx * 0.035}deg)`;
+            card.style.transform = `translate3d(${state.dx}px, ${state.dy}px, 0) rotate(${state.dx * 0.035}deg)`;
             const judge = card.querySelector('.study-card-judge');
             if (judge) judge.textContent = resultSymbol(result);
-        });
+        }
 
-        card.addEventListener('pointerup', event => {
-            if (!dragState || dragState.pointerId !== event.pointerId) return;
-            const state = dragState;
-            dragState = null;
-
-            // Explicitly release pointer capture before committing a swipe.
-            // iOS Safari can otherwise swallow the next tap on the header undo button.
-            if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
-                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+        function finishDrag(state, clientX, clientY) {
+            if (!state) return;
+            if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+                updateDragPosition(state, clientX, clientY);
             }
             card.classList.remove('is-dragging');
 
             const result = resultDirection(state.dx, state.dy);
             const distance = dragDistanceFor(result, state.dx, state.dy);
-            if (result && distance >= state.threshold) {
-                event.preventDefault();
+            const elapsed = Math.max(1, performance.now() - (state.startedAt || performance.now()));
+            const velocity = distance / elapsed;
+            const isQuickFlick = distance >= 30 && velocity >= 0.22;
+            if (result && (distance >= state.threshold || isQuickFlick)) {
                 commitResult(result);
                 return;
             }
             resetCardPosition(card);
             if (!state.moved && !hasActiveTextSelection()) card.classList.toggle('flipped');
+        }
+
+        // iOS Safari can interrupt Pointer Events while a touch is moving across a
+        // transformed card. Track fingers with Touch Events directly so the card stays
+        // attached to the finger instead of feeling like it catches or snaps back.
+        card.addEventListener('touchstart', event => {
+            if (isCardControlTarget(event.target) || event.touches.length !== 1 || pendingCommit) return;
+            const touch = event.touches[0];
+            dragState = makeDragState(touch.clientX, touch.clientY, {
+                input: 'touch',
+                touchId: touch.identifier
+            });
+            card.classList.add('is-dragging');
+        }, { passive: true });
+
+        card.addEventListener('touchmove', event => {
+            if (!dragState || dragState.input !== 'touch') return;
+            if (hasActiveTextSelection()) {
+                dragState = null;
+                resetCardPosition(card);
+                return;
+            }
+            const touch = Array.from(event.touches).find(item => item.identifier === dragState.touchId);
+            if (!touch) return;
+            updateDragPosition(dragState, touch.clientX, touch.clientY);
+            if (dragState.moved) event.preventDefault();
+        }, { passive: false });
+
+        card.addEventListener('touchend', event => {
+            if (!dragState || dragState.input !== 'touch') return;
+            const state = dragState;
+            const touch = Array.from(event.changedTouches).find(item => item.identifier === state.touchId);
+            dragState = null;
+            if (state.moved) event.preventDefault();
+            finishDrag(state, touch?.clientX, touch?.clientY);
+        }, { passive: false });
+
+        card.addEventListener('touchcancel', () => {
+            if (dragState?.input !== 'touch') return;
+            dragState = null;
+            resetCardPosition(card);
+        }, { passive: true });
+
+        card.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'touch') return;
+            if (isCardControlTarget(event.target)) return;
+            if (event.button !== undefined && event.button !== 0) return;
+            dragState = makeDragState(event.clientX, event.clientY, {
+                input: 'pointer',
+                pointerId: event.pointerId
+            });
+            card.setPointerCapture?.(event.pointerId);
+            dragState.captured = true;
+            card.classList.add('is-dragging');
+        });
+
+        card.addEventListener('pointermove', event => {
+            if (!dragState || dragState.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            updateDragPosition(dragState, event.clientX, event.clientY);
+        });
+
+        card.addEventListener('pointerup', event => {
+            if (!dragState || dragState.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            const state = dragState;
+            dragState = null;
+            if (state.captured && card.hasPointerCapture?.(event.pointerId)) {
+                try { card.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
+            finishDrag(state, event.clientX, event.clientY);
         });
 
         card.addEventListener('pointercancel', event => {
-            if (dragState?.captured && dragState.pointerId === event.pointerId && card.hasPointerCapture?.(event.pointerId)) {
+            if (!dragState || dragState.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            if (dragState.captured && card.hasPointerCapture?.(event.pointerId)) {
                 try { card.releasePointerCapture(event.pointerId); } catch (_) {}
             }
             dragState = null;
@@ -976,9 +1285,8 @@
         });
 
         card.addEventListener('lostpointercapture', event => {
-            if (dragState?.pointerId !== event.pointerId) return;
-            dragState = null;
-            card.classList.remove('is-dragging');
+            if (dragState?.input !== 'pointer' || dragState.pointerId !== event.pointerId) return;
+            dragState.captured = false;
         });
 
         card.addEventListener('keydown', event => {
@@ -1014,7 +1322,12 @@
         pendingCommit = null;
         session = {
             label: label || '学習',
+            startedAt: Date.now(),
             initialEntries: [...selected],
+            initialStates: new Map(selected.map(entry => {
+                const view = studyView(entry.word);
+                return [entry.key, { isNew: view.isNew, due: view.due, difficult: view.difficult, level: view.study.level }];
+            })),
             initialCount: selected.length,
             queue,
             nextRound: [],
@@ -1025,7 +1338,7 @@
             answeredUnique: new Set(),
             attempts: new Map(),
             history: [],
-            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0 }
+            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0, currentStreak: 0, bestStreak: 0, weakCleared: 0 }
         };
         closeStudyHub();
         renderSession();
@@ -1399,9 +1712,11 @@
                 <div class="study-session-shell" role="dialog" aria-modal="true" aria-label="フラッシュカード学習">
                     <header class="study-session-header">
                         <button type="button" id="study-session-close" class="study-icon-action" aria-label="学習を終了">×</button>
-                        <div class="study-session-progress-wrap"><strong id="study-session-progress">1 / 1</strong><span id="study-session-round">1周目</span></div>
+                        <div class="study-session-progress-wrap"><strong id="study-session-progress">1 / 1</strong><span id="study-session-round">1周目</span><span id="study-session-streak" class="study-session-streak" hidden></span></div>
                         <button type="button" id="study-session-undo" class="study-icon-action" aria-label="直前の判定を戻す">↶</button>
                     </header>
+                    <div class="study-session-progress-bar" aria-hidden="true"><span id="study-session-progress-fill"></span></div>
+                    <div id="study-answer-feedback" class="study-answer-feedback" aria-live="polite"></div>
                     <div id="study-session-stage" class="study-session-stage"></div>
                     <div id="study-session-source" class="study-session-source"></div>
                 </div>
@@ -1433,20 +1748,21 @@
             .study-hub-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:16px}.study-preset{display:grid;grid-template-columns:1fr auto;grid-template-areas:'label count' 'hint hint';gap:2px 8px;text-align:left;padding:12px;border:1px solid #e5dbd1;border-radius:12px;background:#fff;color:#51463d}.study-preset.primary{border-color:#cdb59c;background:#fff8f0}.study-preset.context{grid-column:1/-1}.study-preset span{grid-area:label;font-weight:700}.study-preset strong{grid-area:count;font-size:1.35rem}.study-preset small{grid-area:hint;color:#897d71}
             .study-hub-settings{margin-top:12px;padding:9px 11px;border:1px solid #e7ddd3;border-radius:10px;background:#faf7f3}.study-hub-settings summary{cursor:pointer;font-weight:700;color:#6b5c4e}.study-setting-row{display:flex;align-items:center;gap:6px;margin-top:8px}.study-setting-row label{display:flex;align-items:center;gap:7px}.study-setting-row input[type=number]{width:72px;min-height:36px;font-size:16px}.study-setting-row select{min-height:36px;padding:5px 8px;border:1px solid #ded3c9;border-radius:8px;background:#fff;color:#5f5348;font-size:16px}.study-setting-check{display:flex;align-items:center;gap:7px;margin-top:9px}
             .study-swipe-guide{display:flex;justify-content:center;gap:30px;margin-top:14px}.study-swipe-guide span{display:flex;align-items:center;gap:7px;font-weight:800}.study-swipe-guide i{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-style:normal}.study-swipe-guide .wrong i{background:var(--study-red)}.study-swipe-guide .unsure i{background:var(--study-gray)}.study-swipe-guide .known i{background:var(--study-green)}.study-hub-status{min-height:1.2em;margin:10px 0 0;color:var(--study-red);font-size:.85rem}
-            .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
-            .study-session-shell{width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap span{display:block;margin-top:2px;color:#817568;font-size:.78rem}
+            .study-session-overlay{position:fixed;inset:0;z-index:13000;display:none;background:rgba(245,241,236,.98);overflow:auto;overscroll-behavior:none}.study-session-overlay.show{display:block}.study-session-open{overflow:hidden}
+            .study-session-shell{position:relative;width:min(760px,100%);min-height:100%;margin:0 auto;padding:14px 18px 24px;display:flex;flex-direction:column}.study-session-header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px}.study-session-progress-wrap{text-align:center}.study-session-progress-wrap strong{display:block;font-size:1.05rem;color:#433a32}.study-session-progress-wrap>span{display:inline-block;margin:2px 3px 0;color:#817568;font-size:.78rem}.study-session-streak{padding:2px 7px;border-radius:999px;background:#fff0d5;color:#9b5b08!important;font-weight:850}.study-session-streak[hidden]{display:none!important}.study-session-progress-bar{height:5px;margin:9px 54px 0;border-radius:999px;background:#e9e1d9;overflow:hidden}.study-session-progress-bar span{display:block;width:0;height:100%;border-radius:inherit;background:var(--study-green);transition:width .28s ease}.study-answer-feedback{position:absolute;z-index:20;top:78px;left:50%;transform:translate(-50%,-8px) scale(.94);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:150px;max-width:82%;padding:9px 15px;border:1px solid #dfd5cb;border-radius:14px;background:rgba(255,253,249,.96);box-shadow:0 8px 24px rgba(67,57,48,.13);opacity:0;pointer-events:none}.study-answer-feedback.show{animation:study-feedback-pop .2s ease-out forwards}.study-answer-feedback strong{font-size:1rem;color:#433930}.study-answer-feedback span{font-size:.72rem;color:#76695e}.study-answer-feedback.known{border-color:#b9d9c5}.study-answer-feedback.unsure{border-color:#d4d5da}.study-answer-feedback.wrong{border-color:#e6bbbb}.study-answer-feedback.special{box-shadow:0 10px 28px rgba(150,100,30,.2)}@keyframes study-feedback-pop{from{opacity:0;transform:translate(-50%,-8px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
             .study-session-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:470px}.study-gesture-field{position:relative;width:min(500px,92vw);padding:52px 0 18px}.study-flashcard{--study-feedback-alpha:0;position:relative;width:100%;height:min(350px,58vw);min-height:285px;max-height:390px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:transform .22s ease;transform-origin:center center;outline:none}.study-flashcard.is-dragging{cursor:grabbing;transition:none}.study-flashcard.is-committing{transition:transform .19s ease-out}.study-flashcard:focus-visible{outline:3px solid rgba(141,90,43,.25);outline-offset:5px;border-radius:22px}
             .study-flashcard-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .28s ease}.study-flashcard.flipped .study-flashcard-inner{transform:rotateY(180deg)}.study-card-face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid #dfd3c7;border-radius:22px;background:var(--study-paper);box-shadow:0 15px 38px rgba(79,63,50,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:auto}.study-card-back{transform:rotateY(180deg)}
             .study-card-selectable{user-select:text!important;-webkit-user-select:text!important;-webkit-touch-callout:default;touch-action:auto;cursor:text}.study-card-selectable::selection{background:rgba(141,90,43,.2)}
             .study-card-corner-action{position:absolute;z-index:9;top:14px;width:40px;height:40px;border:1px solid #ded3c9;border-radius:50%;background:rgba(255,253,249,.94);color:#65594d;display:flex;align-items:center;justify-content:center;font-size:1rem;line-height:1;box-shadow:0 3px 10px rgba(70,55,44,.08);user-select:none;-webkit-user-select:none;touch-action:manipulation}.study-card-copy{left:14px}.study-card-speak{right:14px;font-size:.9rem}
             .study-card-judge{position:absolute;z-index:5;top:62px;right:20px;width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.1rem;font-weight:900;opacity:var(--study-feedback-alpha);pointer-events:none}.study-flashcard[data-direction=wrong] .study-card-judge{background:var(--study-red)}.study-flashcard[data-direction=known] .study-card-judge{background:var(--study-green)}.study-flashcard[data-direction=unsure] .study-card-judge{background:var(--study-gray)}
             .study-flashcard[data-direction=wrong] .study-card-face{border-color:color-mix(in srgb,var(--study-red) 60%,#fff);box-shadow:0 15px 38px rgba(160,55,55,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=known] .study-card-face{border-color:color-mix(in srgb,var(--study-green) 60%,#fff);box-shadow:0 15px 38px rgba(50,130,85,calc(.08 + var(--study-feedback-alpha)*.22))}.study-flashcard[data-direction=unsure] .study-card-face{border-color:color-mix(in srgb,var(--study-gray) 60%,#fff)}
-            .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-context-front{margin-top:14px;max-height:38%;overflow:auto;font-size:.82rem}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{max-width:100%;margin-top:5px;color:#8c7c6d;font-size:.72rem;line-height:1.45;text-align:center}
+            .study-card-word{font-size:clamp(2rem,7vw,3.5rem);font-weight:800;color:#3f352d;line-height:1.15;overflow-wrap:anywhere}.study-card-surface{margin-top:12px;color:#7d7064;font-size:1rem}.study-card-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:16px}.study-card-meta span{padding:3px 8px;border-radius:999px;background:#eee7df;color:#716458;font-size:.72rem}.study-card-back-word{font-size:1.2rem;font-weight:800;color:#6d5d4f}.study-card-meaning{margin-top:18px;font-size:clamp(1.35rem,4vw,2rem);font-weight:750;color:#352e28;line-height:1.45}.study-card-other-meanings{display:grid;gap:2px;margin-top:7px;color:#8b7f74;font-size:clamp(.8rem,2.5vw,.95rem);font-weight:500;line-height:1.4}.study-card-other-meanings>div::before{content:'・'}.study-card-memo{margin-top:16px;color:#6f6257;line-height:1.5}.study-card-context{width:100%;margin-top:17px;padding:12px;border-radius:10px;background:#f5f0ea;color:#65594e;font-size:.88rem;line-height:1.55;text-align:left}.study-card-context-front{margin-top:14px;max-height:38%;overflow:auto;font-size:.82rem}.study-card-source{margin-top:14px;color:#95887b;font-size:.74rem}.study-card-studyline{max-width:100%;margin-top:5px;color:#8c7c6d;font-size:.72rem;line-height:1.45;text-align:center}
             .study-direction-hint{position:absolute;z-index:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.45rem;font-weight:900;opacity:.78}.hint-wrong{left:-8px;top:50%;background:var(--study-red)}.hint-known{right:-8px;top:50%;background:var(--study-green)}.hint-unsure{left:50%;top:3px;transform:translateX(-50%);background:var(--study-gray)}
             .study-touch-actions{display:flex;justify-content:center;align-items:flex-start;gap:26px;margin-top:14px}.study-judge-control{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:48px}.study-judge-button{width:48px;height:48px;border:0;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.12)}.study-judge-button.wrong{background:var(--study-red)}.study-judge-button.unsure{background:var(--study-gray)}.study-judge-button.known{background:var(--study-green)}.study-judge-count{display:block;min-height:1em;color:#8a7c70;font-size:.7rem;font-weight:700;line-height:1}.study-session-source{text-align:center;color:#8a7c70;font-size:.75rem;min-height:1.2em}
             .study-session-summary{width:min(560px,94vw);padding:24px;border:1px solid #e1d7cd;border-radius:20px;background:#fff;text-align:center;box-shadow:0 14px 38px rgba(70,55,44,.12)}.study-summary-mark{width:56px;height:56px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--study-green);color:#fff;font-size:1.8rem}.study-session-summary h2{margin:8px 0;color:#433930}.study-summary-main{display:flex;align-items:baseline;justify-content:center;gap:7px}.study-summary-main strong{font-size:2.4rem}.study-summary-main span{color:#7b6e62}.study-summary-judges{display:flex;justify-content:center;gap:18px;margin:18px 0}.study-judge-stat{display:flex;align-items:center;gap:7px}.study-judge-stat span{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900}.study-judge-stat.wrong span{background:var(--study-red)}.study-judge-stat.unsure span{background:var(--study-gray)}.study-judge-stat.known span{background:var(--study-green)}.study-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left}.study-summary-grid>div{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:9px;background:#f7f3ef}.study-summary-grid span{color:#75685c;font-size:.82rem}.study-summary-actions{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px}
             @media(max-width:700px){.study-today-card{margin:10px 0 14px;padding:12px}.study-today-heading{align-items:flex-start}.study-today-heading h2{font-size:1.2rem}.study-today-stats{grid-template-columns:1fr 1fr}.study-primary-action{padding:8px 11px;font-size:.86rem}.global-study-controls{display:grid;grid-template-columns:1fr 1fr;grid-column:1/-1;gap:6px;width:100%}.global-study-controls select,.global-study-controls button{width:100%;min-width:0;font-size:13px}.global-study-controls button{grid-column:span 1}.sidebar-study-controls{grid-template-columns:1fr auto}.study-overlay{align-items:flex-end;padding:0}.study-hub{width:100%;max-height:92vh;border-radius:18px 18px 0 0;padding:15px}.study-hub-preset-grid{grid-template-columns:1fr 1fr}.study-preset{padding:10px}.study-preset small{font-size:.68rem}.study-swipe-guide{gap:22px}.study-session-shell{padding:10px 12px 18px}.study-session-stage{min-height:420px}.study-gesture-field{width:min(88vw,470px);padding-top:48px}.study-flashcard{height:58vh;max-height:420px;min-height:300px}.study-card-face{padding:22px 18px}.study-touch-actions{gap:30px}.study-judge-button{width:52px;height:52px}.study-judge-control{min-width:52px}.study-summary-grid{grid-template-columns:1fr}.hint-wrong{left:-6px}.hint-known{right:-6px}}
-            @media(max-width:390px){.study-hub-preset-grid{grid-template-columns:1fr}.study-preset.context{grid-column:auto}.study-today-heading{flex-direction:column}.study-today-heading .study-primary-action{width:100%}.study-session-stage{min-height:390px}.study-flashcard{min-height:285px;height:56vh}.study-direction-hint{width:40px;height:40px;font-size:1.2rem}}
+            @media(max-width:390px){.study-hub-preset-grid{grid-template-columns:1fr}.study-preset.context{grid-column:auto}.study-today-heading{flex-direction:column}.study-today-heading .study-primary-action{width:100%}.study-session-stage{min-height:390px}.study-flashcard{min-height:285px;height:56vh}.study-direction-hint{width:40px;height:40px;font-size:1.2rem}.study-session-progress-bar{margin-left:50px;margin-right:50px}.study-answer-feedback{top:72px}}
+            @media(prefers-reduced-motion:reduce){.study-answer-feedback.show{animation:none;opacity:1;transform:translate(-50%,0) scale(1)}.study-session-progress-bar span{transition:none}}
         `;
         document.head.appendChild(style);
     }
@@ -1460,6 +1776,57 @@
         });
     }
 
+    function getActiveSessionSnapshot() {
+        if (!session) return null;
+        const entries = (Array.isArray(session.initialEntries) ? session.initialEntries : []).map(entry => {
+            const attempt = session.attempts instanceof Map ? session.attempts.get(entry.key) : null;
+            const senseDisplay = resolveStudySenseDisplay(entry.word || {});
+            const view = entry.word ? studyView(entry.word) : null;
+            return {
+                key: entry.key || '',
+                articleId: entry.articleId ?? entry.article?.id ?? null,
+                articleTitle: String(entry.articleTitle || entry.article?.name || ''),
+                chapterId: entry.chapterId ?? null,
+                chapterTitle: String(entry.chapterTitle || ''),
+                word: String(entry.word?.word || entry.word?.surfaceText || ''),
+                meaning: senseDisplay.meaning,
+                otherMeanings: [...senseDisplay.otherMeanings],
+                weaknessScore: Number(view?.weaknessScore) || 0,
+                difficult: !!view?.difficult,
+                mastered: !!view?.mastered,
+                attempt: attempt ? { ...attempt } : { responses: 0, known: 0, unsure: 0, wrong: 0, firstResult: null }
+            };
+        });
+        return {
+            label: String(session.label || '学習'),
+            startedAt: Number(session.startedAt) || null,
+            finished: !!session.finished,
+            initialCount: Number(session.initialCount) || entries.length,
+            round: Number(session.round) || 1,
+            stats: { ...(session.stats || {}) },
+            entries
+        };
+    }
+
+    function retryActiveSession(mode = 'missed') {
+        if (!session || !session.finished) return false;
+        const attempts = session.attempts instanceof Map ? session.attempts : new Map();
+        const selected = (Array.isArray(session.initialEntries) ? session.initialEntries : []).filter(entry => {
+            const attempt = attempts.get(entry.key);
+            if (!attempt) return false;
+            if (mode === 'wrong') return (Number(attempt.wrong) || 0) > 0;
+            if (mode === 'unsure') return (Number(attempt.unsure) || 0) > 0;
+            return (Number(attempt.wrong) || 0) + (Number(attempt.unsure) || 0) > 0;
+        });
+        if (!selected.length) return false;
+        const label = mode === 'wrong'
+            ? `×だけ再挑戦 · ${selected.length}語`
+            : (mode === 'unsure' ? `？をもう一度 · ${selected.length}語` : `？と×両方 · ${selected.length}語`);
+        closeSession(true);
+        window.setTimeout(() => startSession(selected, label), 0);
+        return true;
+    }
+
     function init() {
         injectStyles();
         injectStudyOverlays();
@@ -1471,6 +1838,7 @@
         injectSidebarStudyControls();
         bindGlobalKeyboard();
         refreshStudySurfaces();
+        void ensureStudyHistoryLoaded();
 
         window.SmartReaderStudy = {
             open: openStudyHub,
@@ -1480,6 +1848,12 @@
             getSummary: () => summarizeEntries(),
             getWordStudy: word => readStudy(word),
             getWordView: word => studyView(word),
+            getWordMeaning: word => resolveStudyMeaning(word),
+            getHistory: () => studyHistoryCache.map(item => ({ ...item, stats: { ...(item.stats || {}) }, words: Array.isArray(item.words) ? item.words.map(word => ({ ...word })) : [] })),
+            getActiveSession: getActiveSessionSnapshot,
+            retryActiveSession,
+            loadHistory: () => ensureStudyHistoryLoaded(),
+            isHistoryLoaded: () => studyHistoryLoaded,
             refresh: refreshStudySurfaces
         };
     }

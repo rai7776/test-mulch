@@ -154,6 +154,7 @@
     function filterEntries() {
         return state.rawEntries.filter(entry => {
             const word = entry.word || {};
+            if (word.study && typeof word.study === 'object' && word.study.suspended) return false;
             const sourceId = articleId(entry);
             if (!state.selectedArticleIds.has(sourceId)) return false;
             if (state.chapterKey !== 'all' && chapterKey(entry) !== state.chapterKey) return false;
@@ -200,6 +201,9 @@
         const lastResult = String(study.lastReviewResult || study.lastResult || '');
         const unstudied = seenCount === 0 && knownCount === 0 && unsureCount === 0 && wrongCount === 0 && !word.memorized;
         if (unstudied) return 'new';
+
+        const centralView = window.SmartReaderStudy?.getWordView?.(word);
+        if (centralView) return centralView.difficult ? 'difficult' : 'known';
 
         const stable = !!word.memorized || level >= 4 || correctStreak >= 3;
         const difficult = lastResult === 'wrong'

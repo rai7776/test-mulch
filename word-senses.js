@@ -59,6 +59,26 @@
         return matching?.id || senses[0]?.id || null;
     }
 
+    function getSenseDisplay(word) {
+        const senses = getWordSenses(word);
+        const contextSenseId = getContextSenseId(word, senses);
+        const context = senses.find(sense => sense.id === contextSenseId) || senses[0] || null;
+        const seen = new Set();
+        const contextMeaning = normalizeText(context?.meaning);
+        if (contextMeaning) seen.add(contextMeaning.toLocaleLowerCase());
+        const others = [];
+        senses.forEach(sense => {
+            if (!sense || sense.id === context?.id) return;
+            const meaning = normalizeText(sense.meaning);
+            if (!meaning) return;
+            const key = meaning.toLocaleLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            others.push({ ...clone(sense), meaning });
+        });
+        return { senses, contextSenseId: context?.id || contextSenseId || null, context, others };
+    }
+
     function resolveCurrentWord() {
         try {
             if (typeof globalVocabularyEditRef !== 'undefined' && globalVocabularyEditRef) {
@@ -166,15 +186,41 @@
             empty.className = 'word-senses-empty';
             empty.textContent = '意味を追加してください。';
             list.appendChild(empty);
+            syncLegacyMeaning();
+            return;
         }
-        state.rows.forEach((row, index) => {
+
+        const orderedRows = state.rows
+            .map((row, sourceIndex) => ({ row, sourceIndex }))
+            .sort((left, right) => {
+                const leftContext = left.row.id === state.contextSenseId ? 0 : 1;
+                const rightContext = right.row.id === state.contextSenseId ? 0 : 1;
+                return leftContext - rightContext || left.sourceIndex - right.sourceIndex;
+            });
+        let secondaryHeadingAdded = false;
+
+        orderedRows.forEach(({ row, sourceIndex }, visualIndex) => {
+            const isContext = row.id === state.contextSenseId;
+            if (isContext) {
+                const heading = document.createElement('div');
+                heading.className = 'word-senses-section-label word-senses-context-label';
+                heading.textContent = '文脈の意味';
+                list.appendChild(heading);
+            } else if (!secondaryHeadingAdded) {
+                const heading = document.createElement('div');
+                heading.className = 'word-senses-section-label word-senses-other-label';
+                heading.textContent = 'その他の意味';
+                list.appendChild(heading);
+                secondaryHeadingAdded = true;
+            }
+
             const card = document.createElement('div');
-            card.className = 'word-sense-row';
+            card.className = `word-sense-row ${isContext ? 'is-context' : 'is-secondary'}`;
             const contextButton = document.createElement('button');
             contextButton.type = 'button';
             contextButton.className = 'word-sense-context-toggle';
-            contextButton.setAttribute('aria-label', 'この文脈の意味にする');
-            contextButton.textContent = row.id === state.contextSenseId ? '●' : '○';
+            contextButton.setAttribute('aria-label', isContext ? '現在の文脈の意味' : 'この文脈の意味にする');
+            contextButton.textContent = isContext ? '●' : '○';
             contextButton.addEventListener('click', () => {
                 state.contextSenseId = row.id;
                 state.dirty = true;
@@ -185,7 +231,7 @@
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'word-sense-meaning';
-            input.placeholder = '意味を入力';
+            input.placeholder = isContext ? 'この文脈での意味' : 'その他の意味';
             input.value = row.meaning || '';
             input.addEventListener('input', () => {
                 row.meaning = input.value;
@@ -197,16 +243,16 @@
             const badge = document.createElement('span');
             badge.className = 'word-sense-context-badge';
             badge.textContent = 'この文脈';
-            badge.hidden = row.id !== state.contextSenseId;
+            badge.hidden = !isContext;
 
             const remove = document.createElement('button');
             remove.type = 'button';
             remove.className = 'word-sense-remove';
             remove.textContent = '×';
-            remove.setAttribute('aria-label', `${index + 1}番目の意味を外す`);
+            remove.setAttribute('aria-label', `${visualIndex + 1}番目の意味を外す`);
             remove.addEventListener('click', () => {
                 const wasContext = row.id === state.contextSenseId;
-                state.rows.splice(index, 1);
+                state.rows.splice(sourceIndex, 1);
                 if (wasContext) state.contextSenseId = state.rows[0]?.id || null;
                 state.dirty = true;
                 syncLegacyMeaning();
@@ -463,6 +509,46 @@
         return Array.from(map.values());
     }
 
+    function enhanceVocabularyCard(card, entry) {
+        if (!card || !entry?.word) return card;
+        const display = getSenseDisplay(entry.word);
+        if (!display.context) return card;
+        const summary = card.querySelector('.global-vocabulary-summary');
+        const meaning = summary?.querySelector('.meaning-right');
+        if (!summary || !meaning) return card;
+
+        card.querySelector(':scope > .global-vocabulary-card-memo-preview')?.remove();
+
+        // Keep the normal one-line Global Vocabulary card when there is only one meaning.
+        // Only switch to the taller stacked layout when secondary meanings actually exist.
+        if (!display.others.length) {
+            card.classList.remove('global-vocabulary-sense-rich');
+            meaning.classList.remove('global-vocabulary-meaning-stack');
+            meaning.textContent = display.context.meaning;
+            return card;
+        }
+
+        card.classList.add('global-vocabulary-sense-rich');
+        meaning.classList.add('global-vocabulary-meaning-stack');
+        meaning.replaceChildren();
+
+        const primary = document.createElement('div');
+        primary.className = 'global-vocabulary-primary-sense';
+        primary.textContent = display.context.meaning;
+        meaning.appendChild(primary);
+
+        const secondary = document.createElement('div');
+        secondary.className = 'global-vocabulary-secondary-senses';
+        secondary.setAttribute('aria-label', 'その他の意味');
+        display.others.forEach(sense => {
+            const row = document.createElement('span');
+            row.textContent = sense.meaning;
+            secondary.appendChild(row);
+        });
+        meaning.appendChild(secondary);
+        return card;
+    }
+
     function enhanceGroupCard(card, group) {
         if (!card || !group) return card;
         const senses = collectGroupSenses(group);
@@ -500,6 +586,116 @@
         return card;
     }
 
+    function appendHighlightedText(target, value, filter) {
+        const text = String(value || '');
+        const query = String(filter || '').trim();
+        if (!query) {
+            target.textContent = text;
+            return;
+        }
+        const lower = text.toLocaleLowerCase();
+        const needle = query.toLocaleLowerCase();
+        let cursor = 0;
+        let index = lower.indexOf(needle, cursor);
+        while (index >= 0) {
+            if (index > cursor) target.appendChild(document.createTextNode(text.slice(cursor, index)));
+            const mark = document.createElement('span');
+            mark.className = 'text-highlight';
+            mark.textContent = text.slice(index, index + query.length);
+            target.appendChild(mark);
+            cursor = index + query.length;
+            index = lower.indexOf(needle, cursor);
+        }
+        if (cursor < text.length) target.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+
+    function enhanceArticleVocabularyCard(card, word, filter = '') {
+        if (!card || !word) return;
+        const meaning = card.querySelector('.meaning-right');
+        if (!meaning) return;
+        const display = getSenseDisplay(word);
+        const contextMeaning = normalizeText(display.context?.meaning || word.meaning);
+        if (!contextMeaning) return;
+
+        card.classList.add('article-vocabulary-sense-rich');
+        meaning.classList.add('article-vocabulary-meaning-stack');
+        meaning.replaceChildren();
+
+        const primary = document.createElement('div');
+        primary.className = 'article-vocabulary-primary-sense';
+        appendHighlightedText(primary, contextMeaning, filter);
+        meaning.appendChild(primary);
+
+        if (display.others.length) {
+            const secondary = document.createElement('div');
+            secondary.className = 'article-vocabulary-secondary-senses';
+            secondary.setAttribute('aria-label', 'その他の意味');
+            display.others.forEach(sense => {
+                const row = document.createElement('span');
+                appendHighlightedText(row, sense.meaning, filter);
+                secondary.appendChild(row);
+            });
+            meaning.appendChild(secondary);
+        }
+
+        const memo = card.querySelector('.memo-row');
+        if (memo) {
+            const memoText = normalizeText(word.memo);
+            memo.classList.add('article-vocabulary-memo');
+            memo.replaceChildren();
+            const body = document.createElement('span');
+            body.className = 'article-vocabulary-memo-text';
+            appendHighlightedText(body, memoText, filter);
+            memo.append(body);
+        }
+    }
+
+    function enhanceArticleVocabularyList(filter = '') {
+        const panel = byId('panel-content');
+        if (!panel) return;
+        let article = null;
+        try {
+            article = typeof currentArticle !== 'undefined' ? currentArticle : null;
+        } catch (_) {}
+        if (!article || !Array.isArray(article.words)) return;
+
+        article.words.forEach((word, sourceIndex) => {
+            const hasId = word?.id !== undefined && word?.id !== null && String(word.id) !== '';
+            const cardId = hasId ? `word-card-${String(word.id)}` : `word-card-index-${sourceIndex}`;
+            const card = byId(cardId);
+            if (!card || !panel.contains(card)) return;
+            enhanceArticleVocabularyCard(card, word, filter);
+        });
+    }
+
+    function wrapArticleVocabularyList() {
+        let original = null;
+        try {
+            original = typeof renderList === 'function' ? renderList : window.renderList;
+        } catch (_) {
+            original = window.renderList;
+        }
+        if (typeof original !== 'function' || original.__wordSensesSidePanelWrapped) return;
+        const wrapped = function (type, filter = '') {
+            const result = original.apply(this, arguments);
+            if (type === 'words') enhanceArticleVocabularyList(filter);
+            return result;
+        };
+        wrapped.__wordSensesSidePanelWrapped = true;
+        try { renderList = wrapped; } catch (_) {}
+        window.renderList = wrapped;
+    }
+
+    function wrapGlobalVocabularyCard() {
+        const original = window.createGlobalVocabularyCard;
+        if (typeof original !== 'function' || original.__wordSensesWrapped) return;
+        const wrapped = function (entry) {
+            return enhanceVocabularyCard(original.apply(this, arguments), entry);
+        };
+        wrapped.__wordSensesWrapped = true;
+        window.createGlobalVocabularyCard = wrapped;
+    }
+
     function wrapGlobalGroupCard() {
         const original = window.createGlobalVocabularyGroupCard;
         if (typeof original !== 'function' || original.__wordSensesWrapped) return;
@@ -518,12 +714,19 @@
             .word-senses-legacy-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
             #word-senses-editor { margin: 4px 0 14px; }
             .word-senses-title { margin: 0 0 8px; font-weight: 700; color: #3f454b; }
-            .word-senses-list { display: grid; gap: 8px; }
+            .word-senses-list { display: grid; gap: 7px; }
+            .word-senses-section-label { margin:3px 2px 0; color:#7c858d; font-size:.72rem; font-weight:800; letter-spacing:.02em; }
+            .word-senses-other-label { margin-top:7px; color:#939ba2; }
             .word-sense-row { display:grid; grid-template-columns: 34px minmax(0,1fr) auto 36px; gap:8px; align-items:center; padding:8px 9px; border:1px solid #dfe3e7; border-radius:10px; background:#fff; }
+            .word-sense-row.is-context { border-color:#d8cabd; background:#fffdf9; box-shadow:0 2px 8px rgba(84,66,48,.05); }
+            .word-sense-row.is-secondary { padding-top:6px; padding-bottom:6px; border-color:#e7eaed; background:#fafbfc; }
             .word-sense-context-toggle, .word-sense-remove { border:0; background:transparent; min-height:36px; font-size:1.25rem; line-height:1; padding:0; }
             .word-sense-context-toggle { color:#30363b; }
             .word-sense-remove { color:#8a5550; font-size:1.1rem; }
             .word-sense-meaning { min-width:0; width:100%; border:0!important; padding:7px 4px!important; margin:0!important; background:transparent!important; box-shadow:none!important; font-size:1rem; }
+            .word-sense-row.is-context .word-sense-meaning { font-size:1.04rem; font-weight:700; color:#343a40; }
+            .word-sense-row.is-secondary .word-sense-meaning { padding-top:5px!important; padding-bottom:5px!important; color:#727b83; font-size:.88rem; font-weight:500; }
+            .word-sense-row.is-secondary .word-sense-context-toggle { color:#9ba2a8; font-size:1.05rem; }
             .word-sense-context-badge { white-space:nowrap; padding:4px 7px; border-radius:999px; background:#f3eee8; color:#805a33; font-size:.72rem; font-weight:700; }
             .word-senses-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
             .word-senses-actions button { border:1px solid #d8dde2; background:#fff; color:#47515a; border-radius:9px; padding:8px 10px; font-weight:700; }
@@ -539,6 +742,25 @@
             .word-senses-empty, .word-senses-existing-empty { padding:9px; color:#8a929a; font-size:.78rem; }
             .word-senses-status { min-height:1.1em; margin-top:6px; color:#6d7780; font-size:.72rem; }
             .word-senses-status.is-error { color:#ad3f3f; }
+            .article-vocabulary-sense-rich { padding:16px 16px 12px; }
+            .article-vocabulary-sense-rich .word-row { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:18px; align-items:start; }
+            .article-vocabulary-sense-rich .word-left { min-width:0; align-items:flex-start; }
+            .article-vocabulary-sense-rich .word-text { font-size:1.06rem; font-weight:800; line-height:1.3; overflow-wrap:anywhere; }
+            .article-vocabulary-meaning-stack { min-width:0; display:grid; align-content:start; gap:3px; text-align:left; }
+            .article-vocabulary-primary-sense { color:var(--primary,#8d5a2b); font-size:1.04rem; font-weight:850; line-height:1.4; overflow-wrap:anywhere; }
+            .article-vocabulary-secondary-senses { display:grid; gap:2px; margin-top:3px; color:#444b52; font-size:.84rem; font-weight:600; line-height:1.45; }
+            .article-vocabulary-secondary-senses span { display:block; overflow-wrap:anywhere; }
+            .article-vocabulary-secondary-senses span::before { content:'・'; margin-right:3px; }
+            .article-vocabulary-memo { display:block; margin:7px 0 0 42px; padding:6px 0 0; border-top:1px solid #eceff1; }
+            .article-vocabulary-memo-text { color:#626a72; font-size:.84rem; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+            .article-vocabulary-sense-rich .action-group { margin-top:8px; }
+            .global-vocabulary-sense-rich .global-vocabulary-summary { align-items:flex-start; min-height:48px; }
+            .global-vocabulary-sense-rich .word-left { align-items:flex-start; padding-top:1px; }
+            .global-vocabulary-meaning-stack { display:grid; align-content:start; gap:2px; min-width:0; padding-top:1px; text-align:left; }
+            .global-vocabulary-primary-sense { color:var(--primary,#8d5a2b); font-size:1.02rem; font-weight:800; line-height:1.35; overflow-wrap:anywhere; }
+            .global-vocabulary-secondary-senses { display:grid; gap:1px; margin-top:4px; color:#555f68; font-size:.86rem; font-weight:600; line-height:1.4; }
+            .global-vocabulary-secondary-senses span { display:block; overflow-wrap:anywhere; }
+            .global-vocabulary-secondary-senses span::before { content:'・'; margin-right:2px; }
             .global-vocabulary-senses-summary { margin:10px 0; padding:10px; border:1px solid #e4e7ea; border-radius:10px; background:#fafafa; }
             .global-vocabulary-senses-title { margin-bottom:6px; font-weight:800; }
             .global-vocabulary-sense-item { padding:7px 4px; border-top:1px solid #eceeef; }
@@ -551,6 +773,18 @@
                 .word-sense-remove { grid-column:3; grid-row:1 / span 2; }
                 .word-senses-actions { display:grid; grid-template-columns:1fr; }
                 .word-senses-actions button { width:100%; text-align:left; }
+                .article-vocabulary-sense-rich { padding:13px 12px 10px; }
+                .article-vocabulary-sense-rich .word-row { grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr); gap:10px; }
+                .article-vocabulary-sense-rich .word-text { font-size:1rem; }
+                .article-vocabulary-primary-sense { font-size:.98rem; }
+                .article-vocabulary-secondary-senses { font-size:.78rem; }
+                .article-vocabulary-memo { margin-top:6px; margin-left:38px; padding-top:5px; }
+                .article-vocabulary-memo-text { font-size:.8rem; }
+                .global-vocabulary-sense-rich .global-vocabulary-summary { gap:10px; }
+                .global-vocabulary-sense-rich .word-left { min-width:40%; }
+                .global-vocabulary-meaning-stack { min-width:42%; }
+                .global-vocabulary-primary-sense { font-size:.98rem; }
+                .global-vocabulary-secondary-senses { font-size:.8rem; }
             }
         `;
         document.head.appendChild(style);
@@ -560,7 +794,9 @@
         installStyles();
         ensureEditor();
         wrapSave();
+        wrapGlobalVocabularyCard();
         wrapGlobalGroupCard();
+        wrapArticleVocabularyList();
         wrapGlobal('showUnifiedModal', () => loadFromContext(true));
         wrapGlobal('switchModalType', () => loadFromContext(false));
         wrapGlobal('openUnifiedModal', () => loadFromContext(true));
@@ -584,6 +820,7 @@
     window.SmartReaderWordSenses = {
         getWordSenses,
         getContextSenseId,
+        getSenseDisplay,
         collectGroupSenses,
         refresh: () => loadFromContext(true)
     };
