@@ -59,7 +59,7 @@
                 if (!dbRef || nextId === currentState()?.activeWorkspaceId) return;
                 select.disabled = true;
                 try {
-                    await api.switchWorkspace(dbRef, nextId);
+                    await api.switchWorkspace(dbRef, nextId, window.localStorage);
                     window.location.reload();
                 } catch (error) {
                     console.error('Workspace switch failed', error);
@@ -240,7 +240,7 @@
                 kind,
                 contentLanguage: kind === 'language' ? contentLanguage : ''
             });
-            await api.switchWorkspace(dbRef, created.id);
+            await api.switchWorkspace(dbRef, created.id, window.localStorage);
             window.location.reload();
         } catch (error) {
             console.error('Workspace creation failed', error);
