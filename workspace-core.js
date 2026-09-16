@@ -12,11 +12,21 @@
     const DEFAULT_EXPLANATION_LANGUAGE = 'ja';
     const WORKSPACE_SCHEMA_VERSION = 2;
     const WORKSPACE_KINDS = Object.freeze(['language', 'general']);
+    const ACTIVE_LIBRARY_KEY = 'library_items';
+    const ACTIVE_STUDY_HISTORY_KEY = 'study_history_v1';
 
     function normalizeLanguageCode(value, fallback = '') {
         const text = String(value ?? '').trim();
         if (!text) return fallback;
         return text;
+    }
+
+    function dedicatedLibraryKey(id) {
+        return `workspace:${id}:library_items`;
+    }
+
+    function dedicatedStudyHistoryKey(id) {
+        return `workspace:${id}:study_history_v1`;
     }
 
     function createDefaultWorkspace(now = Date.now()) {
@@ -26,8 +36,8 @@
             kind: 'language',
             contentLanguage: 'en',
             explanationLanguageOverride: null,
-            libraryKey: 'library_items',
-            studyHistoryKey: 'study_history_v1',
+            libraryKey: ACTIVE_LIBRARY_KEY,
+            studyHistoryKey: ACTIVE_STUDY_HISTORY_KEY,
             createdAt: Number.isFinite(now) ? now : Date.now(),
             migratedFromLegacy: true
         };
@@ -51,8 +61,8 @@
             kind,
             contentLanguage,
             explanationLanguageOverride: input.explanationLanguageOverride || null,
-            libraryKey: input.libraryKey || `workspace:${id}:library_items`,
-            studyHistoryKey: input.studyHistoryKey || `workspace:${id}:study_history_v1`,
+            libraryKey: input.libraryKey || dedicatedLibraryKey(id),
+            studyHistoryKey: input.studyHistoryKey || dedicatedStudyHistoryKey(id),
             createdAt: Number.isFinite(now) ? now : Date.now(),
             migratedFromLegacy: !!input.migratedFromLegacy
         };
@@ -124,6 +134,103 @@
         return { workspaces, activeWorkspaceId: activeWorkspace?.id || null, activeWorkspace, globalSettings };
     }
 
+    async function addWorkspace(database, input, now = Date.now()) {
+        const state = await readWorkspaceState(database);
+        const workspace = createWorkspace(input, now);
+        if (getWorkspaceById(state.workspaces, workspace.id)) {
+            throw new Error('A workspace with this id already exists.');
+        }
+        await database.setItem(workspace.libraryKey, []);
+        await database.setItem(workspace.studyHistoryKey, []);
+        const workspaces = [...state.workspaces, workspace];
+        await database.setItem(WORKSPACES_KEY, workspaces);
+        return workspace;
+    }
+
+    async function switchWorkspace(database, targetId) {
+        if (!database || typeof database.getItem !== 'function' || typeof database.setItem !== 'function') {
+            throw new TypeError('A LocalForage-compatible database instance is required.');
+        }
+        const state = await readWorkspaceState(database);
+        const current = state.activeWorkspace;
+        const target = getWorkspaceById(state.workspaces, targetId);
+        if (!target) throw new Error('Workspace not found.');
+        if (!current || current.id === target.id) return state;
+
+        const originalWorkspaces = state.workspaces.map(item => ({ ...item }));
+        const originalActiveId = state.activeWorkspaceId;
+        const currentLibrary = await database.getItem(ACTIVE_LIBRARY_KEY) || [];
+        const currentHistory = await database.getItem(ACTIVE_STUDY_HISTORY_KEY) || [];
+        const targetLibrarySourceKey = target.libraryKey === ACTIVE_LIBRARY_KEY
+            ? dedicatedLibraryKey(target.id)
+            : target.libraryKey;
+        const targetHistorySourceKey = target.studyHistoryKey === ACTIVE_STUDY_HISTORY_KEY
+            ? dedicatedStudyHistoryKey(target.id)
+            : target.studyHistoryKey;
+        const targetLibrary = await database.getItem(targetLibrarySourceKey) || [];
+        const targetHistory = await database.getItem(targetHistorySourceKey) || [];
+        const currentLibraryArchiveKey = dedicatedLibraryKey(current.id);
+        const currentHistoryArchiveKey = dedicatedStudyHistoryKey(current.id);
+
+        try {
+            // Persist the workspace we are leaving before replacing the active aliases.
+            await database.setItem(currentLibraryArchiveKey, currentLibrary);
+            await database.setItem(currentHistoryArchiveKey, currentHistory);
+
+            // The legacy app continues to use these two keys as the active workspace aliases.
+            await database.setItem(ACTIVE_LIBRARY_KEY, targetLibrary);
+            await database.setItem(ACTIVE_STUDY_HISTORY_KEY, targetHistory);
+
+            const updatedWorkspaces = state.workspaces.map(item => {
+                if (item.id === current.id) {
+                    return {
+                        ...item,
+                        libraryKey: currentLibraryArchiveKey,
+                        studyHistoryKey: currentHistoryArchiveKey
+                    };
+                }
+                if (item.id === target.id) {
+                    return {
+                        ...item,
+                        libraryKey: ACTIVE_LIBRARY_KEY,
+                        studyHistoryKey: ACTIVE_STUDY_HISTORY_KEY
+                    };
+                }
+                return item;
+            });
+            await database.setItem(WORKSPACES_KEY, updatedWorkspaces);
+            await database.setItem(ACTIVE_WORKSPACE_KEY, target.id);
+
+            // Once metadata points to the active aliases, old target archives are redundant.
+            if (typeof database.removeItem === 'function') {
+                if (targetLibrarySourceKey !== ACTIVE_LIBRARY_KEY) await database.removeItem(targetLibrarySourceKey);
+                if (targetHistorySourceKey !== ACTIVE_STUDY_HISTORY_KEY) await database.removeItem(targetHistorySourceKey);
+            }
+
+            return readWorkspaceState(database);
+        } catch (error) {
+            // Roll back the visible aliases and metadata. Archive copies may remain, which is safe.
+            try { await database.setItem(ACTIVE_LIBRARY_KEY, currentLibrary); } catch (_) {}
+            try { await database.setItem(ACTIVE_STUDY_HISTORY_KEY, currentHistory); } catch (_) {}
+            try { await database.setItem(WORKSPACES_KEY, originalWorkspaces); } catch (_) {}
+            try { await database.setItem(ACTIVE_WORKSPACE_KEY, originalActiveId); } catch (_) {}
+            throw error;
+        }
+    }
+
+    async function updateGlobalSettings(database, patch = {}) {
+        const state = await readWorkspaceState(database);
+        const next = {
+            ...state.globalSettings,
+            ...patch
+        };
+        if (!normalizeLanguageCode(next.explanationLanguage)) {
+            next.explanationLanguage = DEFAULT_EXPLANATION_LANGUAGE;
+        }
+        await database.setItem(GLOBAL_SETTINGS_KEY, next);
+        return next;
+    }
+
     return Object.freeze({
         WORKSPACES_KEY,
         ACTIVE_WORKSPACE_KEY,
@@ -132,13 +239,20 @@
         DEFAULT_EXPLANATION_LANGUAGE,
         WORKSPACE_SCHEMA_VERSION,
         WORKSPACE_KINDS,
+        ACTIVE_LIBRARY_KEY,
+        ACTIVE_STUDY_HISTORY_KEY,
         normalizeLanguageCode,
+        dedicatedLibraryKey,
+        dedicatedStudyHistoryKey,
         createDefaultWorkspace,
         createWorkspace,
         normalizeWorkspaceList,
         getWorkspaceById,
         migrateToWorkspaceMetadata,
         ensureWorkspaceMetadata,
-        readWorkspaceState
+        readWorkspaceState,
+        addWorkspace,
+        switchWorkspace,
+        updateGlobalSettings
     });
 });
