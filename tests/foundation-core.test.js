@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const foundation = require('../smart-reader-foundation-core.js');
+const workspace = require('../workspace-core.js');
 
 function createFakeDb(seed = {}) {
     const store = new Map(Object.entries(seed));
@@ -64,4 +65,24 @@ test('schema metadata stays invisible to legacy exact-key backup logic', async (
     assert.equal(await db.length(), 2);
     assert.equal(await db.key(0), 'library_items');
     assert.equal(db.store.has(foundation.SCHEMA_VERSION_KEY), true);
+});
+
+test('foundation can run workspace v2 migration without rewriting legacy library data', async () => {
+    const originalLibrary = [{ id: 7, type: 'article', name: 'Existing English data' }];
+    const db = createFakeDb({
+        [foundation.SCHEMA_VERSION_KEY]: 1,
+        library_items: originalLibrary
+    });
+    const storage = foundation.installStorageFoundation(db, {
+        currentVersion: workspace.WORKSPACE_SCHEMA_VERSION,
+        migrations: { 2: workspace.migrateToWorkspaceMetadata }
+    });
+    await storage.ensureSchema();
+
+    assert.equal(await db.getItem(foundation.SCHEMA_VERSION_KEY), 2);
+    assert.deepEqual(await db.getItem('library_items'), originalLibrary);
+    const workspaces = await db.getItem(workspace.WORKSPACES_KEY);
+    assert.equal(workspaces.length, 1);
+    assert.equal(workspaces[0].name, '英語');
+    assert.equal(workspaces[0].libraryKey, 'library_items');
 });
