@@ -152,69 +152,6 @@
         return root;
     }
 
-    function fieldLabel(input) {
-        if (!input) return null;
-        const explicit = document.querySelector(`label[for="${input.id}"]`);
-        if (explicit) return explicit;
-        const previous = input.previousElementSibling;
-        return previous?.tagName === 'LABEL' ? previous : null;
-    }
-
-    function moveField(container, inputId, className = '') {
-        const input = byId(inputId);
-        if (!input || !container) return null;
-        const field = document.createElement('div');
-        field.className = `word-modal-field ${className}`.trim();
-        const label = fieldLabel(input);
-        if (label) field.appendChild(label);
-        field.appendChild(input);
-        container.appendChild(field);
-        return field;
-    }
-
-    function ensureModalLayout() {
-        const section = byId('form-word-section');
-        const editor = ensureEditor();
-        if (!section || !editor) return;
-        if (section.querySelector('.word-modal-hero')) return;
-
-        section.classList.add('word-modal-rich');
-
-        const hero = document.createElement('div');
-        hero.className = 'word-modal-hero';
-
-        const wordPane = document.createElement('section');
-        wordPane.className = 'word-modal-word-pane';
-        const wordEyebrow = document.createElement('div');
-        wordEyebrow.className = 'word-modal-eyebrow';
-        wordEyebrow.textContent = 'WORD';
-        wordPane.appendChild(wordEyebrow);
-        moveField(wordPane, 'input-word-text', 'word-modal-word-field');
-
-        const meaningPane = document.createElement('section');
-        meaningPane.className = 'word-modal-meaning-pane';
-        const meaningEyebrow = document.createElement('div');
-        meaningEyebrow.className = 'word-modal-eyebrow';
-        meaningEyebrow.textContent = 'MEANING';
-        meaningPane.append(meaningEyebrow, editor);
-
-        hero.append(wordPane, meaningPane);
-        section.insertBefore(hero, section.firstChild);
-
-        const memoBlock = document.createElement('section');
-        memoBlock.className = 'word-modal-memo-block';
-        moveField(memoBlock, 'input-word-memo', 'word-modal-memo-field');
-        hero.insertAdjacentElement('afterend', memoBlock);
-
-        const metadata = document.createElement('section');
-        metadata.className = 'word-modal-meta-grid';
-        moveField(metadata, 'input-word-surface-text');
-        moveField(metadata, 'input-word-part-of-speech');
-        moveField(metadata, 'input-word-tags');
-        moveField(metadata, 'input-word-context', 'word-modal-context-field');
-        memoBlock.insertAdjacentElement('afterend', metadata);
-    }
-
     function setStatus(message, error = false) {
         const status = byId('word-senses-status');
         if (!status) return;
@@ -425,7 +362,6 @@
 
     function loadFromContext(force = false) {
         ensureEditor();
-        ensureModalLayout();
         const section = byId('form-word-section');
         if (!section || getComputedStyle(section).display === 'none') return;
         const key = modalKey();
@@ -656,6 +592,109 @@
         return card;
     }
 
+    function appendHighlightedText(target, value, filter) {
+        const text = String(value || '');
+        const query = String(filter || '').trim();
+        if (!query) {
+            target.textContent = text;
+            return;
+        }
+        const lower = text.toLocaleLowerCase();
+        const needle = query.toLocaleLowerCase();
+        let cursor = 0;
+        let index = lower.indexOf(needle, cursor);
+        while (index >= 0) {
+            if (index > cursor) target.appendChild(document.createTextNode(text.slice(cursor, index)));
+            const mark = document.createElement('span');
+            mark.className = 'text-highlight';
+            mark.textContent = text.slice(index, index + query.length);
+            target.appendChild(mark);
+            cursor = index + query.length;
+            index = lower.indexOf(needle, cursor);
+        }
+        if (cursor < text.length) target.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+
+    function enhanceArticleVocabularyCard(card, word, filter = '') {
+        if (!card || !word) return;
+        const meaning = card.querySelector('.meaning-right');
+        if (!meaning) return;
+        const display = getSenseDisplay(word);
+        const contextMeaning = normalizeText(display.context?.meaning || word.meaning);
+        if (!contextMeaning) return;
+
+        card.classList.add('article-vocabulary-sense-rich');
+        meaning.classList.add('article-vocabulary-meaning-stack');
+        meaning.replaceChildren();
+
+        const primary = document.createElement('div');
+        primary.className = 'article-vocabulary-primary-sense';
+        appendHighlightedText(primary, contextMeaning, filter);
+        meaning.appendChild(primary);
+
+        if (display.others.length) {
+            const secondary = document.createElement('div');
+            secondary.className = 'article-vocabulary-secondary-senses';
+            secondary.setAttribute('aria-label', 'その他の意味');
+            display.others.forEach(sense => {
+                const row = document.createElement('span');
+                appendHighlightedText(row, sense.meaning, filter);
+                secondary.appendChild(row);
+            });
+            meaning.appendChild(secondary);
+        }
+
+        const memo = card.querySelector('.memo-row');
+        if (memo) {
+            const memoText = normalizeText(word.memo);
+            memo.classList.add('article-vocabulary-memo');
+            memo.replaceChildren();
+            const label = document.createElement('strong');
+            label.className = 'article-vocabulary-memo-label';
+            label.textContent = 'メモ';
+            const body = document.createElement('span');
+            body.className = 'article-vocabulary-memo-text';
+            appendHighlightedText(body, memoText, filter);
+            memo.append(label, body);
+        }
+    }
+
+    function enhanceArticleVocabularyList(filter = '') {
+        const panel = byId('panel-content');
+        if (!panel) return;
+        let article = null;
+        try {
+            article = typeof currentArticle !== 'undefined' ? currentArticle : null;
+        } catch (_) {}
+        if (!article || !Array.isArray(article.words)) return;
+
+        article.words.forEach((word, sourceIndex) => {
+            const hasId = word?.id !== undefined && word?.id !== null && String(word.id) !== '';
+            const cardId = hasId ? `word-card-${String(word.id)}` : `word-card-index-${sourceIndex}`;
+            const card = byId(cardId);
+            if (!card || !panel.contains(card)) return;
+            enhanceArticleVocabularyCard(card, word, filter);
+        });
+    }
+
+    function wrapArticleVocabularyList() {
+        let original = null;
+        try {
+            original = typeof renderList === 'function' ? renderList : window.renderList;
+        } catch (_) {
+            original = window.renderList;
+        }
+        if (typeof original !== 'function' || original.__wordSensesSidePanelWrapped) return;
+        const wrapped = function (type, filter = '') {
+            const result = original.apply(this, arguments);
+            if (type === 'words') enhanceArticleVocabularyList(filter);
+            return result;
+        };
+        wrapped.__wordSensesSidePanelWrapped = true;
+        try { renderList = wrapped; } catch (_) {}
+        window.renderList = wrapped;
+    }
+
     function wrapGlobalVocabularyCard() {
         const original = window.createGlobalVocabularyCard;
         if (typeof original !== 'function' || original.__wordSensesWrapped) return;
@@ -683,40 +722,6 @@
         style.textContent = `
             .word-senses-legacy-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
             #word-senses-editor { margin: 4px 0 14px; }
-            #form-word-section.word-modal-rich { display:block; }
-            .word-modal-hero { display:grid; grid-template-columns:minmax(180px,.78fr) minmax(300px,1.35fr); gap:24px; align-items:start; padding:10px 0 18px; border-bottom:1px solid #e9ecef; }
-            .word-modal-eyebrow { margin-bottom:7px; color:#9a7b60; font-size:.66rem; font-weight:850; letter-spacing:.16em; }
-            .word-modal-field { min-width:0; }
-            .word-modal-field>label { display:block; margin:0 0 5px; color:#687078; font-size:.72rem; font-weight:750; }
-            .word-modal-word-field>label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-            .word-modal-word-field #input-word-text { width:100%; margin:0!important; padding:4px 2px 8px!important; border:0!important; border-bottom:2px solid #e0e3e6!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; color:#25292d; font-size:clamp(1.6rem,4.5vw,2.25rem)!important; font-weight:850; line-height:1.15; }
-            .word-modal-word-field #input-word-text:focus { border-bottom-color:var(--primary,#8d5a2b)!important; outline:none; }
-            .word-modal-meaning-pane #word-senses-editor { margin:0; }
-            .word-modal-meaning-pane .word-senses-title { display:none; }
-            .word-modal-meaning-pane .word-senses-list { gap:4px; }
-            .word-modal-meaning-pane .word-senses-section-label { margin:0 0 1px; font-size:.67rem; letter-spacing:.04em; }
-            .word-modal-meaning-pane .word-senses-other-label { margin-top:7px; }
-            .word-modal-meaning-pane .word-sense-row { grid-template-columns:28px minmax(0,1fr) auto 30px; gap:5px; padding:2px 0; border:0; border-radius:0; background:transparent; box-shadow:none; }
-            .word-modal-meaning-pane .word-sense-row.is-context { background:transparent; }
-            .word-modal-meaning-pane .word-sense-row.is-secondary { padding:1px 0; background:transparent; }
-            .word-modal-meaning-pane .word-sense-context-toggle { min-height:30px; color:#6d7278; font-size:1.05rem; }
-            .word-modal-meaning-pane .word-sense-row.is-context .word-sense-context-toggle { color:var(--primary,#8d5a2b); }
-            .word-modal-meaning-pane .word-sense-remove { min-height:30px; font-size:.95rem; }
-            .word-modal-meaning-pane .word-sense-context-badge { padding:2px 6px; font-size:.62rem; }
-            .word-modal-meaning-pane .word-sense-meaning { padding:3px 2px!important; border:0!important; background:transparent!important; box-shadow:none!important; }
-            .word-modal-meaning-pane .word-sense-row.is-context .word-sense-meaning { color:var(--primary,#8d5a2b); font-size:1.2rem; font-weight:850; line-height:1.35; }
-            .word-modal-meaning-pane .word-sense-row.is-secondary .word-sense-meaning { color:#2f3439; font-size:.93rem; font-weight:650; line-height:1.4; }
-            .word-modal-meaning-pane .word-sense-row.is-secondary .word-sense-meaning::placeholder { color:#a2a8ae; }
-            .word-modal-meaning-pane .word-senses-actions { margin-top:8px; }
-            .word-modal-meaning-pane .word-senses-actions button { padding:6px 8px; border:0; background:transparent; color:#65707a; font-size:.76rem; text-align:left; }
-            .word-modal-memo-block { padding:15px 0 13px; border-bottom:1px solid #eceff1; }
-            .word-modal-memo-field>label { margin-bottom:6px; color:#25292d; font-size:.92rem; font-weight:850; }
-            .word-modal-memo-field #input-word-memo { width:100%; min-height:72px; margin:0!important; padding:10px 12px!important; border:1px solid #e4e7ea!important; border-radius:10px!important; background:#fafbfc!important; color:#2f3439; font-size:.92rem; line-height:1.55; resize:vertical; }
-            .word-modal-meta-grid { display:grid; grid-template-columns:1.15fr .85fr 1fr; gap:10px 12px; padding-top:13px; }
-            .word-modal-meta-grid input, .word-modal-meta-grid select, .word-modal-meta-grid textarea { width:100%; margin:0!important; box-sizing:border-box; }
-            .word-modal-meta-grid input, .word-modal-meta-grid select { min-height:38px; }
-            .word-modal-context-field { grid-column:1/-1; }
-            .word-modal-context-field textarea { min-height:78px; }
             .word-senses-title { margin: 0 0 8px; font-weight: 700; color: #3f454b; }
             .word-senses-list { display: grid; gap: 7px; }
             .word-senses-section-label { margin:3px 2px 0; color:#7c858d; font-size:.72rem; font-weight:800; letter-spacing:.02em; }
@@ -746,6 +751,19 @@
             .word-senses-empty, .word-senses-existing-empty { padding:9px; color:#8a929a; font-size:.78rem; }
             .word-senses-status { min-height:1.1em; margin-top:6px; color:#6d7780; font-size:.72rem; }
             .word-senses-status.is-error { color:#ad3f3f; }
+            .article-vocabulary-sense-rich { padding:16px 16px 12px; }
+            .article-vocabulary-sense-rich .word-row { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:18px; align-items:start; }
+            .article-vocabulary-sense-rich .word-left { min-width:0; align-items:flex-start; }
+            .article-vocabulary-sense-rich .word-text { font-size:1.06rem; font-weight:800; line-height:1.3; overflow-wrap:anywhere; }
+            .article-vocabulary-meaning-stack { min-width:0; display:grid; align-content:start; gap:3px; text-align:left; }
+            .article-vocabulary-primary-sense { color:var(--primary,#8d5a2b); font-size:1.04rem; font-weight:850; line-height:1.4; overflow-wrap:anywhere; }
+            .article-vocabulary-secondary-senses { display:grid; gap:2px; margin-top:3px; color:#444b52; font-size:.84rem; font-weight:600; line-height:1.45; }
+            .article-vocabulary-secondary-senses span { display:block; overflow-wrap:anywhere; }
+            .article-vocabulary-secondary-senses span::before { content:'・'; margin-right:3px; }
+            .article-vocabulary-memo { display:grid; gap:4px; margin:12px 0 0 42px; padding:10px 0 0; border-top:1px solid #eceff1; }
+            .article-vocabulary-memo-label { color:#30363b; font-size:.76rem; font-weight:850; }
+            .article-vocabulary-memo-text { color:#626a72; font-size:.84rem; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+            .article-vocabulary-sense-rich .action-group { margin-top:8px; }
             .global-vocabulary-sense-rich .global-vocabulary-summary { align-items:flex-start; min-height:48px; }
             .global-vocabulary-sense-rich .word-left { align-items:flex-start; padding-top:1px; }
             .global-vocabulary-meaning-stack { display:grid; align-content:start; gap:2px; min-width:0; padding-top:1px; text-align:left; }
@@ -768,16 +786,13 @@
                 .word-sense-remove { grid-column:3; grid-row:1 / span 2; }
                 .word-senses-actions { display:grid; grid-template-columns:1fr; }
                 .word-senses-actions button { width:100%; text-align:left; }
-                .word-modal-hero { grid-template-columns:1fr; gap:14px; padding-top:4px; }
-                .word-modal-word-field #input-word-text { font-size:1.7rem!important; }
-                .word-modal-meaning-pane .word-sense-row { grid-template-columns:26px minmax(0,1fr) 30px; }
-                .word-modal-meaning-pane .word-sense-context-badge { grid-column:2; justify-self:start; margin-top:-2px; }
-                .word-modal-meaning-pane .word-sense-remove { grid-column:3; grid-row:1 / span 2; }
-                .word-modal-meaning-pane .word-sense-row.is-context .word-sense-meaning { font-size:1.08rem; }
-                .word-modal-meaning-pane .word-sense-row.is-secondary .word-sense-meaning { font-size:.88rem; }
-                .word-modal-memo-block { padding-top:12px; }
-                .word-modal-meta-grid { grid-template-columns:1fr 1fr; }
-                .word-modal-context-field { grid-column:1/-1; }
+                .article-vocabulary-sense-rich { padding:13px 12px 10px; }
+                .article-vocabulary-sense-rich .word-row { grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr); gap:10px; }
+                .article-vocabulary-sense-rich .word-text { font-size:1rem; }
+                .article-vocabulary-primary-sense { font-size:.98rem; }
+                .article-vocabulary-secondary-senses { font-size:.78rem; }
+                .article-vocabulary-memo { margin-left:38px; padding-top:8px; }
+                .article-vocabulary-memo-text { font-size:.8rem; }
                 .global-vocabulary-sense-rich .global-vocabulary-summary { gap:10px; }
                 .global-vocabulary-sense-rich .word-left { min-width:40%; }
                 .global-vocabulary-meaning-stack { min-width:42%; }
@@ -792,10 +807,10 @@
     function init() {
         installStyles();
         ensureEditor();
-        ensureModalLayout();
         wrapSave();
         wrapGlobalVocabularyCard();
         wrapGlobalGroupCard();
+        wrapArticleVocabularyList();
         wrapGlobal('showUnifiedModal', () => loadFromContext(true));
         wrapGlobal('switchModalType', () => loadFromContext(false));
         wrapGlobal('openUnifiedModal', () => loadFromContext(true));

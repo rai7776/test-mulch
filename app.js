@@ -2279,7 +2279,10 @@ function renderList(type, filter = '') {
     if (filter) {
         const q = filter.toLowerCase();
         list = list.filter(({ item }) => {
-            if (type === 'words') return `${item.word || ''} ${item.meaning || ''} ${item.memo || ''}`.toLowerCase().includes(q);
+            if (type === 'words') {
+                const otherSenseText = Array.isArray(item.senses) ? item.senses.map(sense => sense?.meaning || '').join(' ') : '';
+                return `${item.word || ''} ${item.meaning || ''} ${otherSenseText} ${item.memo || ''}`.toLowerCase().includes(q);
+            }
             if (type === 'notes') return `${item.originalText || ''} ${item.translation || ''} ${item.extra || ''}`.toLowerCase().includes(q);
             return `${item.selectedText || item.anchor?.selectedText || ''} ${item.question || ''} ${item.answer || ''} ${item.explanation || ''} ${item.memo || ''} ${normalizeQuestionTags(item.tags).join(' ')}`.toLowerCase().includes(q);
         });
