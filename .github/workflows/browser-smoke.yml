@@ -17,6 +17,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Add non-committed smoke probe
+        run: |
+          cat > smoke-probe.js <<'JS'
+          (() => {
+            let attempts = 0;
+            const probe = () => {
+              const active = window.SmartReaderWorkspaceState?.activeWorkspace;
+              const overlay = document.getElementById('smart-reader-workspace-create-overlay');
+              if (active?.setupPending === true) {
+                document.documentElement.dataset.smartReaderSmokeState = 'setup-pending';
+                document.documentElement.dataset.smartReaderSmokeOverlay = overlay?.hidden ? 'hidden' : 'visible';
+                if (overlay && !overlay.hidden) {
+                  document.documentElement.dataset.smartReaderSmoke = 'ready';
+                  return;
+                }
+              }
+              attempts += 1;
+              if (attempts >= 250) {
+                document.documentElement.dataset.smartReaderSmoke = 'timeout';
+                document.documentElement.dataset.smartReaderSmokeOverlay = overlay?.hidden ? 'hidden' : 'visible';
+                return;
+              }
+              setTimeout(probe, 100);
+            };
+            probe();
+          })();
+          JS
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          marker = '<script src="smoke-probe.js"></script>'
+          if marker not in text:
+              text = text.replace('</body>', f'    {marker}\n</body>')
+          path.write_text(text, encoding='utf-8')
+          PY
       - name: Start static server
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/smart-reader-http.log 2>&1 &
@@ -37,14 +73,16 @@ jobs:
             --disable-gpu \
             --disable-dev-shm-usage \
             --user-data-dir=/tmp/smart-reader-chrome-profile \
-            --virtual-time-budget=8000 \
+            --virtual-time-budget=30000 \
             --dump-dom \
             http://127.0.0.1:4173/ \
             > /tmp/smart-reader-dom.html \
             2> /tmp/smart-reader-chrome.log
       - name: Verify rendered app
         run: |
-          grep -F 'id="smart-reader-workspace-create-overlay"' /tmp/smart-reader-dom.html
+          grep -F 'data-smart-reader-smoke="ready"' /tmp/smart-reader-dom.html
+          grep -F 'data-smart-reader-smoke-state="setup-pending"' /tmp/smart-reader-dom.html
+          grep -F 'data-smart-reader-smoke-overlay="visible"' /tmp/smart-reader-dom.html
           grep -F '最初の学習スペースを作成' /tmp/smart-reader-dom.html
           grep -F 'id="workspace-create-name"' /tmp/smart-reader-dom.html
           grep -F 'https://unpkg.com/localforage@1.10.0/dist/localforage.min.js' /tmp/smart-reader-dom.html
