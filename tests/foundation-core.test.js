@@ -55,3 +55,13 @@ test('newer unsupported schema fails before data operations', async () => {
     foundation.installStorageFoundation(db);
     await assert.rejects(() => db.getItem('library_items'), /newer than this app supports/);
 });
+
+test('schema metadata stays invisible to legacy exact-key backup logic', async () => {
+    const db = createFakeDb({ library_items: [], reader_settings: {} });
+    foundation.installStorageFoundation(db);
+    const keys = await db.keys();
+    assert.deepEqual(keys.sort(), ['library_items', 'reader_settings']);
+    assert.equal(await db.length(), 2);
+    assert.equal(await db.key(0), 'library_items');
+    assert.equal(db.store.has(foundation.SCHEMA_VERSION_KEY), true);
+});
