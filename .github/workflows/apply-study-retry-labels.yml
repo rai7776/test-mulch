@@ -1,0 +1,53 @@
+name: Apply Study retry labels
+
+on:
+  push:
+    branches: [feature/study-center]
+    paths:
+      - .github/workflows/apply-study-retry-labels.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/study-center
+          fetch-depth: 0
+      - name: Update retry buttons
+        shell: python
+        run: |
+          from pathlib import Path
+
+          reward_path = Path('study-reward-ui.js')
+          text = reward_path.read_text()
+          old = """        const unsureEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.unsure) > 0);\n        const missedEntries = (snapshot.entries || []).filter(entry => (Number(entry.attempt?.wrong) || 0) + (Number(entry.attempt?.unsure) || 0) > 0);\n        if (unsureEntries.length || missedEntries.length) {\n            const retry = document.createElement('div');\n            retry.className = 'study-reward-retry-actions';\n            if (unsureEntries.length) {\n                const unsure = document.createElement('button');\n                unsure.type = 'button';\n                unsure.className = 'study-reward-retry unsure';\n                unsure.textContent = `？をもう一度 · ${unsureEntries.length}語`;\n                unsure.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('unsure'));\n                retry.appendChild(unsure);\n            }\n            if (missedEntries.length) {\n                const missed = document.createElement('button');\n                missed.type = 'button';\n                missed.className = 'study-reward-retry missed';\n                missed.textContent = `？と×両方 · ${missedEntries.length}語`;\n                missed.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('missed'));\n                retry.appendChild(missed);\n            }\n            summary.querySelector('.study-summary-actions')?.insertAdjacentElement('beforebegin', retry);\n        }\n"""
+          new = """        const wrongEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.wrong) > 0);\n        const unsureEntries = (snapshot.entries || []).filter(entry => Number(entry.attempt?.unsure) > 0);\n        const missedEntries = (snapshot.entries || []).filter(entry => (Number(entry.attempt?.wrong) || 0) + (Number(entry.attempt?.unsure) || 0) > 0);\n        if (wrongEntries.length || unsureEntries.length) {\n            const retry = document.createElement('div');\n            retry.className = 'study-reward-retry-actions';\n            if (wrongEntries.length) {\n                const wrong = document.createElement('button');\n                wrong.type = 'button';\n                wrong.className = 'study-reward-retry wrong';\n                wrong.textContent = `×のみもう一度 · ${wrongEntries.length}語`;\n                wrong.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('wrong'));\n                retry.appendChild(wrong);\n            }\n            if (unsureEntries.length && missedEntries.length) {\n                const missed = document.createElement('button');\n                missed.type = 'button';\n                missed.className = 'study-reward-retry missed';\n                missed.textContent = `×と？もう一度 · ${missedEntries.length}語`;\n                missed.addEventListener('click', () => window.SmartReaderStudy?.retryActiveSession?.('missed'));\n                retry.appendChild(missed);\n            }\n            summary.querySelector('.study-summary-actions')?.insertAdjacentElement('beforebegin', retry);\n        }\n"""
+          if old not in text:
+              raise SystemExit('retry block target not found')
+          reward_path.write_text(text.replace(old, new, 1))
+
+          index_path = Path('index.html')
+          index = index_path.read_text()
+          if 'study-reward-ui.js?v=3' not in index:
+              raise SystemExit('expected reward cache version not found')
+          index_path.write_text(index.replace('study-reward-ui.js?v=3', 'study-reward-ui.js?v=4', 1))
+      - name: Check JavaScript syntax
+        run: node --check study-reward-ui.js
+      - name: Check retry labels
+        run: |
+          grep -q '×のみもう一度' study-reward-ui.js
+          grep -q '×と？もう一度' study-reward-ui.js
+          grep -q "retryActiveSession?.('wrong')" study-reward-ui.js
+          grep -q "retryActiveSession?.('missed')" study-reward-ui.js
+          grep -q 'study-reward-ui.js?v=4' index.html
+      - name: Commit changes
+        run: |
+          git config user.name "Smart Reader Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add study-reward-ui.js index.html
+          git commit -m "Update Study retry choices" || exit 0
+          git push origin HEAD:feature/study-center
