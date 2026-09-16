@@ -145,6 +145,10 @@
         .then(() => loadScript('workspace-management-ui.js?v=1', 'smart-reader-workspace-management-ui-loader'))
         .catch(error => console.error('Failed to load workspace management feature', error));
 
+    loadScriptPromise('speech-language-core.js?v=1', 'smart-reader-speech-language-core-loader')
+        .then(() => loadScript('speech-language-adapter.js?v=1', 'smart-reader-speech-language-adapter-loader'))
+        .catch(error => console.error('Failed to load multilingual speech support', error));
+
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
     style.id = 'note-structure-sample-v2-style';
