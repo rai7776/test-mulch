@@ -149,6 +149,10 @@
         .then(() => loadScript('speech-language-adapter.js?v=1', 'smart-reader-speech-language-adapter-loader'))
         .catch(error => console.error('Failed to load multilingual speech support', error));
 
+    loadScriptPromise('bulk-prompt-context-core.js?v=1', 'smart-reader-bulk-prompt-context-core-loader')
+        .then(() => loadScript('bulk-prompt-context-adapter.js?v=1', 'smart-reader-bulk-prompt-context-adapter-loader'))
+        .catch(error => console.error('Failed to load contextual bulk import prompt support', error));
+
     // 実データに文構造がある場合は、旧来の固定デモカードを重ねて表示しない。
     const style = document.createElement('style');
     style.id = 'note-structure-sample-v2-style';
