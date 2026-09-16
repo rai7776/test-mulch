@@ -358,7 +358,7 @@
         const manualMastered = !!view.manualMastered;
         const senses = studySenseDisplay(entry.word);
         return `
-            <article class="study-center-word-card ${held ? 'is-held' : ''} ${manualMastered ? 'is-manual-mastered' : ''}">
+            <article class="study-center-word-card ${held ? 'is-held' : ''} ${manualMastered ? 'is-manual-mastered' : ''}" data-study-entry-key="${escapeHtml(entry.key)}" tabindex="0" role="button" aria-label="${escapeHtml(entry.word.word || entry.word.surfaceText || '単語')} の学習詳細を開く">
                 <div class="study-center-word-main">
                     <div class="study-center-word-title-row">
                         <strong>${escapeHtml(entry.word.word || entry.word.surfaceText || '—')}</strong>

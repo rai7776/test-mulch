@@ -1073,8 +1073,49 @@
         if (result === 'unsure') card.style.transform = 'translate3d(0, -110vh, 0)';
 
         // Record the judgement immediately so undo always has one history item to restore.
+        // Reward feedback is deliberately measured outside answerCurrent so the stable
+        // answer / queue transition path stays untouched.
+        const rewardEntry = session.queue[session.index] || null;
+        let rewardBefore = null;
+        try {
+            if (rewardEntry?.word) rewardBefore = studyView(rewardEntry.word);
+        } catch (_) {}
+
         // Only the visual transition to the next card is delayed.
         answerCurrent(result, { deferRender: true });
+
+        try {
+            if (session && rewardEntry?.word) {
+                const rewardAfter = studyView(rewardEntry.word);
+                const currentStreak = result === 'known'
+                    ? (Number(session.stats.currentStreak) || 0) + 1
+                    : 0;
+                session.stats.currentStreak = currentStreak;
+                session.stats.bestStreak = Math.max(Number(session.stats.bestStreak) || 0, currentStreak);
+
+                const beforeWeakness = Number(rewardBefore?.weaknessScore);
+                const afterWeakness = Number(rewardAfter?.weaknessScore);
+                const weakCleared = result === 'known' && !!rewardBefore?.difficult && !rewardAfter?.difficult;
+                if (weakCleared) session.stats.weakCleared = (Number(session.stats.weakCleared) || 0) + 1;
+
+                window.dispatchEvent(new CustomEvent('smartreader:study-answer-feedback', {
+                    detail: {
+                        result,
+                        key: rewardEntry.key || '',
+                        word: String(rewardEntry.word.word || rewardEntry.word.surfaceText || ''),
+                        beforeWeakness: Number.isFinite(beforeWeakness) ? beforeWeakness : null,
+                        afterWeakness: Number.isFinite(afterWeakness) ? afterWeakness : null,
+                        weakCleared,
+                        currentStreak,
+                        bestStreak: Number(session.stats.bestStreak) || 0,
+                        levelUp: Number(rewardAfter?.study?.level) > Number(rewardBefore?.study?.level),
+                        mastered: !!rewardAfter?.mastered
+                    }
+                }));
+            }
+        } catch (error) {
+            console.warn('Study reward feedback skipped', error);
+        }
 
         const timerId = window.setTimeout(() => {
             if (!pendingCommit || pendingCommit.timerId !== timerId) return;
@@ -1297,7 +1338,7 @@
             answeredUnique: new Set(),
             attempts: new Map(),
             history: [],
-            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0 }
+            stats: { responses: 0, known: 0, unsure: 0, wrong: 0, promoted: 0, demoted: 0, lapses: 0, currentStreak: 0, bestStreak: 0, weakCleared: 0 }
         };
         closeStudyHub();
         renderSession();
@@ -1735,6 +1776,54 @@
         });
     }
 
+    function getActiveSessionSnapshot() {
+        if (!session) return null;
+        const entries = (Array.isArray(session.initialEntries) ? session.initialEntries : []).map(entry => {
+            const attempt = session.attempts instanceof Map ? session.attempts.get(entry.key) : null;
+            const senseDisplay = resolveStudySenseDisplay(entry.word || {});
+            const view = entry.word ? studyView(entry.word) : null;
+            return {
+                key: entry.key || '',
+                articleId: entry.articleId ?? entry.article?.id ?? null,
+                articleTitle: String(entry.articleTitle || entry.article?.name || ''),
+                chapterId: entry.chapterId ?? null,
+                chapterTitle: String(entry.chapterTitle || ''),
+                word: String(entry.word?.word || entry.word?.surfaceText || ''),
+                meaning: senseDisplay.meaning,
+                otherMeanings: [...senseDisplay.otherMeanings],
+                weaknessScore: Number(view?.weaknessScore) || 0,
+                difficult: !!view?.difficult,
+                mastered: !!view?.mastered,
+                attempt: attempt ? { ...attempt } : { responses: 0, known: 0, unsure: 0, wrong: 0, firstResult: null }
+            };
+        });
+        return {
+            label: String(session.label || '学習'),
+            startedAt: Number(session.startedAt) || null,
+            finished: !!session.finished,
+            initialCount: Number(session.initialCount) || entries.length,
+            round: Number(session.round) || 1,
+            stats: { ...(session.stats || {}) },
+            entries
+        };
+    }
+
+    function retryActiveSession(mode = 'missed') {
+        if (!session || !session.finished) return false;
+        const attempts = session.attempts instanceof Map ? session.attempts : new Map();
+        const selected = (Array.isArray(session.initialEntries) ? session.initialEntries : []).filter(entry => {
+            const attempt = attempts.get(entry.key);
+            if (!attempt) return false;
+            if (mode === 'wrong') return (Number(attempt.wrong) || 0) > 0;
+            return (Number(attempt.wrong) || 0) + (Number(attempt.unsure) || 0) > 0;
+        });
+        if (!selected.length) return false;
+        const label = mode === 'wrong' ? `✕だけ再挑戦 · ${selected.length}語` : `?・✕を再挑戦 · ${selected.length}語`;
+        closeSession(true);
+        window.setTimeout(() => startSession(selected, label), 0);
+        return true;
+    }
+
     function init() {
         injectStyles();
         injectStudyOverlays();
@@ -1758,6 +1847,8 @@
             getWordView: word => studyView(word),
             getWordMeaning: word => resolveStudyMeaning(word),
             getHistory: () => studyHistoryCache.map(item => ({ ...item, stats: { ...(item.stats || {}) }, words: Array.isArray(item.words) ? item.words.map(word => ({ ...word })) : [] })),
+            getActiveSession: getActiveSessionSnapshot,
+            retryActiveSession,
             loadHistory: () => ensureStudyHistoryLoaded(),
             isHistoryLoaded: () => studyHistoryLoaded,
             refresh: refreshStudySurfaces
