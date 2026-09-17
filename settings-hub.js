@@ -78,22 +78,21 @@
         return false;
     }
 
+    // Dark mode is intentionally disabled until every Smart Reader surface has
+    // complete dark-theme styling. Keep any previously saved preference intact
+    // in workspace metadata so it can be restored when dark mode returns.
     function getConfiguredTheme() {
-        const value = String(workspaceState()?.globalSettings?.theme || 'system');
-        return ['system', 'light', 'dark'].includes(value) ? value : 'system';
+        return 'light';
     }
 
-    function resolveTheme(theme) {
-        if (theme === 'light' || theme === 'dark') return theme;
-        try { return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
-        catch (_) { return 'light'; }
+    function resolveTheme() {
+        return 'light';
     }
 
-    function applyTheme(theme) {
-        const resolved = resolveTheme(theme);
-        document.documentElement.dataset.smartReaderTheme = resolved;
-        document.documentElement.dataset.smartReaderThemeMode = theme;
-        document.documentElement.style.colorScheme = resolved;
+    function applyTheme() {
+        document.documentElement.dataset.smartReaderTheme = 'light';
+        document.documentElement.dataset.smartReaderThemeMode = 'light-fixed';
+        document.documentElement.style.colorScheme = 'light';
     }
 
     async function saveGlobalSettings(patch) {
@@ -153,22 +152,10 @@
         block.appendChild(field('行間', lineInput, lineValue));
 
         const themeSelect = document.createElement('select');
-        themeSelect.append(
-            selectOption('system', '端末の設定に合わせる'),
-            selectOption('light', 'ライト'),
-            selectOption('dark', 'ダーク')
-        );
-        themeSelect.value = getConfiguredTheme();
-        themeSelect.addEventListener('change', async () => {
-            const previous = getConfiguredTheme();
-            applyTheme(themeSelect.value);
-            try { await saveGlobalSettings({ theme: themeSelect.value }); }
-            catch (error) {
-                console.error('Theme setting save failed', error);
-                themeSelect.value = previous;
-                applyTheme(previous);
-            }
-        });
+        themeSelect.append(selectOption('light', 'ライト（現在固定）'));
+        themeSelect.value = 'light';
+        themeSelect.disabled = true;
+        themeSelect.setAttribute('aria-label', '外観は現在ライトに固定されています');
         block.appendChild(field('外観', themeSelect));
         return block;
     }
@@ -356,15 +343,11 @@
 
     function refreshFromWorkspace(event) {
         if (event?.detail) window.SmartReaderWorkspaceState = event.detail;
-        applyTheme(getConfiguredTheme());
+        applyTheme();
         ensureButton();
         if (!document.getElementById(OVERLAY_ID)?.hidden) renderSettings();
     }
 
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    media?.addEventListener?.('change', () => {
-        if (getConfiguredTheme() === 'system') applyTheme('system');
-    });
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !document.getElementById(OVERLAY_ID)?.hidden) closeSettings();
     });
@@ -374,12 +357,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             ensureOverlay();
             ensureButton();
-            applyTheme(getConfiguredTheme());
+            applyTheme();
         }, { once: true });
     } else {
         ensureOverlay();
         ensureButton();
-        applyTheme(getConfiguredTheme());
+        applyTheme();
     }
 
     window.SmartReaderSettingsHub = Object.freeze({ open: openSettings, close: closeSettings, applyTheme });
