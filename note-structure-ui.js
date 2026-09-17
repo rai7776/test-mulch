@@ -70,7 +70,7 @@
         'smart-reader-workspace-core-loader'
     );
     const foundationReady = loadScriptPromise(
-        'smart-reader-foundation-core.js?v=2',
+        'smart-reader-foundation-core.js?v=3',
         'smart-reader-foundation-core-loader'
     );
 
@@ -124,6 +124,7 @@
     loadStyle('library-toolbar-polish.css?v=2', 'library-toolbar-polish-style');
     loadStyle('workspace-ui.css?v=1', 'smart-reader-workspace-ui-style');
     loadStyle('settings-hub.css?v=1', 'smart-reader-settings-hub-style');
+    loadStyle('reader-mobile-polish.css?v=1', 'smart-reader-reader-mobile-polish-style');
     loadStyle('article-copy-ui.css?v=1', 'smart-reader-article-copy-ui-style');
     loadStyle('workspace-backup-ui.css?v=1', 'smart-reader-workspace-backup-ui-style');
     loadStyle('workspace-management-ui.css?v=1', 'smart-reader-workspace-management-ui-style');
