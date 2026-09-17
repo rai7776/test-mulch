@@ -56,11 +56,12 @@
     flex: 1 0 100%;
     width: 100%;
     min-width: 0;
-    gap: 7px;
+    gap: 8px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
-    padding: 2px 0 1px;
+    padding: 3px 0 2px;
+    scroll-padding-inline: 8px;
     scrollbar-width: none;
   }
 
@@ -71,15 +72,21 @@
   #article-meta button,
   #article-meta a {
     flex: 0 0 auto;
+    min-height: 38px;
     max-width: none;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     white-space: nowrap;
     writing-mode: horizontal-tb !important;
     line-height: 1.2;
+    touch-action: manipulation;
   }
 
   #article-meta .small-edit-btn,
   #article-meta a {
-    padding: 6px 10px;
+    padding: 8px 12px;
   }
 
   #reader-search-bar {
