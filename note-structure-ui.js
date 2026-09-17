@@ -142,7 +142,7 @@
         backupFeatureReady,
         loadScriptPromise('workspace-management-core.js?v=1', 'smart-reader-workspace-management-core-loader')
     ])
-        .then(() => loadScript('workspace-management-ui.js?v=1', 'smart-reader-workspace-management-ui-loader'))
+        .then(() => loadScript('workspace-management-ui.js?v=2', 'smart-reader-workspace-management-ui-loader'))
         .catch(error => console.error('Failed to load workspace management feature', error));
 
     loadScriptPromise('speech-language-core.js?v=1', 'smart-reader-speech-language-core-loader')
