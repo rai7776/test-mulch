@@ -1,5 +1,6 @@
 const DEBUG_URL = process.env.CHROME_DEBUG_URL || 'http://127.0.0.1:9222';
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 20000);
+const COMMAND_TIMEOUT_MS = Number(process.env.CDP_COMMAND_TIMEOUT_MS || 5000);
 const POLL_MS = 200;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -9,7 +10,7 @@ async function getPageTarget() {
   let lastError = null;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${DEBUG_URL}/json/list`);
+      const response = await fetch(`${DEBUG_URL}/json/list`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) throw new Error(`CDP target list returned ${response.status}`);
       const targets = await response.json();
       const page = targets.find(item => item.type === 'page' && /^http:\/\/127\.0\.0\.1:4173\/?/.test(item.url || ''));
@@ -28,39 +29,80 @@ function connectCdp(url) {
     const pending = new Map();
     const exceptions = [];
     let nextId = 1;
+    let settled = false;
 
-    const timer = setTimeout(() => reject(new Error('Timed out opening Chrome DevTools websocket.')), 5000);
+    const openTimer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { socket.close(); } catch (_) {}
+      reject(new Error('Timed out opening Chrome DevTools websocket.'));
+    }, COMMAND_TIMEOUT_MS);
+
+    function rejectAll(error) {
+      for (const { rej, timer } of pending.values()) {
+        clearTimeout(timer);
+        rej(error);
+      }
+      pending.clear();
+    }
+
     socket.addEventListener('open', () => {
-      clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      clearTimeout(openTimer);
       resolve({
         exceptions,
-        async send(method, params = {}) {
+        send(method, params = {}) {
           const id = nextId++;
-          const result = new Promise((res, rej) => pending.set(id, { res, rej }));
-          socket.send(JSON.stringify({ id, method, params }));
-          return result;
+          return new Promise((res, rej) => {
+            const timer = setTimeout(() => {
+              pending.delete(id);
+              rej(new Error(`Chrome DevTools command timed out: ${method}`));
+            }, COMMAND_TIMEOUT_MS);
+            pending.set(id, { res, rej, timer, method });
+            socket.send(JSON.stringify({ id, method, params }));
+          });
         },
         close() {
+          rejectAll(new Error('Chrome DevTools connection closed.'));
           try { socket.close(); } catch (_) {}
         }
       });
     });
+
     socket.addEventListener('error', event => {
-      clearTimeout(timer);
-      reject(new Error(`Chrome DevTools websocket failed: ${event?.message || 'unknown error'}`));
+      const error = new Error(`Chrome DevTools websocket failed: ${event?.message || 'unknown error'}`);
+      clearTimeout(openTimer);
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+      rejectAll(error);
     });
+
+    socket.addEventListener('close', () => {
+      rejectAll(new Error('Chrome DevTools websocket closed before a response arrived.'));
+    });
+
     socket.addEventListener('message', event => {
-      const message = JSON.parse(String(event.data || '{}'));
+      let message;
+      try {
+        message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data || '{}'));
+      } catch (error) {
+        console.error('Could not parse Chrome DevTools message:', error);
+        return;
+      }
       if (message.method === 'Runtime.exceptionThrown') {
         const details = message.params?.exceptionDetails;
         exceptions.push(details?.exception?.description || details?.text || 'Unknown page exception');
         return;
       }
       if (!message.id || !pending.has(message.id)) return;
-      const { res, rej } = pending.get(message.id);
+      const entry = pending.get(message.id);
       pending.delete(message.id);
-      if (message.error) rej(new Error(message.error.message || 'CDP command failed'));
-      else res(message.result);
+      clearTimeout(entry.timer);
+      if (message.error) entry.rej(new Error(`${entry.method}: ${message.error.message || 'CDP command failed'}`));
+      else entry.res(message.result);
     });
   });
 }
@@ -114,9 +156,12 @@ function validate(state) {
 }
 
 async function main() {
+  console.log('Waiting for Smart Reader Chrome target...');
   const target = await getPageTarget();
+  console.log(`Connecting to Chrome target: ${target.url}`);
   const cdp = await connectCdp(target.webSocketDebuggerUrl);
   try {
+    console.log('Enabling Runtime domain...');
     await cdp.send('Runtime.enable');
     const deadline = Date.now() + TIMEOUT_MS;
     let lastState = null;
