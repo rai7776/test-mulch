@@ -51,6 +51,17 @@
         return question;
     }
 
+    function hasOwn(object, key) {
+        return Object.prototype.hasOwnProperty.call(object || {}, key);
+    }
+
+    function sameId(left, right) {
+        if (left === null || left === undefined || right === null || right === undefined) {
+            return left === right;
+        }
+        return String(left) === String(right);
+    }
+
     function cloneArticleForWorkspace(sourceArticle, options = {}) {
         if (!sourceArticle || typeof sourceArticle !== 'object' || sourceArticle.type !== 'article') {
             throw new TypeError('An article is required.');
@@ -61,7 +72,7 @@
         const sourceArticleId = sourceArticle.id;
 
         copy.id = idFactory('article');
-        copy.parentId = null;
+        copy.parentId = hasOwn(options, 'parentId') ? options.parentId : null;
         copy.createdAt = now;
         copy.updatedAt = now;
         copy.copiedFrom = {
@@ -104,13 +115,59 @@
         return copy;
     }
 
+    function clonePlainLibraryItem(sourceItem, parentId, now, idFactory) {
+        const copy = deepClone(sourceItem);
+        const prefix = sourceItem?.type === 'folder' ? 'folder' : (sourceItem?.type || 'item');
+        copy.id = idFactory(prefix);
+        copy.parentId = parentId;
+        copy.createdAt = now;
+        copy.updatedAt = now;
+        copy.copiedFrom = {
+            itemId: sourceItem?.id,
+            copiedAt: now
+        };
+        delete copy.readingPosition;
+        delete copy.readingPositions;
+        delete copy.lastReadAt;
+        delete copy.lastOpenedAt;
+        return copy;
+    }
+
+    function cloneLibraryItemTree(sourceLibrary, sourceItemId, options = {}) {
+        if (!Array.isArray(sourceLibrary)) throw new TypeError('A library array is required.');
+        const source = sourceLibrary.find(item => sameId(item?.id, sourceItemId));
+        if (!source) throw new Error('Source library item not found.');
+
+        const now = Number.isFinite(options.now) ? options.now : Date.now();
+        const idFactory = typeof options.idFactory === 'function' ? options.idFactory : createIdFactory(now);
+        const rootParentId = hasOwn(options, 'parentId') ? options.parentId : null;
+        const copies = [];
+
+        function cloneNode(item, parentId) {
+            const copy = item?.type === 'article'
+                ? cloneArticleForWorkspace(item, { now, idFactory, parentId })
+                : clonePlainLibraryItem(item, parentId, now, idFactory);
+            copies.push(copy);
+
+            if (item?.type === 'folder') {
+                sourceLibrary
+                    .filter(child => sameId(child?.parentId, item.id))
+                    .forEach(child => cloneNode(child, copy.id));
+            }
+            return copy;
+        }
+
+        const rootItem = cloneNode(source, rootParentId);
+        return { rootItem, items: copies };
+    }
+
     function resolveWorkspaceLibraryKey(workspace, activeWorkspaceId) {
         if (!workspace) return null;
         if (workspace.id === activeWorkspaceId) return 'library_items';
         return workspace.libraryKey || `workspace:${workspace.id}:library_items`;
     }
 
-    async function copyArticleToWorkspace(database, workspaceApi, sourceArticle, targetWorkspaceId, options = {}) {
+    async function readCopyTarget(database, workspaceApi, targetWorkspaceId, options = {}) {
         if (!database || typeof database.getItem !== 'function' || typeof database.setItem !== 'function') {
             throw new TypeError('A LocalForage-compatible database instance is required.');
         }
@@ -123,14 +180,48 @@
         if (target.id === state.activeWorkspaceId && options.allowCurrent !== true) {
             throw new Error('Copying to the current workspace is not allowed.');
         }
-
         const libraryKey = resolveWorkspaceLibraryKey(target, state.activeWorkspaceId);
-        const existing = await database.getItem(libraryKey);
-        const targetLibrary = Array.isArray(existing) ? existing.slice() : [];
-        const copy = cloneArticleForWorkspace(sourceArticle, options);
-        targetLibrary.push(copy);
-        await database.setItem(libraryKey, targetLibrary);
-        return { article: copy, workspace: target, libraryKey };
+        const existing = target.id === state.activeWorkspaceId && Array.isArray(options.activeLibrary)
+            ? options.activeLibrary
+            : await database.getItem(libraryKey);
+        return {
+            state,
+            target,
+            libraryKey,
+            targetLibrary: Array.isArray(existing) ? existing.slice() : []
+        };
+    }
+
+    async function copyArticleToWorkspace(database, workspaceApi, sourceArticle, targetWorkspaceId, options = {}) {
+        const targetInfo = await readCopyTarget(database, workspaceApi, targetWorkspaceId, options);
+        const copy = cloneArticleForWorkspace(sourceArticle, {
+            ...options,
+            parentId: hasOwn(options, 'targetParentId') ? options.targetParentId : null
+        });
+        targetInfo.targetLibrary.push(copy);
+        await database.setItem(targetInfo.libraryKey, targetInfo.targetLibrary);
+        return {
+            article: copy,
+            workspace: targetInfo.target,
+            libraryKey: targetInfo.libraryKey,
+            library: targetInfo.targetLibrary
+        };
+    }
+
+    async function copyLibraryItemToWorkspace(database, workspaceApi, sourceLibrary, sourceItemId, targetWorkspaceId, options = {}) {
+        const targetInfo = await readCopyTarget(database, workspaceApi, targetWorkspaceId, options);
+        const cloned = cloneLibraryItemTree(sourceLibrary, sourceItemId, {
+            ...options,
+            parentId: hasOwn(options, 'targetParentId') ? options.targetParentId : null
+        });
+        targetInfo.targetLibrary.push(...cloned.items);
+        await database.setItem(targetInfo.libraryKey, targetInfo.targetLibrary);
+        return {
+            ...cloned,
+            workspace: targetInfo.target,
+            libraryKey: targetInfo.libraryKey,
+            library: targetInfo.targetLibrary
+        };
     }
 
     return Object.freeze({
@@ -140,7 +231,9 @@
         resetWordLearningState,
         resetQuestionLearningState,
         cloneArticleForWorkspace,
+        cloneLibraryItemTree,
         resolveWorkspaceLibraryKey,
-        copyArticleToWorkspace
+        copyArticleToWorkspace,
+        copyLibraryItemToWorkspace
     });
 });
