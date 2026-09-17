@@ -1,3 +1,5 @@
+#article-meta button[onclick*="showCurrentArticleVocabulary"]{display:none!important}
+
 @media (max-width: 767px) {
   .app-header {
     flex-wrap: wrap;
@@ -54,7 +56,7 @@
     flex: 1 0 100%;
     width: 100%;
     min-width: 0;
-    gap: 6px;
+    gap: 7px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
@@ -75,8 +77,9 @@
     line-height: 1.2;
   }
 
-  #article-meta .small-edit-btn {
-    padding: 6px 9px;
+  #article-meta .small-edit-btn,
+  #article-meta a {
+    padding: 6px 10px;
   }
 
   #reader-search-bar {
