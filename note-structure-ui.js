@@ -124,14 +124,14 @@
     loadStyle('library-toolbar-polish.css?v=2', 'library-toolbar-polish-style');
     loadStyle('workspace-ui.css?v=1', 'smart-reader-workspace-ui-style');
     loadStyle('settings-hub.css?v=1', 'smart-reader-settings-hub-style');
-    loadStyle('reader-mobile-polish.css?v=1', 'smart-reader-reader-mobile-polish-style');
-    loadStyle('article-copy-ui.css?v=1', 'smart-reader-article-copy-ui-style');
+    loadStyle('reader-mobile-polish.css?v=2', 'smart-reader-reader-mobile-polish-style');
+    loadStyle('article-copy-ui.css?v=2', 'smart-reader-article-copy-ui-style');
     loadStyle('workspace-backup-ui.css?v=1', 'smart-reader-workspace-backup-ui-style');
     loadStyle('workspace-management-ui.css?v=1', 'smart-reader-workspace-management-ui-style');
     loadScript('workspace-ui.js?v=3', 'smart-reader-workspace-ui-loader');
     loadScript('settings-hub.js?v=2', 'smart-reader-settings-hub-loader');
     loadScriptPromise('article-copy-core.js?v=1', 'smart-reader-article-copy-core-loader')
-        .then(() => loadScript('article-copy-ui.js?v=1', 'smart-reader-article-copy-ui-loader'))
+        .then(() => loadScript('article-copy-ui.js?v=2', 'smart-reader-article-copy-ui-loader'))
         .catch(error => console.error('Failed to load article copy feature', error));
 
     const backupFeatureReady = loadScriptPromise('workspace-backup-core.js?v=1', 'smart-reader-workspace-backup-core-loader');
