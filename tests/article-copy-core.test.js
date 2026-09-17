@@ -58,9 +58,42 @@ test('cloneArticleForWorkspace copies learning content but resets learning/read 
   assert.equal(copied.questions[0].needsReview, false);
   assert.deepEqual(copied.notes[0].structure, source.notes[0].structure);
 
-  // Deep clone: editing the copy must not touch the source.
   copied.notes[0].structure.annotations[0].text = 'Changed';
   assert.equal(source.notes[0].structure.annotations[0].text, 'Text');
+});
+
+test('cloneArticleForWorkspace can keep a selected destination folder', () => {
+  const source = { id: 10, type: 'article', name: 'Source' };
+  const copied = copyCore.cloneArticleForWorkspace(source, {
+    now: 10,
+    parentId: 'folder-target',
+    idFactory: deterministicIdFactory()
+  });
+  assert.equal(copied.parentId, 'folder-target');
+});
+
+test('cloneLibraryItemTree recursively copies a folder and remaps descendants', () => {
+  const library = [
+    { id: 1, type: 'folder', name: 'Root folder', parentId: null },
+    { id: 2, type: 'folder', name: 'Child folder', parentId: 1 },
+    { id: 3, type: 'article', name: 'Article', parentId: 2, words: [], notes: [], bookmarks: [], questions: [] },
+    { id: 4, type: 'article', name: 'Outside', parentId: null, words: [], notes: [], bookmarks: [], questions: [] }
+  ];
+
+  const result = copyCore.cloneLibraryItemTree(library, 1, {
+    now: 100,
+    parentId: 'destination',
+    idFactory: deterministicIdFactory()
+  });
+
+  assert.equal(result.items.length, 3);
+  assert.equal(result.rootItem.type, 'folder');
+  assert.equal(result.rootItem.parentId, 'destination');
+  const copiedChild = result.items.find(item => item.type === 'folder' && item !== result.rootItem);
+  const copiedArticle = result.items.find(item => item.type === 'article');
+  assert.equal(copiedChild.parentId, result.rootItem.id);
+  assert.equal(copiedArticle.parentId, copiedChild.id);
+  assert.equal(result.items.some(item => item.name === 'Outside'), false);
 });
 
 test('copyArticleToWorkspace writes to inactive workspace root without switching', async () => {
@@ -90,6 +123,41 @@ test('copyArticleToWorkspace writes to inactive workspace root without switching
   assert.equal(target[0].parentId, null);
   assert.equal(await db.getItem(workspace.ACTIVE_WORKSPACE_KEY), english.id);
   assert.equal((await db.getItem('library_items')).length, 1);
+});
+
+test('copyLibraryItemToWorkspace can duplicate an item inside the current workspace', async () => {
+  const english = workspace.createDefaultWorkspace(1);
+  const folder = { id: 5, type: 'folder', name: 'Folder', parentId: null };
+  const source = { id: 10, type: 'article', name: 'Source', parentId: 5, words: [], notes: [], bookmarks: [], questions: [] };
+  const db = createFakeDb({
+    [workspace.WORKSPACES_KEY]: [english],
+    [workspace.ACTIVE_WORKSPACE_KEY]: english.id,
+    [workspace.GLOBAL_SETTINGS_KEY]: { explanationLanguage: 'ja' },
+    library_items: [folder, source]
+  });
+
+  const result = await copyCore.copyLibraryItemToWorkspace(
+    db,
+    workspace,
+    [folder, source],
+    source.id,
+    english.id,
+    {
+      allowCurrent: true,
+      activeLibrary: [folder, source],
+      targetParentId: folder.id,
+      now: 200,
+      idFactory: deterministicIdFactory()
+    }
+  );
+
+  assert.equal(result.workspace.id, english.id);
+  assert.equal(result.rootItem.name, 'Source');
+  assert.equal(result.rootItem.parentId, folder.id);
+  assert.notEqual(result.rootItem.id, source.id);
+  const stored = await db.getItem('library_items');
+  assert.equal(stored.length, 3);
+  assert.equal(stored.filter(item => item.name === 'Source').length, 2);
 });
 
 test('copyArticleToWorkspace rejects current workspace by default', async () => {
