@@ -169,14 +169,18 @@
 
     function ensureSection() {
         const body = document.querySelector('[data-settings-hub-body]');
-        if (!body) return;
+        if (!body) return null;
         let section = document.getElementById(SECTION_ID);
         if (!section) {
             section = createSection();
             body.appendChild(section);
-        } else {
-            renderSection(section);
         }
+        return section;
+    }
+
+    function refreshSection() {
+        const section = ensureSection();
+        if (section) renderSection(section);
     }
 
     const observer = new MutationObserver(() => ensureSection());
@@ -186,5 +190,5 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
     else start();
-    window.addEventListener('smartreader:workspace-ready', () => setTimeout(ensureSection, 0));
+    window.addEventListener('smartreader:workspace-ready', () => setTimeout(refreshSection, 0));
 })();
