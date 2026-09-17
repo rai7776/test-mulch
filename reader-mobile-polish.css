@@ -1,0 +1,98 @@
+@media (max-width: 767px) {
+  .app-header {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px 8px;
+    padding: 8px 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .app-header .header-left {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  #back-to-library,
+  #app-title,
+  .workspace-add-button,
+  .settings-hub-open-button {
+    flex: 0 0 auto;
+  }
+
+  #back-to-library {
+    white-space: nowrap;
+    writing-mode: horizontal-tb;
+  }
+
+  #app-title {
+    font-size: 17px;
+    white-space: nowrap;
+  }
+
+  .workspace-control {
+    min-width: 0;
+    flex: 1 1 120px;
+    margin-left: 0;
+  }
+
+  .workspace-select {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .settings-hub-open-button {
+    margin-left: 0;
+  }
+
+  #article-meta {
+    order: 3;
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 0;
+    gap: 6px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px 0 1px;
+    scrollbar-width: none;
+  }
+
+  #article-meta::-webkit-scrollbar {
+    display: none;
+  }
+
+  #article-meta button,
+  #article-meta a {
+    flex: 0 0 auto;
+    max-width: none;
+    white-space: nowrap;
+    writing-mode: horizontal-tb !important;
+    line-height: 1.2;
+  }
+
+  #article-meta .small-edit-btn {
+    padding: 6px 9px;
+  }
+
+  #reader-search-bar {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .reader-search-main {
+    gap: 5px;
+  }
+
+  #search-count {
+    min-width: 42px;
+  }
+
+  .reader-search-options {
+    gap: 9px;
+  }
+}
