@@ -188,7 +188,7 @@
                 link.dataset.smartReaderUnsafeUrl = 'true';
                 return;
             }
-            link.setAttribute('href', safe);
+            if (href !== safe) link.setAttribute('href', safe);
             delete link.dataset.smartReaderUnsafeUrl;
         };
 
