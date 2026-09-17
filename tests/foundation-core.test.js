@@ -26,6 +26,44 @@ test('external URLs allow only http and https', () => {
     assert.equal(foundation.sanitizeExternalUrl('file:///tmp/test'), null);
 });
 
+test('source-link observer does not rewrite an already sanitized href forever', () => {
+    let href = 'https://example.com/a';
+    let hrefWrites = 0;
+    let observerCallback = null;
+    class FakeMutationObserver {
+        constructor(callback) { observerCallback = callback; }
+        observe() {}
+    }
+    const link = {
+        style: {},
+        dataset: {},
+        getAttribute(name) { return name === 'href' ? href : null; },
+        setAttribute(name, value) {
+            if (name === 'href') {
+                href = String(value);
+                hrefWrites += 1;
+            }
+        },
+        removeAttribute(name) { if (name === 'href') href = null; }
+    };
+    const documentRef = {
+        baseURI: 'https://reader.example/',
+        defaultView: { MutationObserver: FakeMutationObserver },
+        getElementById(id) { return id === 'display-url' ? link : null; }
+    };
+
+    foundation.protectExternalSourceLink(documentRef);
+    assert.equal(hrefWrites, 0);
+
+    href = '/source';
+    observerCallback([{ type: 'attributes', attributeName: 'href' }]);
+    assert.equal(href, 'https://reader.example/source');
+    assert.equal(hrefWrites, 1);
+
+    observerCallback([{ type: 'attributes', attributeName: 'href' }]);
+    assert.equal(hrefWrites, 1);
+});
+
 test('schema migration marks existing data without rewriting it', async () => {
     const originalLibrary = [{ id: 1, type: 'article', name: 'Existing' }];
     const db = createFakeDb({ library_items: originalLibrary });
