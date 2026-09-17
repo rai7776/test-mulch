@@ -23,9 +23,16 @@ test('explanation language and theme are saved through global workspace settings
   assert.match(source, /theme/);
 });
 
+test('settings hub can switch directly to another workspace with rollback-safe core API', () => {
+  assert.match(source, /switchWorkspaceFromSettings/);
+  assert.match(source, /api\.switchWorkspace\(dbRef, item\.id, window\.localStorage\)/);
+  assert.match(source, /window\.location\.reload\(\)/);
+  assert.match(source, /データは元のスペースに戻されています/);
+});
+
 test('loader cache-busts updated workspace modules and loads settings hub', () => {
   assert.match(loader, /workspace-core\.js\?v=4/);
   assert.match(loader, /workspace-ui\.js\?v=3/);
-  assert.match(loader, /settings-hub\.js\?v=1/);
+  assert.match(loader, /settings-hub\.js\?v=2/);
   assert.match(loader, /settings-hub\.css\?v=1/);
 });
