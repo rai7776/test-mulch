@@ -33,6 +33,7 @@ jobs:
           test -n "$CHROME_BIN"
           timeout 30s "$CHROME_BIN" \
             --headless \
+            --virtual-time-budget=3000 \
             --no-sandbox \
             --disable-gpu \
             --disable-dev-shm-usage \
