@@ -196,8 +196,36 @@
         return `語学 · ${language}`;
     }
 
+    async function switchWorkspaceFromSettings(item, action) {
+        const api = workspaceApi();
+        const dbRef = database();
+        const state = workspaceState();
+        if (!item?.id || item.id === state?.activeWorkspaceId) return;
+        if (!api?.switchWorkspace || !dbRef) {
+            alert('学習スペースの切り替え機能を読み込めませんでした。');
+            return;
+        }
+
+        const previousLabel = action?.textContent || '切り替える';
+        if (action) {
+            action.disabled = true;
+            action.textContent = '切り替え中…';
+        }
+        try {
+            await api.switchWorkspace(dbRef, item.id, window.localStorage);
+            window.location.reload();
+        } catch (error) {
+            console.error('Workspace switch from settings failed', error);
+            if (action) {
+                action.disabled = false;
+                action.textContent = previousLabel;
+            }
+            alert('学習スペースの切り替えに失敗しました。データは元のスペースに戻されています。');
+        }
+    }
+
     function createWorkspaceSection() {
-        const block = section('学習スペース', '教材・単語・Study履歴はスペースごとに分かれています。');
+        const block = section('学習スペース', '教材・単語・Study履歴はスペースごとに分かれています。ここから使用するスペースを切り替えられます。');
         const list = document.createElement('div');
         list.className = 'settings-hub-workspace-list';
         const state = workspaceState();
@@ -216,6 +244,10 @@
                 badge.className = 'settings-hub-active-badge';
                 badge.textContent = '使用中';
                 row.appendChild(badge);
+            } else {
+                const switchButton = button('切り替える', 'btn-sub', () => void switchWorkspaceFromSettings(item, switchButton));
+                switchButton.setAttribute('aria-label', `「${item.name || 'スペース'}」に切り替える`);
+                row.appendChild(switchButton);
             }
             list.appendChild(row);
         });
