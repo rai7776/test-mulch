@@ -93,6 +93,69 @@
     accent-color: #8b572a;
 }
 
+/* Library cards use the same compact, weighty control language as Study. */
+#library-section .item-card h3 {
+    margin: 8px 0 14px;
+    color: #3f352d;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+#library-section .card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    width: 100%;
+    margin-top: auto;
+}
+
+#library-section .card-actions .small-btn {
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 5px;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.04);
+    font-family: inherit;
+    font-size: .78rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#library-section .card-actions .small-btn.move {
+    border-color: #c9d9e7;
+    background: #f4f8fb;
+    color: #467aa3;
+}
+
+#library-section .card-actions .small-btn.del {
+    border-color: #eccfca;
+    background: #fff7f5;
+    color: #b85b50;
+}
+
+#library-section .card-actions .small-btn.copy {
+    border-color: #c8dfd6;
+    background: #f3faf7;
+    color: #3f826b;
+}
+
+#library-section .card-actions .small-btn:active {
+    transform: translateY(1px);
+    box-shadow: none;
+    filter: brightness(.98);
+}
+
 /* Global Vocabulary / Problems use the same compact navigation language. */
 #vocabulary-section .vocabulary-header,
 #problems-section .problems-header {
@@ -207,6 +270,16 @@
 }
 
 @media (max-width: 420px) {
+    #library-section .card-actions {
+        gap: 5px;
+    }
+
+    #library-section .card-actions .small-btn {
+        min-height: 38px;
+        padding: 7px 3px;
+        font-size: .74rem;
+    }
+
     #vocabulary-section .vocabulary-title-row,
     #problems-section .problems-navigation {
         gap: 5px !important;
@@ -241,5 +314,20 @@
 
     #library-section #global-search-clear-btn:hover {
         background: #f4eee7 !important;
+    }
+
+    #library-section .card-actions .small-btn.move:hover {
+        border-color: #b7ccde;
+        background: #edf5fa;
+    }
+
+    #library-section .card-actions .small-btn.del:hover {
+        border-color: #e4bbb4;
+        background: #fff0ed;
+    }
+
+    #library-section .card-actions .small-btn.copy:hover {
+        border-color: #b3d3c6;
+        background: #ebf7f2;
     }
 }
