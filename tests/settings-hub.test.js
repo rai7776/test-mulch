@@ -17,10 +17,12 @@ test('settings hub exposes the agreed global sections', () => {
   }
 });
 
-test('explanation language and theme are saved through global workspace settings', () => {
+test('explanation language remains global while appearance is temporarily fixed to light', () => {
   assert.match(source, /updateGlobalSettings/);
   assert.match(source, /explanationLanguage/);
-  assert.match(source, /theme/);
+  assert.match(source, /return 'light'/);
+  assert.match(source, /smartReaderThemeMode = 'light-fixed'/);
+  assert.match(source, /ライト（現在固定）/);
 });
 
 test('settings hub can switch directly to another workspace with rollback-safe core API', () => {
@@ -33,6 +35,6 @@ test('settings hub can switch directly to another workspace with rollback-safe c
 test('loader cache-busts updated workspace modules and loads settings hub', () => {
   assert.match(loader, /workspace-core\.js\?v=4/);
   assert.match(loader, /workspace-ui\.js\?v=3/);
-  assert.match(loader, /settings-hub\.js\?v=2/);
+  assert.match(loader, /settings-hub\.js\?v=3/);
   assert.match(loader, /settings-hub\.css\?v=1/);
 });
