@@ -64,7 +64,10 @@ jobs:
           grep -F 'id="smart-reader-workspace-create-overlay"' /tmp/smart-reader-dom.html
           grep -F 'id="workspace-create-name"' /tmp/smart-reader-dom.html
           grep -F 'reader-mobile-polish.css?v=2' /tmp/smart-reader-dom.html
-          grep -F 'id="article-copy-move-section"' /tmp/smart-reader-dom.html
+          grep -F 'id="library-copy-overlay"' /tmp/smart-reader-dom.html
+          grep -F 'id="library-copy-workspace"' /tmp/smart-reader-dom.html
+          grep -F 'library-copy-button' /tmp/smart-reader-dom.html
+          ! grep -F 'id="article-copy-move-section"' /tmp/smart-reader-dom.html
           ! grep -F 'id="article-copy-workspace-button"' /tmp/smart-reader-dom.html
           ! grep -F 'showCurrentArticleVocabulary()' /tmp/smart-reader-dom.html
           grep -F 'https://unpkg.com/localforage@1.10.0/dist/localforage.min.js' /tmp/smart-reader-dom.html
