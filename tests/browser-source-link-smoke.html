@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Source link smoke</title></head>
+<body>
+  <a id="display-url" href="#">source</a>
+  <div id="result">pending</div>
+  <script src="../smart-reader-foundation-core.js"></script>
+  <script>
+    const link = document.getElementById('display-url');
+    SmartReaderFoundation.protectExternalSourceLink(document);
+    link.setAttribute('href', 'https://example.com/tutorial');
+    setTimeout(() => {
+      document.getElementById('result').textContent = 'source-link-smoke-ok';
+    }, 100);
+  </script>
+</body>
+</html>
