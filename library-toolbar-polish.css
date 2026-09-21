@@ -93,9 +93,32 @@
     accent-color: #8b572a;
 }
 
-/* Library cards use the same compact, weighty control language as Study. */
+/* Library cards should feel like the same warm, quiet system as the rest of the app. */
+#library-section .item-card {
+    min-height: 126px;
+    padding: 14px 13px 12px;
+    border: 1px solid #e8ded4;
+    border-top-width: 4px;
+    border-radius: 14px;
+    background: rgba(255, 254, 252, 0.98);
+    box-shadow: 0 3px 10px rgba(65, 50, 39, 0.065);
+}
+
+#library-section .item-card.folder-icon {
+    border-top-color: #d2a064;
+}
+
+#library-section .item-card.article-icon {
+    border-top-color: #8fa7b4;
+}
+
+#library-section .item-card:active {
+    transform: scale(0.985);
+    box-shadow: 0 2px 7px rgba(65, 50, 39, 0.055);
+}
+
 #library-section .item-card h3 {
-    margin: 8px 0 14px;
+    margin: 7px 0 12px;
     color: #3f352d;
     font-size: 1rem;
     font-weight: 800;
@@ -108,21 +131,22 @@
 #library-section .card-actions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 7px;
+    gap: 6px;
     width: 100%;
     margin-top: auto;
 }
 
 #library-section .card-actions .small-btn {
     min-width: 0;
-    min-height: 40px;
-    padding: 8px 5px;
-    border-width: 1px;
-    border-style: solid;
-    border-radius: 10px;
-    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.04);
+    min-height: 36px;
+    padding: 6px 5px;
+    border: 1px solid #ddd2c7;
+    border-radius: 9px;
+    background: #fcfaf7;
+    color: #65584d;
+    box-shadow: none;
     font-family: inherit;
-    font-size: .78rem;
+    font-size: .74rem;
     font-weight: 800;
     line-height: 1;
     letter-spacing: 0;
@@ -132,28 +156,50 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-#library-section .card-actions .small-btn.move {
-    border-color: #c9d9e7;
-    background: #f4f8fb;
-    color: #467aa3;
+#library-section .card-actions .small-btn.move,
+#library-section .card-actions .small-btn.copy {
+    border-color: #ddd2c7;
+    background: #fcfaf7;
+    color: #65584d;
 }
 
 #library-section .card-actions .small-btn.del {
-    border-color: #eccfca;
-    background: #fff7f5;
-    color: #b85b50;
-}
-
-#library-section .card-actions .small-btn.copy {
-    border-color: #c8dfd6;
-    background: #f3faf7;
-    color: #3f826b;
+    border-color: #e6cbc6;
+    background: #fff8f6;
+    color: #ad5c52;
 }
 
 #library-section .card-actions .small-btn:active {
     transform: translateY(1px);
+    border-color: #cfbfae;
+    background: #f3ece4;
     box-shadow: none;
-    filter: brightness(.98);
+    filter: none;
+}
+
+/* Keep floating Reader controls in the same warm accent family. */
+#add-btn,
+#fab-toggle {
+    box-shadow: 0 3px 10px rgba(65, 50, 39, 0.16);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+#add-btn {
+    width: 52px;
+    height: 52px;
+    background: #a8794f;
+}
+
+#fab-toggle {
+    width: 60px;
+    height: 60px;
+    background: var(--primary, #8b572a);
+}
+
+#add-btn:active,
+#fab-toggle:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 2px 7px rgba(65, 50, 39, 0.14);
 }
 
 /* Global Vocabulary / Problems use the same compact navigation language. */
@@ -270,14 +316,18 @@
 }
 
 @media (max-width: 420px) {
+    #library-section .item-card {
+        padding: 13px 11px 11px;
+    }
+
     #library-section .card-actions {
         gap: 5px;
     }
 
     #library-section .card-actions .small-btn {
-        min-height: 38px;
-        padding: 7px 3px;
-        font-size: .74rem;
+        min-height: 34px;
+        padding: 6px 3px;
+        font-size: .72rem;
     }
 
     #vocabulary-section .vocabulary-title-row,
@@ -316,18 +366,14 @@
         background: #f4eee7 !important;
     }
 
-    #library-section .card-actions .small-btn.move:hover {
-        border-color: #b7ccde;
-        background: #edf5fa;
+    #library-section .card-actions .small-btn.move:hover,
+    #library-section .card-actions .small-btn.copy:hover {
+        border-color: #cfbfae;
+        background: #f7f1eb;
     }
 
     #library-section .card-actions .small-btn.del:hover {
-        border-color: #e4bbb4;
-        background: #fff0ed;
-    }
-
-    #library-section .card-actions .small-btn.copy:hover {
-        border-color: #b3d3c6;
-        background: #ebf7f2;
+        border-color: #ddb9b2;
+        background: #fff2ef;
     }
 }
