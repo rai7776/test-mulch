@@ -121,9 +121,9 @@
 
     // Library/global navigation polish and application-level controls are loaded last
     // so they can consistently override legacy styles without rewriting app.js.
-    loadStyle('library-toolbar-polish.css?v=3', 'library-toolbar-polish-style');
-    loadStyle('workspace-ui.css?v=1', 'smart-reader-workspace-ui-style');
-    loadStyle('settings-hub.css?v=1', 'smart-reader-settings-hub-style');
+    loadStyle('library-toolbar-polish.css?v=4', 'library-toolbar-polish-style');
+    loadStyle('workspace-ui.css?v=2', 'smart-reader-workspace-ui-style');
+    loadStyle('settings-hub.css?v=2', 'smart-reader-settings-hub-style');
     loadStyle('reader-mobile-polish.css?v=2', 'smart-reader-reader-mobile-polish-style');
     loadStyle('article-copy-ui.css?v=3', 'smart-reader-article-copy-ui-style');
     loadStyle('workspace-backup-ui.css?v=1', 'smart-reader-workspace-backup-ui-style');
