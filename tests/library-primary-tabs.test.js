@@ -11,7 +11,7 @@ const css = fs.readFileSync(path.join(root, 'library-toolbar-polish.css'), 'utf8
 test('Library exposes four primary tabs in a single equal-width navigation', () => {
   assert.match(index, /class="library-primary-tab is-active"[^>]*>Library<\/button>/);
   assert.match(index, /class="library-primary-tab"[^>]*>Vocabulary<\/button>/);
-  assert.match(index, /class="library-primary-tab study-center-entry-button"[^>]*>Study<\/button>/);
+  assert.match(index, /id="study-center-library-button"[^>]*class="library-primary-tab study-center-entry-button"[^>]*onclick="window\.showStudyCenter\?\.\(\)"[^>]*>Study<\/button>/);
   assert.match(index, /class="library-primary-tab"[^>]*>Problems<\/button>/);
   assert.match(css, /grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
 });
