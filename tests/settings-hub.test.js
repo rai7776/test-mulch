@@ -36,7 +36,7 @@ test('loader cache-busts updated workspace modules and loads settings hub', () =
   assert.match(loader, /workspace-core\.js\?v=4/);
   assert.match(loader, /workspace-ui\.js\?v=3/);
   assert.match(loader, /settings-hub\.js\?v=3/);
-  assert.match(loader, /library-toolbar-polish\.css\?v=6/);
+  assert.match(loader, /library-toolbar-polish\.css\?v=7/);
   assert.match(loader, /workspace-ui\.css\?v=2/);
   assert.match(loader, /settings-hub\.css\?v=2/);
 });
