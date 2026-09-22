@@ -15,6 +15,18 @@
     transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
+/* Primary Library destinations are intentionally larger than utility actions. */
+#library-section .library-actions > button[onclick*='showGlobalVocabulary'],
+#library-section .library-actions > button[onclick*='showGlobalProblems'],
+#library-section .library-actions > button.study-center-entry-button {
+    min-height: 36px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: .9rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
 /* Article creation is the one constructive action in this row, so give it a quiet warm tint. */
 #library-section .library-actions > button.start-btn {
     border-color: #d9c7b5;
@@ -85,16 +97,16 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
     flex: 1 0 100%;
     width: 100%;
     color: #74695f;
 }
 
 #library-section .library-search-options-title {
-    margin-right: 2px;
+    margin-right: 1px;
     color: #8a7d72;
-    font-size: .72rem;
+    font-size: .68rem;
     font-weight: 700;
     letter-spacing: .02em;
 }
@@ -120,14 +132,14 @@
 #library-section .library-search-option > span {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 30px;
-    padding: 5px 9px;
+    gap: 4px;
+    min-height: 24px;
+    padding: 3px 7px;
     border: 1px solid #ddd2c7;
     border-radius: 999px;
     background: rgba(255, 253, 249, .88);
     color: #665b51;
-    font-size: .76rem;
+    font-size: .7rem;
     font-weight: 700;
     line-height: 1;
     transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease;
@@ -135,8 +147,8 @@
 
 #library-section .library-search-option > span::before {
     content: '';
-    width: 11px;
-    height: 11px;
+    width: 9px;
+    height: 9px;
     border: 1px solid #bcaea1;
     border-radius: 3px;
     background: #fff;
