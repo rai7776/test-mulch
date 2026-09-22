@@ -35,14 +35,23 @@
                         <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
                         <button type="button" id="global-search-clear-btn" onclick="clearGlobalSearch()" aria-label="検索をクリア">×</button>
                     </div>
-                    <div class="library-search-options" aria-label="Library検索オプション">
-                        <label><input type="checkbox" id="global-search-whole-word" onchange="performGlobalSearch()"> 単語一致</label>
-                        <label><input type="checkbox" id="global-search-case-sensitive" onchange="performGlobalSearch()"> Aa</label>
+                    <div class="library-search-options" role="group" aria-label="Library検索条件">
+                        <span class="library-search-options-title">検索条件</span>
+                        <label class="library-search-option">
+                            <input type="checkbox" id="global-search-whole-word" onchange="performGlobalSearch()">
+                            <span>単語一致</span>
+                        </label>
+                        <label class="library-search-option">
+                            <input type="checkbox" id="global-search-prefix" onchange="performGlobalSearch()">
+                            <span>前方一致</span>
+                        </label>
+                        <label class="library-search-option">
+                            <input type="checkbox" id="global-search-case-sensitive" onchange="performGlobalSearch()">
+                            <span>Aa 区別</span>
+                        </label>
                     </div>
                     <button class="btn-sub" onclick="createNewFolder()">＋ フォルダ</button>
                     <button class="start-btn" onclick="showInputArea()">＋ 記事作成</button>
-                    <button class="btn-sub" onclick="exportSmartReaderBackup()">バックアップ</button>
-                    <button class="btn-sub" onclick="openSmartReaderRestore()">復元</button>
                     <input type="file" id="backup-file-input" accept="application/json,.json" onchange="handleSmartReaderRestore(event)" style="display:none;">
                 </div>
             </div>
@@ -510,7 +519,7 @@
 
     <script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="importers.js?v=1.1"></script>
-    <script src="app.js?v=4.1"></script>
+    <script src="app.js?v=4.2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
     <script src="bulk-import.js?v=2.0"></script>
     <script src="bulk-import-mobile-fix.js?v=1.0"></script>
