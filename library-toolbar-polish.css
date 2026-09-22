@@ -1,5 +1,61 @@
 /* Shared visual polish for the Library and global section navigation. */
 
+/* Four equal-width primary tabs: label length never changes tab width. */
+#library-section .library-primary-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    flex: 1 0 100%;
+    width: 100%;
+}
+
+#library-section .library-primary-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 38px;
+    margin: 0;
+    padding: 6px 3px;
+    overflow: hidden;
+    border: 1px solid #ded5cc;
+    border-radius: 11px;
+    background: rgba(255, 253, 249, 0.94);
+    color: #4b423a;
+    box-shadow: 0 1px 2px rgba(65, 50, 39, 0.05);
+    font-family: inherit;
+    font-size: clamp(.72rem, 3.1vw, .9rem);
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#library-section .library-primary-tab.is-active {
+    border-color: #bda58e;
+    background: #f1e7dc;
+    color: #654b35;
+}
+
+#library-section .library-primary-tab:active {
+    background: #eadbcd;
+    border-color: #af9379;
+    box-shadow: none;
+}
+
+#library-section .library-primary-tab.study-center-entry-button {
+    gap: 4px;
+}
+
+#library-section .library-primary-tab .study-center-nav-badge {
+    flex: 0 0 auto;
+    margin-left: 0;
+    padding: 2px 5px;
+    font-size: .66rem;
+    line-height: 1.1;
+}
+
 #library-section .library-actions > button.btn-sub,
 #library-section .library-actions > button.start-btn,
 #library-section .library-actions > button.study-center-entry-button {
