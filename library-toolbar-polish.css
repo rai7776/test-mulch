@@ -156,25 +156,43 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-#library-section .card-actions .small-btn.move,
+#library-section .card-actions .small-btn.move {
+    border-color: #cdd9e2;
+    background: #f4f7f9;
+    color: #587b96;
+}
+
 #library-section .card-actions .small-btn.copy {
-    border-color: #ddd2c7;
-    background: #fcfaf7;
-    color: #65584d;
+    border-color: #cfddd7;
+    background: #f4f8f6;
+    color: #557b69;
 }
 
 #library-section .card-actions .small-btn.del {
-    border-color: #e6cbc6;
-    background: #fff8f6;
-    color: #ad5c52;
+    border-color: #e5cfcb;
+    background: #fbf6f5;
+    color: #a6625a;
 }
 
 #library-section .card-actions .small-btn:active {
     transform: translateY(1px);
-    border-color: #cfbfae;
-    background: #f3ece4;
     box-shadow: none;
     filter: none;
+}
+
+#library-section .card-actions .small-btn.move:active {
+    border-color: #b9ccd9;
+    background: #edf3f6;
+}
+
+#library-section .card-actions .small-btn.copy:active {
+    border-color: #bdd2c9;
+    background: #edf5f1;
+}
+
+#library-section .card-actions .small-btn.del:active {
+    border-color: #d9bcb6;
+    background: #f8efed;
 }
 
 /* Keep floating Reader controls in the same warm accent family. */
@@ -366,14 +384,18 @@
         background: #f4eee7 !important;
     }
 
-    #library-section .card-actions .small-btn.move:hover,
+    #library-section .card-actions .small-btn.move:hover {
+        border-color: #b9ccd9;
+        background: #eef4f7;
+    }
+
     #library-section .card-actions .small-btn.copy:hover {
-        border-color: #cfbfae;
-        background: #f7f1eb;
+        border-color: #bdd2c9;
+        background: #eef5f2;
     }
 
     #library-section .card-actions .small-btn.del:hover {
-        border-color: #ddb9b2;
-        background: #fff2ef;
+        border-color: #d9bcb6;
+        background: #f9efed;
     }
 }
