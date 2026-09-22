@@ -1386,13 +1386,16 @@ function readGlobalSearchState() {
 }
 
 function getGlobalSearchMatches(value, options) {
+    const text = String(value ?? '');
     const matches = findSearchMatches(
-        String(value ?? ''),
+        text,
         String(options?.query || ''),
         !!options?.wholeWord,
         !!options?.caseSensitive
     );
-    return options?.prefixOnly ? matches.filter(match => match.index === 0) : matches;
+    return options?.prefixOnly
+        ? matches.filter(match => match.index === 0 || !isSearchWordCharacter(text[match.index - 1]))
+        : matches;
 }
 
 function highlightSearchHtml(value, options, className = 'search-highlight') {
