@@ -1195,12 +1195,14 @@ function showLibrary() {
         let f = libraryItems.find(i => i.id === tempId);
         if(f) { path.unshift(f); tempId = f.parentId; } else break;
     }
-    let html = `<span onclick="goToFolder(null)">🏠 本棚</span>`;
+    let html = '';
     path.forEach((f, idx) => {
-        if(idx === path.length -1) html += ` > <b>${escapeHtml(f.name)}</b>`;
-        else html += ` > <span onclick="goToFolder(${f.id})">${escapeHtml(f.name)}</span>`;
+        const separator = idx === 0 ? '' : ' > ';
+        if(idx === path.length - 1) html += `${separator}<b>${escapeHtml(f.name)}</b>`;
+        else html += `${separator}<span onclick="goToFolder(${f.id})">${escapeHtml(f.name)}</span>`;
     });
     bc.innerHTML = html;
+    bc.style.display = path.length ? '' : 'none';
 
     libraryItems.filter(i => i.parentId === currentFolderId).forEach(item => {
         const card = document.createElement('div');
