@@ -82,15 +82,81 @@
 }
 
 #library-section .library-search-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1 0 100%;
+    width: 100%;
     color: #74695f;
 }
 
-#library-section .library-search-options label {
-    font-weight: 600;
+#library-section .library-search-options-title {
+    margin-right: 2px;
+    color: #8a7d72;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .02em;
 }
 
-#library-section .library-search-options input[type='checkbox'] {
-    accent-color: #8b572a;
+#library-section .library-search-option {
+    position: relative;
+    display: inline-flex;
+    margin: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#library-section .library-search-option input {
+    position: absolute;
+    width: 1px;
+    min-width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#library-section .library-search-option > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 5px 9px;
+    border: 1px solid #ddd2c7;
+    border-radius: 999px;
+    background: rgba(255, 253, 249, .88);
+    color: #665b51;
+    font-size: .76rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease;
+}
+
+#library-section .library-search-option > span::before {
+    content: '';
+    width: 11px;
+    height: 11px;
+    border: 1px solid #bcaea1;
+    border-radius: 3px;
+    background: #fff;
+    box-shadow: inset 0 0 0 2px #fff;
+}
+
+#library-section .library-search-option input:checked + span {
+    border-color: #bca38b;
+    background: #f1e7dc;
+    color: #654b35;
+}
+
+#library-section .library-search-option input:checked + span::before {
+    border-color: #8b572a;
+    background: #8b572a;
+}
+
+#library-section .library-search-option input:focus-visible + span {
+    outline: 2px solid rgba(139, 87, 42, .28);
+    outline-offset: 2px;
 }
 
 /* Library cards should feel like the same warm, quiet system as the rest of the app. */
@@ -382,6 +448,16 @@
 
     #library-section #global-search-clear-btn:hover {
         background: #f4eee7 !important;
+    }
+
+    #library-section .library-search-option:hover > span {
+        border-color: #cdbfb2;
+        background: #f8f3ed;
+    }
+
+    #library-section .library-search-option:hover input:checked + span {
+        border-color: #af9379;
+        background: #eee0d2;
     }
 
     #library-section .card-actions .small-btn.move:hover {
