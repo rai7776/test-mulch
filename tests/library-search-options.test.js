@@ -18,11 +18,11 @@ test('Library search exposes compact option toggles including prefix matching', 
   assert.match(polish, /\.library-search-option input:checked \+ span/);
 });
 
-test('Library prefix mode only keeps matches at the start of each searched field', () => {
+test('Library prefix mode only keeps matches at word starts', () => {
   assert.match(app, /prefixOnly:\s*false/);
   assert.match(app, /global-search-prefix/);
   assert.match(app, /prefixOnly:\s*!!prefixOnly\?\.checked/);
-  assert.match(app, /options\?\.prefixOnly \? matches\.filter\(match => match\.index === 0\) : matches/);
+  assert.match(app, /match\.index === 0 \|\| !isSearchWordCharacter\(text\[match\.index - 1\]\)/);
 });
 
 test('Library toolbar no longer duplicates full backup and restore actions', () => {
