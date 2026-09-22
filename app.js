@@ -95,6 +95,7 @@ let readerSearchState = {
 let globalSearchState = {
     query: '',
     wholeWord: false,
+    prefixOnly: false,
     caseSensitive: false
 };
 let globalVocabularyEditRef = null;
@@ -1373,22 +1374,25 @@ async function saveNewArticle() {
 function readGlobalSearchState() {
     const input = document.getElementById('global-search-input');
     const wholeWord = document.getElementById('global-search-whole-word');
+    const prefixOnly = document.getElementById('global-search-prefix');
     const caseSensitive = document.getElementById('global-search-case-sensitive');
     globalSearchState = {
         query: String(input?.value || '').trim(),
         wholeWord: !!wholeWord?.checked,
+        prefixOnly: !!prefixOnly?.checked,
         caseSensitive: !!caseSensitive?.checked
     };
     return { ...globalSearchState };
 }
 
 function getGlobalSearchMatches(value, options) {
-    return findSearchMatches(
+    const matches = findSearchMatches(
         String(value ?? ''),
         String(options?.query || ''),
         !!options?.wholeWord,
         !!options?.caseSensitive
     );
+    return options?.prefixOnly ? matches.filter(match => match.index === 0) : matches;
 }
 
 function highlightSearchHtml(value, options, className = 'search-highlight') {
