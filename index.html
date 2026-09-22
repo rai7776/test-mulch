@@ -29,8 +29,12 @@
             <div class="library-header">
                 <div id="breadcrumbs" class="breadcrumbs"></div>
                 <div class="library-actions">
-                    <button class="btn-sub" onclick="showGlobalVocabulary()">Vocabulary</button>
-                    <button class="btn-sub" onclick="showGlobalProblems()">Problems</button>
+                    <nav class="library-primary-tabs" aria-label="メインセクション">
+                        <button type="button" class="library-primary-tab is-active" aria-current="page" onclick="showLibrary()">Library</button>
+                        <button type="button" class="library-primary-tab" onclick="showGlobalVocabulary()">Vocabulary</button>
+                        <button type="button" class="library-primary-tab study-center-entry-button">Study</button>
+                        <button type="button" class="library-primary-tab" onclick="showGlobalProblems()">Problems</button>
+                    </nav>
                     <div class="library-search-control">
                         <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
                         <button type="button" id="global-search-clear-btn" onclick="clearGlobalSearch()" aria-label="検索をクリア">×</button>
