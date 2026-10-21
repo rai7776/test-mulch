@@ -674,6 +674,8 @@
             word.memorized = manualMasteredBeforeAnswer && result !== 'wrong'
                 ? true
                 : study.level >= 4;
+            // SRS grades the whole word; reflect whole-word mastery in Chinese sub-targets.
+            window.SmartReaderChinese?.mirrorMastery(word, entry.article);
             promoted = study.level > previousLevel;
             demoted = study.level < previousLevel;
         } else {
