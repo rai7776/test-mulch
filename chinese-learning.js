@@ -10,7 +10,7 @@
 
     function language(article, state) {
         const workspace = state || (typeof window !== 'undefined' ? window.SmartReaderWorkspaceState : null);
-        return String(article?.language || workspace?.activeWorkspace?.contentLanguage || 'en').toLowerCase();
+        return String(workspace?.activeWorkspace?.kind === 'language' ? workspace.activeWorkspace.contentLanguage : 'en').toLowerCase();
     }
     function isChinese(article, state) {
         return /^zh(?:-|$)/.test(language(article, state));
@@ -39,6 +39,8 @@
         word.annotations = annotations;
         if (word.study?.chinese) {
             const learned = learning(word);
+            if (reading(previousWord) !== input) learned.pinyin = false;
+            word.study.chinese = learned;
             word.memorized = !!learned.meaning && (!input || !!learned.pinyin);
         }
         return word;
