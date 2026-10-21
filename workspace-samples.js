@@ -8,6 +8,16 @@
     'use strict';
 
     const SAMPLE_KEY = 'chinese-mandarin-intro-v1';
+    const INITIALIZED_SUFFIX = ':mandarin-sample-initialized-v1';
+    const LEGACY_ARCHIVE_SUFFIX = ':legacy-english-samples-backup-v1';
+
+    function initializedKey(workspace) {
+        return 'workspace:' + String(workspace.id) + INITIALIZED_SUFFIX;
+    }
+
+    function legacyArchiveKey(workspace) {
+        return 'workspace:' + String(workspace.id) + LEGACY_ARCHIVE_SUFFIX;
+    }
 
     function isChineseWorkspace(workspace) {
         return workspace?.kind === 'language'
@@ -96,8 +106,77 @@
         // Only new, empty Workspace libraries are seeded. Existing data is never replaced.
         if (existing !== null && (!Array.isArray(existing) || existing.length > 0)) return false;
         await database.setItem(key, createChineseSample(workspace));
+        await database.setItem(initializedKey(workspace), true);
         return true;
     }
 
-    return Object.freeze({ SAMPLE_KEY, isChineseWorkspace, createChineseSample, hasChineseSample, seedNewChineseWorkspace });
+    // Recognize only the known, unmodified stock article text, never arbitrary English
+    // articles or a user's content. Extra learning data on a stock article is retained
+    // in the full backup before the item is hidden from this Workspace.
+    function isStockArticle(item, stockItems) {
+        if (!item || item.type !== 'article' || !Array.isArray(stockItems)) return false;
+        const original = stockItems.find(sample =>
+            sample?.type === 'article' && String(sample.id) === String(item.id));
+        return !!original
+            && item.name === original.name
+            && item.content === original.content
+            && String(item.parentId) === String(original.parentId);
+    }
+
+    function isStockFolder(item, stockItems) {
+        if (!item || item.type !== 'folder' || !Array.isArray(stockItems)) return false;
+        return stockItems.some(original => original?.type === 'folder'
+            && String(original.id) === String(item.id)
+            && original.name === item.name
+            && String(original.parentId) === String(item.parentId));
+    }
+
+    function stripLegacyEnglishSamples(items, stockItems) {
+        const original = Array.isArray(items) ? items : [];
+        const removedArticles = original.filter(item => isStockArticle(item, stockItems));
+        const remaining = original.filter(item => !removedArticles.includes(item));
+        const removedFolders = remaining.filter(item => isStockFolder(item, stockItems)
+            && !remaining.some(child => String(child.parentId) === String(item.id)));
+        return {
+            kept: remaining.filter(item => !removedFolders.includes(item)),
+            removed: [...removedArticles, ...removedFolders]
+        };
+    }
+
+    // One-time repair for Workspaces created before sample auto-seeding existed.
+    // Only the active Chinese Workspace is repaired; other Workspaces are untouched.
+    // The marker prevents deleted Chinese samples from reappearing on every launch.
+    async function repairActiveChineseWorkspace(database, workspace, stockItems = []) {
+        if (!isChineseWorkspace(workspace) || workspace.setupPending) return null;
+        if (!database || typeof database.getItem !== 'function' || typeof database.setItem !== 'function') {
+            throw new TypeError('Chinese Workspace repair needs a storage adapter.');
+        }
+        const stored = await database.getItem('library_items');
+        if (stored !== null && !Array.isArray(stored)) return null;
+        const original = Array.isArray(stored) ? stored : [];
+        const { kept, removed } = stripLegacyEnglishSamples(original, stockItems);
+        const wasInitialized = await database.getItem(initializedKey(workspace)) === true;
+        const shouldSeed = !wasInitialized && !hasChineseSample(kept)
+            && (kept.length === 0 || removed.length > 0);
+        const next = shouldSeed ? [...kept, ...createChineseSample(workspace)] : kept;
+
+        if (removed.length > 0) {
+            // Archive the entire previous library, including user annotations and notes.
+            // Never overwrite an earlier repair backup.
+            if (await database.getItem(legacyArchiveKey(workspace)) === null) {
+                await database.setItem(legacyArchiveKey(workspace), original);
+            }
+        }
+        if (removed.length > 0 || shouldSeed) {
+            await database.setItem('library_items', next);
+        }
+        if (!wasInitialized) await database.setItem(initializedKey(workspace), true);
+        return next;
+    }
+
+    return Object.freeze({
+        SAMPLE_KEY, isChineseWorkspace, createChineseSample, hasChineseSample,
+        seedNewChineseWorkspace, stripLegacyEnglishSamples, repairActiveChineseWorkspace,
+        initializedKey, legacyArchiveKey
+    });
 });
