@@ -6,6 +6,8 @@
     <title>英読 - Smart Reader</title>
     <link rel="stylesheet" href="style.css?v=1.4">
     <link rel="stylesheet" href="study-center.css?v=10">
+    <link rel="stylesheet" href="workspace-ui.css?v=1">
+    <link rel="stylesheet" href="chinese-learning.css?v=1">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
@@ -296,6 +298,9 @@
             </div>
 
             <div id="text-display" onclick="handleReaderClick(event)" onkeydown="handleReaderKeydown(event)"></div>
+            <div id="chinese-reader-options" hidden>
+                <label><input id="chinese-reader-pinyin-visible" type="checkbox" checked onchange="setChinesePinyinVisibility(this.checked)"> 拼音を表示する</label>
+            </div>
 
         <div id="reading-status-bar">
             <div class="reading-status-main">
@@ -392,7 +397,15 @@
             <form onsubmit="handleUnifiedSave(event)">
                 <div id="form-word-section">
                     <label>単語 / フレーズ</label>
-                    <input type="text" id="input-word-text" required>
+                    <input type="text" id="input-word-text" required oninput="SmartReaderChinese.wordTextChanged()">
+                    <div id="chinese-word-field" hidden>
+                        <label for="input-word-pinyin">拼音（ピンイン）</label>
+                        <div class="chinese-pinyin-input-row">
+                            <input type="text" id="input-word-pinyin" placeholder="例: xuéxí" autocomplete="off">
+                            <button type="button" class="small-btn" onclick="SmartReaderChinese.regenerate()">自動生成</button>
+                        </div>
+                        <small>中国語Workspaceでのみ表示されます。声調を含めて編集できます。</small>
+                    </div>
                     <label for="input-word-surface-text">本文での表現（surfaceText）</label>
                     <input type="text" id="input-word-surface-text" placeholder="本文中に実際に出現した表現">
                     <label for="input-word-part-of-speech">品詞</label>
@@ -522,7 +535,13 @@
 
     <script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="importers.js?v=1.1"></script>
-    <script src="app.js?v=4.3"></script>
+    <script src="workspace-core.js?v=1"></script>
+    <script src="https://unpkg.com/pinyin-pro@3.29.4/dist/index.js"></script>
+    <script src="chinese-learning.js?v=1"></script>
+    <script src="app.js?v=4.4"></script>
+    <script src="workspace-ui.js?v=1"></script>
+    <script src="speech-language-core.js?v=1"></script>
+    <script src="speech-language-adapter.js?v=1"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
     <script src="bulk-import.js?v=2.0"></script>
     <script src="bulk-import-mobile-fix.js?v=1.0"></script>
