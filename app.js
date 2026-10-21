@@ -2357,6 +2357,13 @@ function renderList(type, filter = '') {
         } else {
             renderQuestionCard(card, item, sourceIndex, filter);
         }
+        if (type === 'words') {
+            window.SmartReaderChinese?.attachStudyControls(card, item, currentArticle, async (target, learned) => {
+                window.SmartReaderChinese.setLearning(item, target, learned, currentArticle);
+                await saveToDB();
+                renderList('words', document.getElementById('list-search')?.value || '');
+            });
+        }
         container.appendChild(card);
     });
 }
@@ -2413,6 +2420,7 @@ async function handleUnifiedSave(e) {
                     currentArticle.words = currentArticle.words.map((i, index) => {
                         if (index !== editIndex) return i;
                         const updated = Object.assign({}, i, values);
+                        applyChineseWordForm(updated, i, currentArticle);
                         if ((updated.chapterId === undefined || updated.chapterId === null) && activeChapterId) {
                             updated.chapterId = activeChapterId;
                         }
@@ -2421,6 +2429,7 @@ async function handleUnifiedSave(e) {
                 }
             } else {
                 const word = Object.assign({ id: Date.now(), memorized: false, createdAt: Date.now() }, values);
+                applyChineseWordForm(word, null, currentArticle);
                 if (activeChapterId) word.chapterId = activeChapterId;
                 if (selectedReaderCapture?.anchor && selectedText === selectedReaderCapture.anchor.selectedText) {
                     word.anchor = selectedReaderCapture.anchor;
@@ -2507,6 +2516,7 @@ function editItem(id, type, sourceIndex = null) {
         setQuestionFormValues(item);
     }
     showUnifiedModal();
+    if (type === 'word') window.SmartReaderChinese?.syncEditor(currentArticle, item);
 }
 
 // --- ＋ボタンを押した時にモーダルを新規状態で開く ---
@@ -2545,6 +2555,7 @@ function openUnifiedModal() {
 
     // モーダルを表示
     showUnifiedModal();
+    window.SmartReaderChinese?.syncEditor(currentArticle, null);
 }
 
 
@@ -2966,6 +2977,7 @@ async function toggleMemorized(id, e, sourceIndex = null) {
     if (!w) return;
     const readingPosition = rememberReadingPosition();
     w.memorized = !w.memorized;
+    window.SmartReaderChinese?.mirrorMastery(w, currentArticle);
     await saveToDB();
     renderList('words', document.getElementById('list-search').value);
     restoreReadingPosition(readingPosition);
@@ -3692,6 +3704,14 @@ function getVocabularyWordRuntimeMetadata(word) {
     };
 }
 
+function applyChineseWordForm(word, previousWord = null, article = currentArticle) {
+    const chinese = window.SmartReaderChinese;
+    if (chinese?.isChinese(article)) {
+        chinese.applyReading(word, previousWord, article, document.getElementById('input-word-pinyin')?.value || '');
+    }
+    return word;
+}
+
 function getVocabularyFormValues() {
     const canonical = String(document.getElementById('input-word-text')?.value || '').trim();
     const enteredSurfaceText = String(document.getElementById('input-word-surface-text')?.value || '').trim();
@@ -4403,16 +4423,21 @@ async function toggleGlobalMemorized(key, event) {
     const source = getGlobalEntrySource(entry);
     if (!source) return;
     source.word.memorized = !source.word.memorized;
+    window.SmartReaderChinese?.mirrorMastery(source.word, source.article);
     await saveToDB();
     globalVocabularyState.entries = collectGlobalVocabulary();
     renderGlobalVocabulary();
 }
 
 async function setGlobalGroupMemorized(groupKey, memorized) {
-    const entries = globalVocabularyState.entries.filter(entry => normalizeVocabularyWord(entry.wordText) === groupKey);
+    const entries = globalVocabularyState.entries.filter(entry =>
+        (window.SmartReaderChinese?.groupKey(entry.word) || normalizeVocabularyWord(entry.wordText)) === groupKey);
     entries.forEach(entry => {
         const source = getGlobalEntrySource(entry);
-        if (source) source.word.memorized = memorized;
+        if (source) {
+            source.word.memorized = memorized;
+            window.SmartReaderChinese?.mirrorMastery(source.word, source.article);
+        }
     });
     await saveToDB();
     globalVocabularyState.entries = collectGlobalVocabulary();
@@ -4439,6 +4464,7 @@ function openGlobalVocabularyWordEditor(key) {
     document.getElementById('input-word-memo').value = source.word.memo || '';
     document.getElementById('input-word-context').value = source.word.context || '';
     showUnifiedModal();
+    window.SmartReaderChinese?.syncEditor(source.article, source.word);
 }
 
 async function saveGlobalVocabularyWordFromModal() {
@@ -4457,7 +4483,9 @@ async function saveGlobalVocabularyWordFromModal() {
         return;
     }
 
-    article.words[wordIndex] = Object.assign({}, oldWord, getVocabularyFormValues(), { updatedAt: Date.now() });
+    const updatedWord = Object.assign({}, oldWord, getVocabularyFormValues(), { updatedAt: Date.now() });
+    applyChineseWordForm(updatedWord, oldWord, article);
+    article.words[wordIndex] = updatedWord;
     await saveToDB();
     closeModal();
     globalVocabularyState.entries = collectGlobalVocabulary();
