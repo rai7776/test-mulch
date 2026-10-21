@@ -157,7 +157,8 @@ async function init() {
     if (workspaceState?.activeWorkspace && window.SmartReaderWorkspaceSamples?.repairActiveChineseWorkspace) {
         try {
             const repaired = await window.SmartReaderWorkspaceSamples.repairActiveChineseWorkspace(
-                db, workspaceState.activeWorkspace, SAMPLE_DATA
+                db, workspaceState.activeWorkspace,
+                [...SAMPLE_DATA, ...(window.SmartReaderSampleDataV2?.data || [])]
             );
             if (Array.isArray(repaired)) libraryItems = repaired;
         } catch (error) {
@@ -1200,6 +1201,7 @@ async function readPDF(file) {
 
 // --- 本棚・ライブラリ管理 (参考サイトのカードデザイン再現) ---
 function showLibrary() {
+    window.SmartReaderChinese?.stopSentenceAudio();
     flushReadingPositionSave();
     hideAllSections();
     document.getElementById('side-panel')?.classList.remove('is-open');
@@ -1886,6 +1888,7 @@ function renderQuestionMarkerText(selected, question, chapterId, questionIndex =
 }
 
 function renderArticleText() {
+    window.SmartReaderChinese?.stopSentenceAudio();
     if(!currentArticle) return;
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');

@@ -102,6 +102,7 @@
         }
         const key = initialSetup ? 'library_items' : workspace.libraryKey;
         if (!key) throw new Error('Missing Workspace library key');
+        if (await database.getItem(initializedKey(workspace)) === true) return false;
         const existing = await database.getItem(key);
         // Only new, empty Workspace libraries are seeded. Existing data is never replaced.
         if (existing !== null && (!Array.isArray(existing) || existing.length > 0)) return false;
@@ -110,25 +111,26 @@
         return true;
     }
 
-    // Recognize only the known, unmodified stock article text, never arbitrary English
-    // articles or a user's content. Extra learning data on a stock article is retained
-    // in the full backup before the item is hidden from this Workspace.
+    // Compare whole records, including vocabulary, notes and learning history.
+    // Unknown fields are conservatively treated as user changes.
+    function sameStockValue(value, original) {
+        if (value === original) return true;
+        if (!value || !original || typeof value !== 'object' || typeof original !== 'object') return false;
+        if (Array.isArray(value) !== Array.isArray(original)) return false;
+        const keys = Object.keys(value).sort();
+        const originalKeys = Object.keys(original).sort();
+        return keys.length === originalKeys.length
+            && keys.every((key, index) => key === originalKeys[index] && sameStockValue(value[key], original[key]));
+    }
+
     function isStockArticle(item, stockItems) {
         if (!item || item.type !== 'article' || !Array.isArray(stockItems)) return false;
-        const original = stockItems.find(sample =>
-            sample?.type === 'article' && String(sample.id) === String(item.id));
-        return !!original
-            && item.name === original.name
-            && item.content === original.content
-            && String(item.parentId) === String(original.parentId);
+        return stockItems.some(sample => sample?.type === 'article' && sameStockValue(item, sample));
     }
 
     function isStockFolder(item, stockItems) {
         if (!item || item.type !== 'folder' || !Array.isArray(stockItems)) return false;
-        return stockItems.some(original => original?.type === 'folder'
-            && String(original.id) === String(item.id)
-            && original.name === item.name
-            && String(original.parentId) === String(item.parentId));
+        return stockItems.some(original => original?.type === 'folder' && sameStockValue(item, original));
     }
 
     function stripLegacyEnglishSamples(items, stockItems) {

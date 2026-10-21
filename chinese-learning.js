@@ -7,6 +7,68 @@
     'use strict';
 
     const PINYIN = 'pinyin';
+    let activeSpeech = null;
+
+    function splitSentences(text) {
+        const value = String(text || '');
+        const parts = typeof Intl?.Segmenter === 'function'
+            ? [...new Intl.Segmenter('zh', { granularity: 'sentence' }).segment(value)]
+                .map(part => ({ text: part.segment, start: part.index }))
+            : [...value.matchAll(/[^。！？!?]+[。！？!?]+[”’」』】）)]*|[^。！？!?]+$/gu)]
+                .map(match => ({ text: match[0], start: match.index }));
+        return parts.filter(part => part.text.trim()).map(part => ({
+            ...part, end: part.start + part.text.length
+        }));
+    }
+
+    function characterReadings(text, engine) {
+        const api = engine || (typeof window !== 'undefined' ? window.pinyinPro : null);
+        const readings = new Map();
+        if (!api?.pinyin) return readings;
+        // Generate whole Han runs to retain phrase context across highlight spans.
+        for (const match of String(text).matchAll(/\p{Script=Han}+/gu)) {
+            try {
+                const values = api.pinyin(match[0], { toneType: 'symbol', type: 'array' });
+                const chars = Array.from(match[0]);
+                if (!Array.isArray(values) || values.length !== chars.length) continue;
+                let offset = match.index;
+                chars.forEach((char, index) => { readings.set(offset, String(values[index])); offset += char.length; });
+            } catch (_) { /* Text and audio remain usable without the generator. */ }
+        }
+        return readings;
+    }
+
+    function stopSentenceAudio() {
+        if (!activeSpeech) return;
+        const previous = activeSpeech;
+        activeSpeech = null;
+        previous.button?.setAttribute('aria-pressed', 'false');
+        previous.synthesis.cancel();
+    }
+
+    function playSentence(text, button) {
+        if (typeof window === 'undefined' || !isChinese()) return false;
+        const synthesis = window.speechSynthesis;
+        if (!synthesis || !window.SpeechSynthesisUtterance) return false;
+        const sameButton = activeSpeech?.button === button;
+        stopSentenceAudio();
+        if (sameButton) return true;
+        synthesis.cancel();
+        const utterance = new window.SpeechSynthesisUtterance(String(text).trim());
+        utterance.lang = window.SmartReaderSpeechLanguage?.speechLocaleFromState(window.SmartReaderWorkspaceState) || 'zh-CN';
+        const speech = { synthesis, button, utterance };
+        activeSpeech = speech;
+        button?.setAttribute('aria-pressed', 'true');
+        const done = () => {
+            if (activeSpeech !== speech) return;
+            button?.setAttribute('aria-pressed', 'false');
+            activeSpeech = null;
+        };
+        utterance.onend = done;
+        utterance.onerror = done;
+        try { synthesis.speak(utterance); } catch (_) { done(); return false; }
+        return true;
+    }
 
     function language(article, state) {
         const workspace = state || (typeof window !== 'undefined' ? window.SmartReaderWorkspaceState : null);
@@ -133,12 +195,56 @@
         if (!display) return;
         const enabled = isChinese(article);
         display.classList.toggle('chinese-pinyin-visible', enabled && visible !== false);
-        const words = Array.isArray(article?.words) ? article.words : [];
-        display.querySelectorAll('.word-highlight[data-word-index]').forEach(element => {
-            const index = Number(element.dataset.wordIndex);
-            const value = enabled && Number.isInteger(index) ? reading(words[index]) : '';
-            if (value) element.dataset.pinyin = value;
-            else element.removeAttribute('data-pinyin');
+        if (!enabled) return;
+        const doc = display.ownerDocument;
+        display.querySelectorAll('p[data-paragraph-index]').forEach(paragraph => {
+            if (paragraph.dataset.chineseDecorated) return;
+            const walker = doc.createTreeWalker(paragraph, 4);
+            const nodes = [];
+            while (walker.nextNode()) {
+                if (!walker.currentNode.parentElement.closest('button, .chinese-character')) nodes.push(walker.currentNode);
+            }
+            const text = nodes.map(node => node.nodeValue).join('');
+            const readings = characterReadings(text);
+            const endings = new Map(splitSentences(text).map(sentence => [sentence.end, sentence.text]));
+            let offset = 0;
+            nodes.forEach(node => {
+                const fragment = doc.createDocumentFragment();
+                const wordElement = node.parentElement.closest('.word-highlight[data-word-index]');
+                const word = article?.words?.[Number(wordElement?.dataset.wordIndex)];
+                const manual = reading(word).split(/\s+/).filter(Boolean);
+                const chars = Array.from(node.nodeValue);
+                const override = wordElement && wordElement.textContent === node.nodeValue
+                    && manual.length === chars.length;
+                chars.forEach((char, index) => {
+                    const pinyin = override ? manual[index] : readings.get(offset);
+                    if (pinyin && /\p{Script=Han}/u.test(char)) {
+                        const span = doc.createElement('span');
+                        span.className = 'chinese-character';
+                        span.dataset.pinyin = pinyin;
+                        span.textContent = char;
+                        fragment.appendChild(span);
+                    } else fragment.appendChild(doc.createTextNode(char));
+                    offset += char.length;
+                    if (endings.has(offset)) {
+                        const sentence = endings.get(offset);
+                        const button = doc.createElement('button');
+                        button.type = 'button';
+                        button.className = 'chinese-sentence-audio';
+                        button.setAttribute('aria-label', 'この文を再生: ' + sentence.trim());
+                        button.setAttribute('aria-pressed', 'false');
+                        button.title = 'この文を再生／停止';
+                        button.disabled = !window.speechSynthesis || !window.SpeechSynthesisUtterance;
+                        button.addEventListener('click', event => {
+                            event.stopPropagation();
+                            playSentence(sentence, button);
+                        });
+                        fragment.appendChild(button);
+                    }
+                });
+                node.replaceWith(fragment);
+            });
+            paragraph.dataset.chineseDecorated = 'true';
         });
     }
     function attachStudyControls(card, word, article, onChange) {
@@ -175,6 +281,7 @@
         language, isChinese, reading, generate, applyReading, learning,
         setLearning, setAllLearning, mirrorMastery, countWords, groupKey,
         syncEditor, wordTextChanged, regenerate, syncReaderControls,
-        decorateReader, attachStudyControls
+        decorateReader, attachStudyControls, splitSentences, characterReadings,
+        playSentence, stopSentenceAudio
     });
 });

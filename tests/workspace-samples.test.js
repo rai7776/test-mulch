@@ -161,3 +161,26 @@ test('stock English cleanup never hides a different article with the same ID', a
     const updated = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
     assert.ok(updated.includes(userArticle));
 });
+
+test('editing stock vocabulary, notes, history or metadata preserves the whole article', async () => {
+    for (const edit of [
+        item => { item.words[0].memorized = false; },
+        item => { item.words[0].meaning = '私の訳'; },
+        item => { item.notes = [{ extra: '私のノート' }]; },
+        item => { item.bookmarks = [{ pIndex: 1 }]; },
+        item => { item.customData = 'preserve'; }
+    ]) {
+        const item = structuredClone(stockEnglish[1]);
+        edit(item);
+        const db = store({ library_items: [item] });
+        const result = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+        assert.ok(result.includes(item));
+        assert.equal(db.map.has(samples.legacyArchiveKey(chinese)), false);
+    }
+});
+
+test('stock versions sharing IDs are each recognized without losing edits', () => {
+    const newer = { ...stockEnglish[1], name: 'New stock guide', words: [] };
+    assert.equal(samples.stripLegacyEnglishSamples([structuredClone(newer)], [...stockEnglish, newer]).removed.length, 1);
+    assert.equal(samples.stripLegacyEnglishSamples([{ ...newer, notes: ['user'] }], [...stockEnglish, newer]).removed.length, 0);
+});

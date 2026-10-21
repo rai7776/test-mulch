@@ -81,3 +81,51 @@ test('automatic reading generator degrades without CDN, accepts an injected engi
     assert.equal(chinese.generate('学习', {}), '');
     assert.equal(chinese.generate('学习', { pinyin: () => 'xué xí' }), 'xué xí');
 });
+
+test('full text readings retain phrase context and UTF-16 offsets', () => {
+    const calls = [];
+    const map = chinese.characterReadings('📚我学习。ABC中文', { pinyin(text, options) {
+        calls.push(text);
+        assert.equal(options.type, 'array');
+        return text === '我学习' ? ['wǒ', 'xué', 'xí'] : ['zhōng', 'wén'];
+    } });
+    assert.deepEqual(calls, ['我学习', '中文']);
+    assert.equal(map.get(2), 'wǒ');
+    assert.equal(map.get(4), 'xí');
+    assert.equal(map.get(9), 'zhōng');
+    assert.equal(chinese.characterReadings('中文', {}).size, 0);
+});
+
+test('sentence segmentation covers the complete text without changing offsets', () => {
+    const text = '你好！“我喜欢中文。”\n今天去图书馆。最后一句';
+    const sentences = chinese.splitSentences(text);
+    assert.equal(sentences.map(part => part.text).join(''), text);
+    assert.ok(sentences.length >= 3);
+    for (const part of sentences) assert.equal(text.slice(part.start, part.end), part.text);
+});
+
+test('sentence audio uses Chinese locale and stops the active sentence', () => {
+    const previous = global.window;
+    const spoken = [];
+    const button = { setAttribute(name, value) { this[name] = value; } };
+    let cancelled = 0;
+    global.window = { SmartReaderWorkspaceState: chineseState,
+        speechSynthesis: { cancel() { cancelled++; }, speak(value) { spoken.push(value); } },
+        SpeechSynthesisUtterance: class { constructor(text) { this.text = text; } }
+    };
+    try {
+        assert.equal(chinese.playSentence('你好。', button), true);
+        assert.equal(spoken[0].text, '你好。');
+        assert.equal(spoken[0].lang, 'zh-CN');
+        assert.equal(button['aria-pressed'], 'true');
+        chinese.playSentence('你好。', button);
+        assert.equal(spoken.length, 1);
+        assert.equal(button['aria-pressed'], 'false');
+        assert.equal(cancelled, 2);
+        global.window.SmartReaderWorkspaceState = englishState;
+        assert.equal(chinese.playSentence('hello', button), false);
+    } finally {
+        chinese.stopSentenceAudio();
+        if (previous === undefined) delete global.window; else global.window = previous;
+    }
+});

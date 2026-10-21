@@ -44,25 +44,9 @@
     }
 
     async function runWorkspaceAwareAppInit(previousOnload, event, workspaceState) {
-        const active = workspaceState?.activeWorkspace;
-        const isNewWorkspace = !!active && !active.migratedFromLegacy;
-        if (!isNewWorkspace) {
-            const result = previousOnload.call(window, event);
-            if (result && typeof result.then === 'function') await result;
-            return;
-        }
-
-        // app.js normally injects the English tutorial whenever library_items is empty.
-        // New non-legacy workspaces should start truly empty instead.
-        libraryItems = await db.getItem('library_items') || [];
-        const savedSet = await db.getItem('reader_settings');
-        if (savedSet) {
-            readerSettings = savedSet;
-            applySettings();
-        }
-        showLibrary();
-        renderList('words');
-        setupEventListeners();
+        // init now owns Workspace-aware seeding and repair for every Workspace.
+        const result = previousOnload.call(window, event);
+        if (result && typeof result.then === 'function') await result;
     }
 
     const workspaceReady = loadScriptPromise(
@@ -164,7 +148,7 @@
     loadScript('note-structure-ui-core.js?v=1.5', 'note-structure-ui-core-loader');
     // relation data is retained for a future arrow renderer.
     loadScript('note-structure-editor.js?v=4', 'note-structure-editor-loader');
-    loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
+    // Loaded before app.js so Chinese repair can recognize both sample versions.
     loadScript('global-vocab-card-display.js?v=1', 'global-vocab-card-display-loader');
     loadScript('folder-study-range.js?v=1', 'folder-study-range-loader');
     loadScript('flashcard-auto-audio.js?v=1', 'flashcard-auto-audio-loader');
