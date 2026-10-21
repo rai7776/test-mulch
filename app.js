@@ -141,11 +141,21 @@ let readerScrollLockState = null;
 
 // --- 初期化関数 (1つに統合) ---
 async function init() {
+    let workspaceState = null;
+    if (window.SmartReaderWorkspace?.readWorkspaceState) {
+        try {
+            workspaceState = await window.SmartReaderWorkspace.readWorkspaceState(db);
+            window.SmartReaderWorkspaceState = workspaceState;
+        } catch (error) {
+            console.error('Workspace initialization failed; existing data was not modified.', error);
+            return;
+        }
+    }
     // DBからデータを取得
     libraryItems = await db.getItem('library_items') || [];
 
     // データが空ならサンプルを投入
-    if (libraryItems.length === 0) {
+    if (libraryItems.length === 0 && !workspaceState) {
         libraryItems = SAMPLE_DATA; // SAMPLE_DATAが定義されている前提
         await db.setItem('library_items', libraryItems);
     }
@@ -159,6 +169,7 @@ async function init() {
     showLibrary(); 
     renderList('words');
     setupEventListeners(); // リスナー設定を呼び出す
+    if (workspaceState) window.dispatchEvent(new CustomEvent('smartreader:workspace-ready', { detail: workspaceState }));
 }
 
 // --- イベントリスナー設定 ---
@@ -1908,7 +1919,19 @@ function renderArticleText() {
     });
 
     display.innerHTML = html;
+    const showPinyin = readerSettings.annotationVisibility?.pinyin !== false;
+    window.SmartReaderChinese?.decorateReader(display, currentArticle, showPinyin);
+    window.SmartReaderChinese?.syncReaderControls(currentArticle, showPinyin);
     updateProgress(null, true);
+}
+
+function setChinesePinyinVisibility(visible) {
+    if (!readerSettings.annotationVisibility || typeof readerSettings.annotationVisibility !== 'object') {
+        readerSettings.annotationVisibility = {};
+    }
+    readerSettings.annotationVisibility.pinyin = !!visible;
+    void db.setItem('reader_settings', readerSettings);
+    window.SmartReaderChinese?.decorateReader(document.getElementById('text-display'), currentArticle, visible);
 }
 
 function hasActiveReaderTextSelection() {
@@ -2842,9 +2865,10 @@ function getReaderWordCounts(article = currentArticle) {
     const bookChars = hasStoredChapters(article)
         ? getArticleChapters(article).reduce((sum, chapter) => sum + String(chapter.content || '').length, 0)
         : bookText.length;
+    const wordCount = text => window.SmartReaderChinese?.countWords(text, article) ?? countEnglishWords(text);
     return {
-        chapter: countEnglishWords(chapterText),
-        book: countEnglishWords(bookText),
+        chapter: wordCount(chapterText),
+        book: wordCount(bookText),
         chapterChars: chapterText.length,
         bookChars
     };
@@ -2946,7 +2970,7 @@ async function toggleMemorized(id, e, sourceIndex = null) {
     renderList('words', document.getElementById('list-search').value);
     restoreReadingPosition(readingPosition);
 }
-function speakWord(t) { if ('speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; speechSynthesis.speak(u); } }
+function speakWord(t) { if ('speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = window.SmartReaderSpeechLanguage?.speechLocaleFromState(window.SmartReaderWorkspaceState) || 'en-US'; speechSynthesis.speak(u); } }
 function applySettings() { document.documentElement.style.setProperty('--reader-font-size', readerSettings.fontSize+'px'); document.documentElement.style.setProperty('--reader-line-height', readerSettings.lineHeight); }
 function renderSettingsUI(c) { c.innerHTML = `<div class="settings-group"><p>文字: ${readerSettings.fontSize}px</p><input type="range" min="14" max="30" value="${readerSettings.fontSize}" oninput="updateSetting('font', this.value)"><p>行間: ${readerSettings.lineHeight}</p><input type="range" min="1.2" max="2.5" step="0.1" value="${readerSettings.lineHeight}" oninput="updateSetting('line', this.value)"></div>`; }
 function updateSetting(t, v) { if (t==='font') readerSettings.fontSize=v; else readerSettings.lineHeight=v; applySettings(); db.setItem('reader_settings', readerSettings); renderList('settings'); }
@@ -3431,7 +3455,19 @@ function updateSearchCount() {
 }
 
 function isSearchWordCharacter(char) {
-    return !!char && /[A-Za-z]/.test(char);
+    return !!char && /[\p{L}\p{M}\p{N}]/u.test(char);
+}
+
+function isWholeWordMatch(text, index, length) {
+    if (window.SmartReaderChinese?.isChinese() && typeof Intl.Segmenter === 'function') {
+        const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' });
+        for (const token of segmenter.segment(text)) {
+            if (token.isWordLike && token.index === index && token.segment.length === length) return true;
+            if (token.index > index) break;
+        }
+        return false;
+    }
+    return !isSearchWordCharacter(text[index - 1]) && !isSearchWordCharacter(text[index + length]);
 }
 
 function findSearchMatches(text, query, wholeWord, caseSensitive) {
@@ -3446,7 +3482,7 @@ function findSearchMatches(text, query, wholeWord, caseSensitive) {
         if (index === -1) break;
         const before = text[index - 1];
         const after = text[index + needle.length];
-        if (!wholeWord || (!isSearchWordCharacter(before) && !isSearchWordCharacter(after))) {
+        if (!wholeWord || isWholeWordMatch(text, index, needle.length)) {
             matches.push({ index, length: needle.length });
         }
         start = index + Math.max(needle.length, 1);
