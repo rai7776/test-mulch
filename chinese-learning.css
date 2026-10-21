@@ -63,3 +63,55 @@
 }
 .chinese-pinyin-visible .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
 .chinese-pinyin-visible .chinese-manual-reading .chinese-character::before { content:none; }
+
+/* Chinese Reader: typography and controls outside the reading area. */
+#text-display.chinese-reader {
+    font-weight:400; line-height:max(var(--reader-line-height), 2);
+    word-break:normal; overflow-wrap:break-word; line-break:strict;
+    padding:12px 22px 40px;
+}
+#text-display.chinese-reader p { margin:0.75em 0 1.15em; }
+#text-display.chinese-reader .chinese-character { min-width:1.35em; margin-top:0.75em; }
+#text-display.chinese-reader .chinese-character::before { font-size:0.46em; font-weight:400; color:#7a776f; }
+#text-display.chinese-reader .chinese-word-unit { display:inline-block; white-space:nowrap; border-radius:3px; }
+#text-display.chinese-reader .word-highlight { background-color:#d9eee9; }
+#text-display.chinese-reader .note-highlight { background:rgba(190,153,93,0.045); border-bottom:1px dotted #c6ad87; }
+#text-display.chinese-reader .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
+#text-display.chinese-reader .chinese-sentence-audio {
+    width:1.45em; min-width:32px; height:40px; margin:0 0.08em;
+    padding:0; border:0; border-radius:8px; background:transparent; color:#95806a;
+}
+#text-display.chinese-reader .chinese-sentence-audio:hover,
+#text-display.chinese-reader .chinese-sentence-audio[aria-pressed="true"] { background:#eee7dc; color:#765536; }
+.chinese-sentence-audio:focus-visible { outline:2px solid #a77e55; outline-offset:1px; }
+#reader-wrapper:has(.chinese-reader) #reader-search-bar { order:0; }
+#reader-wrapper:has(.chinese-reader) #chapter-navigation { order:1; }
+#reader-wrapper:has(.chinese-reader) #chinese-reader-options {
+    order:2; flex-shrink:0; margin:0; padding:6px 14px; gap:5px 10px;
+    border-bottom:1px solid #eee8df; background:#fdfbf7; color:#72675b; font-size:12px;
+}
+#reader-wrapper:has(.chinese-reader) #text-display { order:3; }
+#reader-wrapper:has(.chinese-reader) #reading-status-bar { order:4; }
+#chinese-reader-options label { margin:0; font-weight:400; white-space:nowrap; }
+#chinese-reader-options button, #chinese-reader-options select {
+    min-height:36px; margin:0; padding:5px 8px; border:1px solid #e4dbcf;
+    border-radius:8px; background:#fff; color:#72604f; box-shadow:none;
+}
+#chinese-reader-options input[type="checkbox"] { width:16px; height:16px; margin:0; accent-color:#7b958c; }
+#chinese-audio-status:empty { display:none; }
+@media (max-width:767px) {
+    #text-display.chinese-reader { padding:10px 16px 28px; }
+    #reader-wrapper:has(.chinese-reader) #chinese-reader-options { gap:4px 7px; padding:5px 12px; }
+    #reader-wrapper:has(.chinese-reader) #reading-status-bar { padding-bottom:60px; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #app-title, body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) .workspace-sample-button { display:none; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #add-btn, body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #fab-toggle, body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #bulk-add-btn {
+        position:fixed; bottom:max(8px, env(safe-area-inset-bottom)) !important;
+        width:42px; height:42px; border:1px solid #e4dbcf; border-radius:11px;
+        background:#fff; color:#806447; box-shadow:0 2px 6px rgba(68,50,30,0.07); font-size:20px;
+    }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #add-btn { right:114px; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #fab-toggle { right:64px; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #bulk-add-btn { right:14px !important; width:42px !important; height:42px !important; border-radius:11px !important; font-size:12px; }
+    #reader-wrapper:has(.chinese-reader) .reading-status-main { align-items:center; }
+    #reader-wrapper:has(.chinese-reader) #bookmark-btn { background:transparent; color:#806447; border:1px solid #e4dbcf; border-radius:7px; }
+}

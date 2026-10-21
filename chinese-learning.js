@@ -251,6 +251,7 @@
     function decorateReader(display, article, visible) {
         if (!display) return;
         const enabled = isChinese(article);
+        display.classList.toggle('chinese-reader', enabled);
         display.classList.toggle('chinese-pinyin-visible', enabled && visible !== false);
         if (!enabled) return;
         const doc = display.ownerDocument;
@@ -275,6 +276,7 @@
                 sourceOffset+=node.nodeValue.length;
             });
             wordRanges.forEach((range,element)=>{
+                if (Array.from(range.text).length <= 8) element.classList.add('chinese-word-unit');
                 const value=reading(article?.words?.[Number(element.dataset.wordIndex)]);
                 if(!value)return;
                 const syllables=value.split(/\s+/).filter(Boolean);
