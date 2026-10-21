@@ -2,13 +2,13 @@
 
 - **Status:** Target specification / Codex引き継ぎ用・実装前確認の規範
 - **作成:** 2026-10-21
-- **対象リポジトリ:** \`rai7776/test-mulch\`
-- **対象開発:** \`feature/chinese-reading-integration\` / [Draft PR #26](https://github.com/rai7776/test-mulch/pull/26)
-- **仕様の出発点:** [旧 Draft PR #1](https://github.com/rai7776/smart-reader-pages/pull/1) (\`feature/multilingual-foundation\`)
-- **参照必須:** \`AGENTS.md\`, \`HANDOFF.md\`, \`HANDOFF_LATEST.md\`
-- **原則:** 現行 \`test-mulch\` の Workspace/SRS/Library を正本とし、旧PRの機能的同等性を回復する。旧実装をそのまま上書き・全面移植しない。
+- **対象リポジトリ:** `rai7776/test-mulch`
+- **対象開発:** `feature/chinese-reading-integration` / [Draft PR #26](https://github.com/rai7776/test-mulch/pull/26)
+- **仕様の出発点:** [旧 Draft PR #1](https://github.com/rai7776/smart-reader-pages/pull/1) (`feature/multilingual-foundation`)
+- **参照必須:** `AGENTS.md`, `HANDOFF.md`, `HANDOFF_LATEST.md`
+- **原則:** 現行 `test-mulch` の Workspace/SRS/Library を正本とし、旧PRの機能的同等性を回復する。旧実装をそのまま上書き・全面移植しない。
 
-> この文書は**将来満たすべき仕様**。現在のPRがすべて実装済みだとは意味しない。機能の有無は毎回最新HEADと自動テスト・実ブラウザで確認すること。ユーザー承認なしに \`main\` / GitHub Pagesへ反映しない。
+> この文書は**将来満たすべき仕様**。現在のPRがすべて実装済みだとは意味しない。機能の有無は毎回最新HEADと自動テスト・実ブラウザで確認すること。ユーザー承認なしに `main` / GitHub Pagesへ反映しない。
 
 ## 1. プロダクトと設計上の確定事項
 
@@ -18,25 +18,25 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 
 **学習対象言語は記事ごとではなく、Workspaceごとに一つ設定する。**
 
-- \`Workspace.kind === "language"\` の場合、\`Workspace.contentLanguage\` が唯一の言語選択の正本。例：\`en\`、\`zh\`、\`ja\`。
-- \`Workspace.kind === "general"\` では中国語専用機能は出さない。
+- `Workspace.kind === "language"` の場合、`Workspace.contentLanguage` が唯一の言語選択の正本。例：`en`、`zh`、`ja`。
+- `Workspace.kind === "general"` では中国語専用機能は出さない。
 - Workspace切替・新規作成・復元・コピー・再読み込み後もこの規則を守る。
-- 記事に残っている旧 \`article.language\` は**レガシー互換のため保持可能だが言語判定には使用しない**。新たな「記事の言語を選ぶ」UIは作らない。
+- 記事に残っている旧 `article.language` は**レガシー互換のため保持可能だが言語判定には使用しない**。新たな「記事の言語を選ぶ」UIは作らない。
 - PDF/EPUB/HTML/TXTのImport Review/章編集でも別言語を選ばせない。必要なら現在のWorkspace言語を**読み取り専用表示**する。
-- UI表示言語と解説言語は独立（全体の \`globalSettings.explanationLanguage\`）。たとえば中国語Workspace＋日本語解説が通常ケース。
+- UI表示言語と解説言語は独立（全体の `globalSettings.explanationLanguage`）。たとえば中国語Workspace＋日本語解説が通常ケース。
 - 他Workspaceへ記事をコピーした場合、表示・TTS・分割処理は**コピー先Workspace**に合わせる。本文・notes・annotations等は安全にコピーし、学習済み状態・履歴・読書位置は既存仕様に従ってリセットする。
 
 ### 1.2 非破壊・既存構成の尊重
 
-- \`test-mulch/main\`・既存のGitHub Pages・Productionには未承認で変更しない。現段階は Draft PR/Preview のみ。
-- \`LocalForage: ProjectA_DB_v3\` と現在のキー、既存の \`library_items\` active slot、Workspaceごとのアーカイブ、Study履歴、バックアップ形式を壊さない。
-- 既存の \`word\`, \`meaning\`, \`memorized\`, \`study\`, \`annotations\` などのフィールドを一括改名・破棄しない。
+- `test-mulch/main`・既存のGitHub Pages・Productionには未承認で変更しない。現段階は Draft PR/Preview のみ。
+- `LocalForage: ProjectA_DB_v3` と現在のキー、既存の `library_items` active slot、Workspaceごとのアーカイブ、Study履歴、バックアップ形式を壊さない。
+- 既存の `word`, `meaning`, `memorized`, `study`, `annotations` などのフィールドを一括改名・破棄しない。
 - React等への全面書き換え、新しいバックエンド、クラウド同期、課金はこのPRの範囲外。
 - **開発前にAGENTS.mdのセーブポイント規則を確認**。旧PRと現行実装の差分をテストで可視化する。
 
 ## 2. 共通Language Profile基盤（P0）
 
-旧PRの \`LANGUAGE_PROFILES\` に相当する**汎用言語プロファイル**を現行コードへ統合する。
+旧PRの `LANGUAGE_PROFILES` に相当する**汎用言語プロファイル**を現行コードへ統合する。
 
 最低限、次を集中管理する設計：
 
@@ -49,11 +49,11 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 | word count label | words | 語 |
 | AI/訳向け学習言語 | 英語 | 中国語 |
 
-- **唯一の取得経路:** アクティブWorkspaceの\`contentLanguage\` → profile。中国語判定を各ファイルに文字列比較として散在させない。
-- \`zh\`、必要に応じて \`zh-CN\` を同一基本プロファイルとして解釈。将来の繁体字・地域差を無断で同一化しない。
+- **唯一の取得経路:** アクティブWorkspaceの`contentLanguage` → profile。中国語判定を各ファイルに文字列比較として散在させない。
+- `zh`、必要に応じて `zh-CN` を同一基本プロファイルとして解釈。将来の繁体字・地域差を無断で同一化しない。
 - 未対応言語でもアプリは落ちず、基本Reader/Library/Studyが利用可能。対応範囲を明示し、安易に英語固有処理を実行しない。
-- \`annotation definitions\` は言語ごとに拡張可能にし、将来の日本語の読み、韓国語の発音補助などを追加しても「中国語専用ifの大量コピー」にならない構造を目指す。
-- 現行 \`SmartReaderWorkspace\`、\`speech-language-core.js\`、\`speech-language-adapter.js\`、\`flashcard-study.js\` と**重複した言語判定・SRS実装を作らない**。
+- `annotation definitions` は言語ごとに拡張可能にし、将来の日本語の読み、韓国語の発音補助などを追加しても「中国語専用ifの大量コピー」にならない構造を目指す。
+- 現行 `SmartReaderWorkspace`、`speech-language-core.js`、`speech-language-adapter.js`、`flashcard-study.js` と**重複した言語判定・SRS実装を作らない**。
 
 ## 3. 拼音・アノテーション（P0）
 
@@ -63,10 +63,10 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 
 **単語・フレーズ → 拼音（声調記号付き） → 意味 → 既存の品詞・タグ・例文・メモ等**
 
-- \`pinyin-pro@3.29.4\` を固定し、単語入力時に拼音を自動生成。
+- `pinyin-pro@3.29.4` を固定し、単語入力時に拼音を自動生成。
 - 自動生成値は**自由に手動修正**可能。ユーザーが修正した後、単語編集・フォーム再描画・再読み込みで勝手に上書きしない。
 - 必要に応じて「自動生成し直す」明示ボタンを設置。
-- 拼音の保存は \`word.annotations[]\` に \`{id:"pinyin", category:"reading", system:"pinyin", display:"ruby", learnable:true, value:"..."}\` 相当。**他のannotation要素は維持**。
+- 拼音の保存は `word.annotations[]` に `{id:"pinyin", category:"reading", system:"pinyin", display:"ruby", learnable:true, value:"..."}` 相当。**他のannotation要素は維持**。
 - 多音字（例：「行」など）は文脈依存のため、登録済みの**手動読みを最優先**。辞書の単語読みと本文の文脈読みが異なる場合でも別々に扱える余地を残す。
 - 外部CDNが使えないときはUIを壊さず、手動入力を継続可能にする（読みが生成できなかった旨が分かる）。
 
@@ -91,21 +91,21 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 - **拼音✓ / 意味✓ → 全体習得済み**。
 - 拼音を学習対象とする単語に読みがない／生成失敗した場合、未習得を勝手に全体習得へ昇格させない。補完・手動入力できる導線を残す。
 - 読みを修正した場合は少なくとも**拼音側の習得状態のみ**を見直し、意味の習得は消さない。
-- 英語などannotationのないWorkspaceでは従来の単一 \`memorized\` 操作を維持。
+- 英語などannotationのないWorkspaceでは従来の単一 `memorized` 操作を維持。
 
 ### 4.2 既存SRSとの統合・互換性
 
-現行の \`flashcard-study.js\` は \`word.study\` 内にSRSのlevel、復習予定、成績、統計等を持つ。**これらを潰してはいけない。**
+現行の `flashcard-study.js` は `word.study` 内にSRSのlevel、復習予定、成績、統計等を持つ。**これらを潰してはいけない。**
 
 互換対象：
-1. 旧英語データ：\`word.memorized\` のみ
-2. 旧PR #1方式：\`study.meaning\` と \`study.annotations.pinyin\`
-3. 新PR #26方式：\`study.chinese.pinyin\` と \`study.chinese.meaning\`
-4. 既存SRS：\`study.level\` / \`nextReviewAt\` / \`seenCount\` 等
+1. 旧英語データ：`word.memorized` のみ
+2. 旧PR #1方式：`study.meaning` と `study.annotations.pinyin`
+3. 新PR #26方式：`study.chinese.pinyin` と `study.chinese.meaning`
+4. 既存SRS：`study.level` / `nextReviewAt` / `seenCount` 等
 
 要件：
 - 読込時に双方の形式を安全に正規化するadapter/migrationを定義し、**正本となる保存表現を一つ**決める。手動操作による習得状態がレガシー値やSRSから誤って上書きされない。
-- 既存学習履歴・スケジュールを保持。\`memorized\` は**全体習得を反映する互換フィールド**として同期。
+- 既存学習履歴・スケジュールを保持。`memorized` は**全体習得を反映する互換フィールド**として同期。
 - 全体を一括で「習得済み／未習得」と明示設定する操作では、関連する個別ターゲットも更新できる。
 - **通常のSRS採点が、片方だけ習得しているユーザーの個別フラグを無条件に両方✓へ上書きしない。** この点は現実装との差分として優先レビュー。必要ならStudy側で「拼音」「意味」の評価対象を分ける。暫定で既存の単語全体SRSを使う場合も意図をUIで明示し、判定はテストで固定する。
 - サイドパネルの単語帳、Global Vocabulary、Flashcard/Studyで習得状態の表示・更新が矛盾しない。
@@ -115,19 +115,19 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 
 旧PR #1に存在した機能を復元する。
 
-- **文ごとの🔊ボタン:** その文だけ読み上げ。中国語の文境界（\`。！？\`、引用符、改行等）を適切に認識。
+- **文ごとの🔊ボタン:** その文だけ読み上げ。中国語の文境界（`。！？`、引用符、改行等）を適切に認識。
 - **連続再生:** 記事/現在章の文を順に再生、現在文を視覚的に示して必要ならスクロール追従。
 - **停止:** 明示ボタンでいつでも中断。文再生・連続再生の競合、章切替・Workspace切替・画面を離れる時も安全に停止。
-- **再生速度:** \`0.7× / 0.85× / 1.0× / 1.2×\` の選択（旧PRと同じ）。設定の保存・再適用も確認。
-- **言語:** TTS localeはアクティブWorkspaceの \`contentLanguage\` に従う（中国語 \`zh-CN\`）。記事言語 \`article.language\` や \`en-US\` 固定を使わない。
+- **再生速度:** `0.7× / 0.85× / 1.0× / 1.2×` の選択（旧PRと同じ）。設定の保存・再適用も確認。
+- **言語:** TTS localeはアクティブWorkspaceの `contentLanguage` に従う（中国語 `zh-CN`）。記事言語 `article.language` や `en-US` 固定を使わない。
 - 端末が中国語TTSに対応していない場合は穏当なエラー・無効表示などで処理し、クラッシュやループしない。
 - 読上げテキストに拼音生成文字・🔊アイコンの文字列・検索UIが混ざらない。
 - モバイルで🔊が本文や単語選択を邪魔しない。読上げ速度・停止・連続再生は操作しやすいサイズで配置。
 
 ## 6. 検索・分割・計数（P0）
 
-- 中国語の語分割は利用可能なら \`Intl.Segmenter('zh-CN',{granularity:'word'})\`、非対応ブラウザでは明示的なfallbackを持つ。
-- 文分割は \`。！？\` と \`.!?\` を扱う。引用符・空白などで文を壊さない。
+- 中国語の語分割は利用可能なら `Intl.Segmenter('zh-CN',{granularity:'word'})`、非対応ブラウザでは明示的なfallbackを持つ。
+- 文分割は `。！？` と `.!?` を扱う。引用符・空白などで文を壊さない。
 - Reader内検索とLibrary全体検索、単語一致、ハイライト、語彙統計は**中国語の原文ベース**で動作。
 - 「学习」を「我喜欢学习中文。」から語単位検索で見つけられること。
 - 拼音ON/OFF、音声ボタン追加、ハイライト適用前後で検索結果数・アンカー位置が変わらない。
@@ -138,19 +138,19 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 
 - Articleの単語帳とGlobal Vocabularyの両方で、読みと意味の学習状態を表示・編集。
 - 表示単語の横に拼音を自然な位置で表示し、読上げ音声のlocaleもWorkspaceに準拠。
-- 多音字を誤統合しない**グループキーは少なくとも \`language + normalized word + reading\`**。単純に同じ漢字だけでは統合しない。
-- CSV出力には既存列を壊さず、**Language / ReadingSystem / Reading / ReadingLearned / MeaningLearned**を追加（現在の \`PinyinLearned\` と旧PRの互換や列名を整理）。
+- 多音字を誤統合しない**グループキーは少なくとも `language + normalized word + reading`**。単純に同じ漢字だけでは統合しない。
+- CSV出力には既存列を壊さず、**Language / ReadingSystem / Reading / ReadingLearned / MeaningLearned**を追加（現在の `PinyinLearned` と旧PRの互換や列名を整理）。
 - 古いCSVエクスポート利用者との互換を念頭に、列追加は末尾優先・既存データを欠落させない。
 - Import Review・書籍EditorではWorkspace言語を**表示して利用**するが、記事単位で上書きするselectは付けない。
-- AI一括登録・解説は、既存の \`contentLanguage\` + 全体 \`explanationLanguage\` のadapterを再利用。英語専用に調整した既存promptを壊さない。
-- \`対象の英文\` / \`和訳\` / \`英語\` などの固定文言を、**必要な場所のみ** \`対象の原文\` / \`訳・意味\` / \`学習対象言語\` へ置換。英語Workspaceに特化した有用な案内は無理に汎用化しない。
+- AI一括登録・解説は、既存の `contentLanguage` + 全体 `explanationLanguage` のadapterを再利用。英語専用に調整した既存promptを壊さない。
+- `対象の英文` / `和訳` / `英語` などの固定文言を、**必要な場所のみ** `対象の原文` / `訳・意味` / `学習対象言語` へ置換。英語Workspaceに特化した有用な案内は無理に汎用化しない。
 
 ## 8. 中国語Workspaceサンプル初期化（P0）
 
-- \`contentLanguage = zh\` の**新規Workspace**に中国語サンプル記事 \`第一次去图书馆\`（日本語での説明、拼音付き8語、notes）を初期登録する。
+- `contentLanguage = zh` の**新規Workspace**に中国語サンプル記事 `第一次去图书馆`（日本語での説明、拼音付き8語、notes）を初期登録する。
 - **既存中国語Workspace**でまだサンプル導入を行っていない場合も、**一度だけ自動補完**する。
-- 中国語Workspaceでは英語のstock \`📚 チュートリアル\` / \`Smart Readerの使い方\` / \`The Pomodoro Technique\` を自動生成・表示しない。
-- 旧 \`SAMPLE_DATA\` と新 \`sample-data-v2\` 等の複数経路から後入れされないか、**起動順序・遅延初期化・Workspace切替後の再読み込み**を実際に確認。
+- 中国語Workspaceでは英語のstock `📚 チュートリアル` / `Smart Readerの使い方` / `The Pomodoro Technique` を自動生成・表示しない。
+- 旧 `SAMPLE_DATA` と新 `sample-data-v2` 等の複数経路から後入れされないか、**起動順序・遅延初期化・Workspace切替後の再読み込み**を実際に確認。
 - 中国語Workspaceに以前から紛れ込んだstock英語サンプルは、**完全一致等の安全な同定**をした未編集サンプルのみ非表示/退避する。ユーザーが編集・追記・学習した記事やその配下のユーザー資料は削除・上書きしない。
 - 退避前にWorkspace固有のバックアップを保存し、二度目以降の修復で以前のバックアップを上書きしない。失敗時に元データが残るようにする。
 - 空にしたWorkspace・意図的に削除した中国語サンプルを**毎回復活させない**（一度の導入を示すmarkerを保存）。
@@ -159,7 +159,7 @@ Smart Readerは「**資料を読む → 重要な語・知識・解説を保存 
 
 ## 9. 検証・受け入れ条件（すべてP0）
 
-Codexは旧PR #1と現在の \`test-mulch\` の**最新版**を比較し、次のテストを追加または更新する。単なるビルド成功だけで「機能完了」としない。
+Codexは旧PR #1と現在の `test-mulch` の**最新版**を比較し、次のテストを追加または更新する。単なるビルド成功だけで「機能完了」としない。
 
 | ID | 受け入れテスト |
 |---|---|
@@ -172,11 +172,11 @@ Codexは旧PR #1と現在の \`test-mulch\` の**最新版**を比較し、次�
 | RD-03 | 拼音＋検索＋単語/ノート/問題の重複ハイライト、文字選択、コピー、しおり/読書位置が正常 |
 | RD-04 | PCとiPhone Safari相当のモバイル幅で読みの重なり・横はみ出し・操作阻害がない |
 | ST-01 | 拼音✓意味×、拼音×意味✓はいずれも全体未習得。両方✓のみ全体習得 |
-| ST-02 | 旧 \`memorized\` / 旧PR状態 / 新PR状態 / SRSデータが非破壊で読み込まれる |
+| ST-02 | 旧 `memorized` / 旧PR状態 / 新PR状態 / SRSデータが非破壊で読み込まれる |
 | ST-03 | SRS採点・undo・reset・個別チェック後の状態が意図せず変更されない |
 | ST-04 | 記事単語帳・Global Vocabulary・暗記モード・Flashcardの状態が一致 |
 | AU-01 | 文ごと再生、連続再生、停止、速度4段階、中国語locale、連続再生中の章切替停止 |
-| SR-01 | \`我喜欢学习中文。\` を妥当に分割、\`学习\` を語単位検索できる |
+| SR-01 | `我喜欢学习中文。` を妥当に分割、`学习` を語単位検索できる |
 | SR-02 | 検索・ハイライト・anchorが拼音ON/OFFや音声UIに左右されない |
 | VO-01 | 多音字を異なる読みで登録した場合、Global Vocabularyで別グループになる |
 | VO-02 | CSVにLanguage/ReadingSystem/Reading/ReadingLearned/MeaningLearnedが入る |
@@ -209,13 +209,13 @@ Codexは旧PR #1と現在の \`test-mulch\` の**最新版**を比較し、次�
 
 ## 11. Codexの作業手順・報告形式
 
-1. まず \`AGENTS.md\` / \`HANDOFF.md\` / \`HANDOFF_LATEST.md\` と **\`test-mulch\` の最新HEAD**を読む。古いチャットよりGitHubの最新コードを優先する。
+1. まず `AGENTS.md` / `HANDOFF.md` / `HANDOFF_LATEST.md` と **`test-mulch` の最新HEAD**を読む。古いチャットよりGitHubの最新コードを優先する。
 2. 旧PR #1を「期待する挙動の参照」として読み、**記事言語UI以外の機能退行を洗い出す**。
-3. 既存 \`feature/chinese-reading-integration\` と Draft PR #26を原則継続し、不要な派生ブランチを増やさない。
+3. 既存 `feature/chinese-reading-integration` と Draft PR #26を原則継続し、不要な派生ブランチを増やさない。
 4. 保存形式・SRS・セーブポイントを保護。APIやデータ互換はテスト先行で設計し、広範な変更を一気に入れず、小さいコミットに分ける。
 5. 変更ごとにCI、最終的にはPreviewで実ブラウザを確認。ユーザーから修正指示がある場合はその画面/挙動を優先して検証。
 6. 完了報告は、**「実装済み / 未実装 / 要実機確認」**の表、変更ファイル、保存互換の説明、テスト結果、PR、Preview URL、マージ可否を必ず含める。
-7. **ユーザー承認なしに\`main\`へマージしない**。本番/Pagesはそのまま。ローカルデータ削除・強制リセット・破壊的migrationをしない。
+7. **ユーザー承認なしに`main`へマージしない**。本番/Pagesはそのまま。ローカルデータ削除・強制リセット・破壊的migrationをしない。
 
 ## 12. 仕様未確定時の原則
 
@@ -225,4 +225,4 @@ Codexは旧PR #1と現在の \`test-mulch\` の**最新版**を比較し、次�
 - 「コードが存在する」「Vercel READY」「CI成功」は、ユーザーが必要な操作を実際に行えることの代替証明ではない。
 
 ---
-**目標の一文:** *旧PR #1で構想した中国語Reader/語彙学習の体験を、言語選択だけWorkspace単位に変更し、現在の\`test-mulch\`の保存・Study・UIを壊さず完成させる。*
+**目標の一文:** *旧PR #1で構想した中国語Reader/語彙学習の体験を、言語選択だけWorkspace単位に変更し、現在の`test-mulch`の保存・Study・UIを壊さず完成させる。*
