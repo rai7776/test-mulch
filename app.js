@@ -2796,6 +2796,26 @@ function flushReadingPositionSave() {
 }
 
 async function saveToDB() { await db.setItem('library_items', libraryItems); }
+
+// Existing Chinese Workspaces can opt in to the sample without replacing any articles.
+async function addChineseSampleToActiveWorkspace() {
+    const workspace = window.SmartReaderWorkspaceState?.activeWorkspace;
+    const samples = window.SmartReaderWorkspaceSamples;
+    if (!samples?.isChineseWorkspace(workspace)) return false;
+    if (samples.hasChineseSample(libraryItems)) return false;
+    const additions = samples.createChineseSample(workspace);
+    const original = libraryItems;
+    libraryItems = [...libraryItems, ...additions];
+    try {
+        await saveToDB();
+    } catch (error) {
+        libraryItems = original;
+        throw error;
+    }
+    showLibrary();
+    return true;
+}
+window.addChineseSampleToActiveWorkspace = addChineseSampleToActiveWorkspace;
 function hideAllSections() { ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 function lockReaderScrollForModal() {
     const display = document.getElementById('text-display');
