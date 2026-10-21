@@ -151,12 +151,25 @@ async function init() {
             return;
         }
     }
-    // DBからデータを取得
+    // Always use the active Workspace library. Repair only Chinese sample data;
+    // never seed the default English tutorial into a Chinese Workspace.
     libraryItems = await db.getItem('library_items') || [];
+    if (workspaceState?.activeWorkspace && window.SmartReaderWorkspaceSamples?.repairActiveChineseWorkspace) {
+        try {
+            const repaired = await window.SmartReaderWorkspaceSamples.repairActiveChineseWorkspace(
+                db, workspaceState.activeWorkspace, SAMPLE_DATA
+            );
+            if (Array.isArray(repaired)) libraryItems = repaired;
+        } catch (error) {
+            // Preserve all existing articles if local storage is unavailable.
+            console.error('Chinese Workspace sample repair failed without deleting user data.', error);
+        }
+    }
 
-    // データが空ならサンプルを投入
-    if (libraryItems.length === 0 && !workspaceState) {
-        libraryItems = SAMPLE_DATA; // SAMPLE_DATAが定義されている前提
+    // Keep the legacy sample fallback only for truly legacy installations
+    // without the Workspace API, not for Workspace-managed user libraries.
+    if (libraryItems.length === 0 && !window.SmartReaderWorkspace) {
+        libraryItems = SAMPLE_DATA;
         await db.setItem('library_items', libraryItems);
     }
 
