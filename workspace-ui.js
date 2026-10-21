@@ -89,7 +89,7 @@
             const sampleButton = document.createElement('button');
             sampleButton.type = 'button';
             sampleButton.className = 'workspace-add-button workspace-sample-button';
-            sampleButton.textContent = '中文例文';
+            sampleButton.textContent = '例文';
             sampleButton.title = 'この中国語スペースに練習用の文章を追加';
             sampleButton.setAttribute('aria-label', '中国語サンプル記事を追加');
             sampleButton.addEventListener('click', async () => {
