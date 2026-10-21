@@ -49,7 +49,7 @@ test('new Chinese Workspace is seeded to its own dedicated library key', async (
     assert.equal(changed, true);
     assert.equal(db.map.get('library_items').length, 1);
     assert.equal(db.map.get(chinese.libraryKey).length, 2);
-    assert.deepEqual(db.writes, [chinese.libraryKey]);
+    assert.deepEqual(db.writes, [chinese.libraryKey, samples.initializedKey(chinese)]);
 });
 
 test('first-run setup seeds active library key, leaving unrelated Workspace archives alone', async () => {
@@ -58,7 +58,7 @@ test('first-run setup seeds active library key, leaving unrelated Workspace arch
     assert.equal(changed, true);
     assert.equal(db.map.get('library_items').length, 2);
     assert.deepEqual(db.map.get(english.libraryKey), [{ id: 3 }]);
-    assert.deepEqual(db.writes, ['library_items']);
+    assert.deepEqual(db.writes, ['library_items', samples.initializedKey(chinese)]);
 });
 
 test('existing articles and deleted samples are never auto-overwritten or reinserted', async () => {
@@ -79,4 +79,85 @@ test('manual sample construction makes fresh IDs and does not duplicate static r
     assert.notEqual(first[0].id, second[0].id);
     assert.notEqual(first[1].id, second[1].id);
     assert.notEqual(first[1].words[0].id, second[1].words[0].id);
+});
+
+
+const stockEnglish = [
+    { id: 1001, type: 'folder', name: '📚 チュートリアル', parentId: null },
+    { id: 1002, type: 'article', parentId: 1001, name: 'Smart Readerの使い方',
+      content: 'Smart Readerへようこそ！', words: [{ id: 2001, memorized: true }] },
+    { id: 1003, type: 'article', parentId: 1001, name: '🍅 The Pomodoro Technique',
+      content: 'The Pomodoro Technique is a time management method.', words: [] }
+];
+
+test('old English sample data is archived and replaced by Mandarin only in Chinese Workspace', async () => {
+    const original = stockEnglish.map(item => ({ ...item }));
+    const db = store({ library_items: original });
+    const updated = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.equal(updated.length, 2);
+    assert.equal(updated.some(item => item.name === '🍅 The Pomodoro Technique'), false);
+    assert.equal(updated.some(item => item.name === 'Smart Readerの使い方'), false);
+    assert.equal(updated.some(item => item.type === 'article' && /图书馆/.test(item.content)), true);
+    assert.deepEqual(db.map.get(samples.legacyArchiveKey(chinese)), original);
+    assert.equal(db.map.get(samples.initializedKey(chinese)), true);
+    assert.deepEqual(db.map.get('library_items'), updated);
+});
+
+test('repair preserves user articles even inside the stock English tutorial folder', async () => {
+    const userArticle = { id: 9876, type: 'article', name: '自分の中国語学習', content: '你好！', parentId: 1001 };
+    const db = store({ library_items: [...stockEnglish, userArticle] });
+    const updated = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.ok(updated.some(item => item.id === 9876 && item.content === '你好！'));
+    assert.ok(updated.some(item => item.id === 1001)); // Keep parent so the user article stays reachable
+    assert.ok(updated.some(item => item.type === 'article' && item.sampleKey === samples.SAMPLE_KEY));
+    assert.equal(updated.some(item => item.id === 1002 || item.id === 1003), false);
+    assert.equal(db.map.get(samples.legacyArchiveKey(chinese)).length, 4);
+});
+
+test('edited article contents that resemble samples are not removed', async () => {
+    const modified = { ...stockEnglish[1], content: '我的私人日记。' };
+    const db = store({ library_items: [modified] });
+    const updated = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.ok(updated.some(item => item === modified));
+    assert.ok(updated.some(item => item.sampleKey === samples.SAMPLE_KEY));
+    assert.equal(db.map.has(samples.legacyArchiveKey(chinese)), false);
+});
+
+test('repair never touches an English or general Workspace', async () => {
+    for (const target of [english, general]) {
+        const original = stockEnglish.map(item => ({ ...item }));
+        const db = store({ library_items: original });
+        const returned = await samples.repairActiveChineseWorkspace(db, target, stockEnglish);
+        assert.equal(returned, null);
+        assert.strictEqual(db.map.get('library_items'), original);
+        assert.deepEqual(db.writes, []);
+    }
+});
+
+test('a user deleting the Mandarin sample does not cause repeated re-seeding', async () => {
+    const db = store({ library_items: [] });
+    const first = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.equal(first.length, 2);
+    db.map.set('library_items', []); // Explicit user deletion
+    const second = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.deepEqual(second, []);
+    assert.deepEqual(db.map.get('library_items'), []);
+});
+
+test('an existing Chinese Workspace with real articles gets a Mandarin example once', async () => {
+    const doc = { id: 9959, type: 'article', name: '私の作文', content: '我喜欢茶。' };
+    const db = store({ library_items: [doc] });
+    const first = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.equal(first.length, 3);
+    assert.ok(first.includes(doc));
+    const second = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.equal(second.length, 3);
+    assert.ok(second.includes(doc));
+});
+
+test('stock English cleanup never hides a different article with the same ID', async () => {
+    const userArticle = { ...stockEnglish[1], name: '中国語の記事', content: '学习很快乐。' };
+    const db = store({ library_items: [userArticle] });
+    const updated = await samples.repairActiveChineseWorkspace(db, chinese, stockEnglish);
+    assert.ok(updated.includes(userArticle));
 });
