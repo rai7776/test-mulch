@@ -156,8 +156,9 @@
         const original = Array.isArray(stored) ? stored : [];
         const { kept, removed } = stripLegacyEnglishSamples(original, stockItems);
         const wasInitialized = await database.getItem(initializedKey(workspace)) === true;
-        const shouldSeed = !wasInitialized && !hasChineseSample(kept)
-            && (kept.length === 0 || removed.length > 0);
+        // Existing Chinese Workspaces created before this feature also receive
+        // one Mandarin example, even if they already contain user articles.
+        const shouldSeed = !wasInitialized && !hasChineseSample(kept);
         const next = shouldSeed ? [...kept, ...createChineseSample(workspace)] : kept;
 
         if (removed.length > 0) {
