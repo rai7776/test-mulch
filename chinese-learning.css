@@ -115,3 +115,5 @@
     #reader-wrapper:has(.chinese-reader) .reading-status-main { align-items:center; }
     #reader-wrapper:has(.chinese-reader) #bookmark-btn { background:transparent; color:#806447; border:1px solid #e4dbcf; border-radius:7px; }
 }
+
+.learning-target-summary { color:#7b715f; font-size:0.85em; }

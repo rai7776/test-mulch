@@ -10,7 +10,7 @@ function workspace(fn) {
     global.window = { SmartReaderWorkspaceState: state('zh') };
     try { return fn(); } finally { chinese.stopSentenceAudio(); if (previous === undefined) delete global.window; else global.window = previous; }
 }
-function word(study = {}) { return { word: '行', memorized: false, annotations: [{ id: 'pinyin', value: 'xíng' }], study }; }
+function word(study = {}) { return { word: '行', meaning: '行く', memorized: false, annotations: [{ id: 'pinyin', value: 'xíng' }], study }; }
 
 test('profile resolves Workspace regions and neutral unsupported languages', () => {
     assert.equal(profile.active(state('zh-CN')).id, 'zh');
@@ -40,13 +40,14 @@ test('old PR learning flags normalize without changing SRS or annotations', () =
     assert.equal(item.study.chinese.meaning, true);
 }));
 
-test('missing readings never silently promote meaning-only learning', () => workspace(() => {
-    const item = { word: '学习', memorized: true };
+test('optional missing readings allow meaning-only mastery without generating an annotation', () => workspace(() => {
+    const item = { word: '学习', meaning: '学ぶ', memorized: true };
     chinese.normalizeLearning(item);
-    assert.equal(item.memorized, false);
+    assert.equal(item.memorized, true);
     chinese.setAllLearning(item, true);
-    assert.equal(item.memorized, false);
+    assert.equal(item.memorized, true);
     assert.equal(item.study.chinese.meaning, true);
+    assert.equal(item.annotations, undefined);
 }));
 
 test('editing old PR readings resets only pinyin and preserves unknown annotations', () => workspace(() => {

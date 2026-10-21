@@ -390,7 +390,7 @@
         const due = next !== null && next < tomorrow;
         const suspended = !!study.suspended;
         const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
-        const mastered = window.SmartReaderChinese?.isChinese() ? !!word?.memorized : manualMastered || !!word?.memorized || study.level >= 4;
+        const mastered = window.SmartReaderLearningTargets?.managed(word) ? !!word?.memorized : manualMastered || !!word?.memorized || study.level >= 4;
         const learning = !suspended && !isNew && !mastered;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
         const weakScore = weaknessScore(study);
@@ -936,13 +936,17 @@
                 <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
             `;
         }
-        if (back && window.SmartReaderChinese?.isChinese()) {
+        if (back && window.SmartReaderLearningTargets?.managed(word)) {
             const help=document.createElement('p');
             help.className='chinese-study-help';
-            help.textContent='判定は単語全体の復習予定を更新します。拼音・意味の習得は個別にチェックします。';
+            help.textContent='判定は単語全体の復習予定を更新します。習得は各項目でチェックします。';
             back.appendChild(help);
             window.SmartReaderChinese.attachStudyControls(back,word,entry.article,(target,learned)=>{
                 window.SmartReaderChinese.setLearning(word,target,learned,entry.article);
+                const currentCard=document.getElementById('study-flashcard');
+                const flipped=currentCard?.classList.contains('flipped');
+                renderCardContent(entry);
+                if(flipped)currentCard.classList.add('flipped');
                 scheduleSave();
             });
         }

@@ -62,7 +62,7 @@ test('editing the pinyin resets pinyin mastery only', () => withWorkspace(chines
 }));
 
 test('whole-word SRS mastery can synchronize Chinese sub-targets', () => withWorkspace(chineseState, () => {
-    const word = { word: '中文', memorized: true, annotations: [{ id: 'pinyin', value: 'zhōng wén' }] };
+    const word = { word: '中文', meaning: '中国語', memorized: true, annotations: [{ id: 'pinyin', value: 'zhōng wén' }] };
     chinese.mirrorMastery(word);
     assert.deepEqual(chinese.learning(word), { pinyin: true, meaning: true });
     word.memorized = false;

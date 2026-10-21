@@ -1,14 +1,15 @@
 /* Chinese reading and vocabulary adapter. Non-Chinese articles retain legacy data/behavior. */
 (function (root, factory) {
     const profile = typeof module === 'object' && module.exports ? require('./language-profile.js') : root.SmartReaderLanguageProfile;
-    const api = factory(profile);
+    const targets = typeof module === 'object' && module.exports ? require('./learning-targets.js') : root.SmartReaderLearningTargets;
+    const api = factory(profile,targets);
     if (typeof module === 'object' && module.exports) module.exports = api;
     if (root) {
         root.SmartReaderChinese=api;
         root.addEventListener?.('pagehide',api.stopSentenceAudio);
         root.addEventListener?.('smartreader:workspace-ready',api.stopSentenceAudio);
     }
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (profiles) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (profiles,targets) {
     'use strict';
 
     const PINYIN = 'pinyin';
@@ -123,57 +124,29 @@
     }
     function applyReading(word, previousWord, article, value) {
         if (!word || !isChinese(article)) return word;
-        const state = learning(previousWord || word);
-        const previousReading = reading(previousWord || word);
-        const previous = previousWord?.annotations || word.annotations;
-        const annotations = (Array.isArray(previous) ? previous : []).filter(item => item && item.id !== PINYIN).map(item => ({...item}));
-        const input = String(value || '').trim();
-        if (input) annotations.push({ id:PINYIN, category:'reading', system:PINYIN, value:input, learnable:true, display:'ruby' });
-        word.annotations = annotations;
-        if (previousReading !== input) state.pinyin = false;
-        word.study = { ...(word.study || {}), chinese:state };
-        normalizeLearning(word, article);
+        const previousReading=reading(previousWord || word);
+        targets.normalize(word);
+        const previous=previousWord?.annotations || word.annotations;
+        const annotations=(Array.isArray(previous)?previous:[]).filter(item=>item && item.id!==PINYIN).map(item=>({...item}));
+        const input=String(value || '').trim();
+        if(input)annotations.push({ id:PINYIN,category:'reading',system:PINYIN,value:input,learnable:true,display:'ruby' });
+        word.annotations=annotations;
+        if(input && previousReading!==input)targets.changed(word,targets.PINYIN);
+        else targets.normalize(word);
         return word;
     }
-
     function learning(word) {
-        const legacy = !!word?.memorized;
-        const state = word?.study?.chinese;
-        const old = word?.study;
-        return {
-            pinyin: typeof state?.pinyin === 'boolean' ? state.pinyin : typeof old?.annotations?.pinyin === 'boolean' ? old.annotations.pinyin : legacy && !!reading(word),
-            meaning: typeof state?.meaning === 'boolean' ? state.meaning : typeof old?.meaning === 'boolean' ? old.meaning : legacy
-        };
+        return { pinyin:!!reading(word) && targets.readState(word,targets.PINYIN), meaning:targets.readState(word,targets.MEANING) };
     }
-    function normalizeLearning(word, article) {
-        if (!word || !isChinese(article)) return word;
-        const state = learning(word);
-        if (!word.study || typeof word.study !== 'object' || Array.isArray(word.study)) word.study = {};
-        word.study.chinese = state;
-        word.memorized = !!reading(word) && state.pinyin && state.meaning;
-        return word;
+    function normalizeLearning(word) { return targets.normalize(word); }
+    function setLearning(word,target,learned) {
+        if(!word || !targets.managed(word))return;
+        if(target==='__all')return targets.setAll(word,learned);
+        return targets.set(word,target==='pinyin'?targets.PINYIN:target,learned);
     }
-
-    function setLearning(word, target, learned, article) {
-        if (!word || !isChinese(article) || (target !== 'pinyin' && target !== 'meaning')) return;
-        if (target === 'pinyin' && !reading(word)) return;
-        const state = learning(word);
-        state[target] = !!learned;
-        if (!word.study || typeof word.study !== 'object' || Array.isArray(word.study)) word.study = {};
-        word.study.chinese = state;
-        word.memorized = !!reading(word) && !!state.meaning && !!state.pinyin;
-    }
-    function setAllLearning(word, learned, article) {
-        if (!word || !isChinese(article)) {
-            if (word) word.memorized = !!learned;
-            return;
-        }
-        if (!word.study || typeof word.study !== 'object' || Array.isArray(word.study)) word.study = {};
-        word.study.chinese = { pinyin: !!learned && !!reading(word), meaning: !!learned };
-        normalizeLearning(word, article);
-    }
-    function mirrorMastery(word, article) {
-        if (word && isChinese(article)) setAllLearning(word, !!word.memorized, article);
+    function setAllLearning(word,learned) { return targets.setAll(word,learned); }
+    function mirrorMastery(word) {
+        if(word && targets.managed(word))targets.setAll(word,!!word.memorized);
     }
     function countWords(text, article,state) { return profiles.wordSegments(text,state).length; }
 
@@ -200,12 +173,12 @@
     }
 
     // UI entry points; no DOM work during module load.
-    function generationHint(text, value) {
+    function generationHint(text, value, attempted=true) {
         if (typeof document === 'undefined') return;
         const hint=document.querySelector('#chinese-word-field small');
-        if(hint)hint.textContent=/\p{Script=Han}/u.test(text) && !value
+        if(hint)hint.textContent=attempted && /\p{Script=Han}/u.test(text) && !value
             ? '拼音を自動生成できませんでした。手動で入力できます。'
-            : '声調を含めて手動で編集できます。';
+            : '拼音は任意です。空欄のまま保存できます。';
     }
     function syncEditor(article, word) {
         if (typeof document === 'undefined') return;
@@ -217,24 +190,30 @@
         if (!active) { input.value = ''; input.dataset.generated = ''; return; }
         const text = document.getElementById('input-word-text')?.value || '';
         const saved = reading(word);
-        const automatic = !saved ? generate(text) : '';
+        const automatic = !word && !saved ? generate(text) : '';
         input.value = saved || automatic;
         input.dataset.generated = automatic;
-        generationHint(text,input.value);
+        input.dataset.userEdited = word && !saved ? "true" : "false";
+        generationHint(text,input.value,!word);
     }
     function wordTextChanged() {
         if (typeof document === 'undefined') return;
         const input = document.getElementById('input-word-pinyin');
         if (!input || document.getElementById('chinese-word-field')?.hidden) return;
-        if (input.value.trim() && input.value !== (input.dataset.generated || '')) return;
+        if (input.dataset.userEdited === 'true' || (input.value.trim() && input.value !== (input.dataset.generated || ''))) return;
         input.value = generate(document.getElementById('input-word-text')?.value || '');
         input.dataset.generated = input.value;
         generationHint(document.getElementById('input-word-text')?.value || '',input.value);
+    }
+    function readingEdited() {
+        const input=typeof document!=='undefined'?document.getElementById('input-word-pinyin'):null;
+        if(input){ input.dataset.userEdited='true'; generationHint('',input.value,false); }
     }
     function regenerate() {
         if (typeof document === 'undefined') return;
         const input = document.getElementById('input-word-pinyin');
         if (!input) return;
+        input.dataset.userEdited='false';
         input.value = generate(document.getElementById('input-word-text')?.value || '');
         input.dataset.generated = input.value;
         generationHint(document.getElementById('input-word-text')?.value || '',input.value);
@@ -338,32 +317,46 @@
         });
         sentenceRecords.set(display,records);
     }
-    function attachStudyControls(card, word, article, onChange) {
-        if (!card || !isChinese(article) || typeof document === 'undefined') return;
-        const value = reading(word);
-        normalizeLearning(word,article);
-        const status = learning(word);
-        const controls = document.createElement('div');
-        controls.className = 'chinese-study-controls';
-        if (value) {
-            const pronunciation = document.createElement('span');
-            pronunciation.className = 'chinese-pinyin-label';
-            pronunciation.textContent = '拼音: ' + value;
+    function attachStudyControls(card,word,article,onChange) {
+        if(!card || !targets.managed(word) || typeof document==='undefined')return;
+        targets.normalize(word);
+        const controls=document.createElement('div');
+        controls.className='chinese-study-controls';
+        const value=isChinese(article)?reading(word):'';
+        if(value){
+            const pronunciation=document.createElement('span');
+            pronunciation.className='chinese-pinyin-label';
+            pronunciation.textContent='拼音: '+value;
             controls.appendChild(pronunciation);
         }
-        [['pinyin', '拼音', !!value], ['meaning', '意味', true]].forEach(([target, label, available]) => {
-            if (!available) return;
-            const wrapper = document.createElement('label');
-            wrapper.className = 'chinese-study-check';
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.checked = !!status[target];
-            input.addEventListener('click', event => event.stopPropagation());
-            input.addEventListener('change', event => {
-                event.stopPropagation();
-                if (typeof onChange === 'function') onChange(target, input.checked);
+        const status=document.createElement('span');
+        status.className='learning-target-summary';
+        const summary=targets.summary(word);
+        status.textContent=summary.all?'すべて習得済み':summary.partial?'一部習得':'未習得';
+        controls.appendChild(status);
+        if(!card.querySelector('.word-left input[type="checkbox"]')){
+            const label=document.createElement('label');
+            label.className='chinese-study-check';
+            const all=document.createElement('input');all.type='checkbox';
+            targets.syncCheckbox(all,word);
+            label.addEventListener('click',event=>event.stopPropagation());
+            all.addEventListener('change',()=>{
+                if(typeof onChange==='function')onChange('__all',all.checked);
             });
-            wrapper.append(input, document.createTextNode(label + ' 習得済み'));
+            label.append(all,document.createTextNode('全体習得'));
+            controls.appendChild(label);
+        }
+        targets.targets(word).forEach(target=>{
+            const wrapper=document.createElement('label');
+            wrapper.className='chinese-study-check';
+            const input=document.createElement('input');
+            input.type='checkbox';input.checked=target.learned;
+            wrapper.addEventListener('click',event=>event.stopPropagation());
+            input.addEventListener('change',event=>{
+                event.stopPropagation();
+                if(typeof onChange==='function')onChange(target.id===targets.PINYIN?'pinyin':target.id,input.checked);
+            });
+            wrapper.append(input,document.createTextNode(target.label+' 習得済み'));
             controls.appendChild(wrapper);
         });
         card.appendChild(controls);
@@ -372,7 +365,7 @@
     return Object.freeze({
         language, isChinese, reading, generate, applyReading, learning, normalizeLearning,
         setLearning, setAllLearning, mirrorMastery, countWords, groupKey,
-        syncEditor, wordTextChanged, regenerate, syncReaderControls,
+        syncEditor, wordTextChanged, readingEdited, regenerate, syncReaderControls,
         decorateReader, attachStudyControls, syncMaskOptions, splitSentences, characterReadings,
         playSentence, stopSentenceAudio, playAllSentences, setSpeechRate, beforeSpeech
     });

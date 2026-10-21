@@ -2390,6 +2390,7 @@ function renderList(type, filter = '') {
             renderQuestionCard(card, item, sourceIndex, filter);
         }
         if (type === 'words') {
+            window.SmartReaderLearningTargets?.syncCheckbox(card.querySelector('.word-left input[type="checkbox"]'),item);
             window.SmartReaderChinese?.attachStudyControls(card, item, currentArticle, async (target, learned) => {
                 window.SmartReaderChinese.setLearning(item, target, learned, currentArticle);
                 await saveToDB();
@@ -3073,7 +3074,7 @@ function exportToCSV() {
     const chinese=window.SmartReaderChinese;
     const header=['Word','Meaning','Memo','Language','ReadingSystem','Reading','ReadingLearned','MeaningLearned'];
     const rows=currentArticle.words.map(word=>[word.word,word.meaning,word.memo,
-        chinese.language(),chinese.isChinese()?'pinyin':'',chinese.reading(word),
+        chinese.language(),chinese.isChinese() && chinese.reading(word)?'pinyin':'',chinese.reading(word),
         chinese.isChinese()?String(chinese.learning(word).pinyin):'',
         chinese.isChinese()?String(chinese.learning(word).meaning):String(!!word.memorized)]);
     downloadGlobalVocabularyCsv([header,...rows].map(row=>row.map(globalCsvValue).join(',')).join('\r\n')+'\r\n','words.csv');
@@ -4270,6 +4271,7 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
     const check = document.createElement('input');
     check.type = 'checkbox';
     check.checked = entry.memorized;
+    window.SmartReaderLearningTargets?.syncCheckbox(check,entry.word);
     check.title = '暗記済み';
     check.addEventListener('click', event => event.stopPropagation());
     check.addEventListener('change', event => toggleGlobalMemorized(entry.key, event));
@@ -4723,7 +4725,7 @@ function exportGlobalVocabularyCSV() {
         entry.reading || '',
         window.SmartReaderChinese?.isChinese() && entry.reading ? String(!!window.SmartReaderChinese.learning(entry.word).pinyin) : '',
         window.SmartReaderChinese?.isChinese() ? String(!!window.SmartReaderChinese.learning(entry.word).meaning) : '',
-        window.SmartReaderChinese?.isChinese() ? 'pinyin' : '',
+        window.SmartReaderChinese?.isChinese() && entry.reading ? 'pinyin' : '',
         window.SmartReaderChinese?.isChinese() ? String(!!window.SmartReaderChinese.learning(entry.word).pinyin) : ''
     ]);
     const csv = [header, ...rows].map(row => row.map(globalCsvValue).join(',')).join('\r\n') + '\r\n';

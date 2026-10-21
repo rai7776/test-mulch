@@ -1,5 +1,7 @@
 # 中国語Workspace Phase A 差分・引き継ぎ
 
+> 追加確定仕様（2026-10-22）を反映。拼音は任意、未登録時は意味だけで全体習得を判定する。保存モデルの最新版は LEARNING_TARGETS_MODEL.md。
+
 比較元: `rai7776/smart-reader-pages` Draft PR #1、`af1e0bb5abf696e8dd06f537a5616ad840b260c7`。
 比較先: `rai7776/test-mulch` Draft PR #26、実装開始時 `ea74f2a258a8138875fd69eaf5877e3e2543c20a`。
 規範: `CHINESE_WORKSPACE_TARGET_SPEC.md`。記事単位の言語選択は移植しない。
@@ -24,9 +26,9 @@
 
 ## 保存・採点の契約
 
-- 中国語の正本は `study.chinese = { pinyin, meaning }`。存在するbooleanは旧形式より優先する。
+- 学習状態の正本は study.learningTargets[targetId].learned。旧Chinese/旧PR形式を読み取り、study.chineseは互換ミラーとして保持する。
 - 旧 `memorized`、旧PR形式を遅延解釈する。`study.level`、予定・成績・未知フィールド、他annotationを削除しない。
-- 読みが欠けている場合、意味だけの習得で全体習得にはしない。明示的な全体習得操作は両方のターゲットへ反映する。
+- 拼音が未登録なら意味だけで全体習得を判定する。全体習得は有効・値あり・判定に参加するターゲットすべてへの一括操作。
 - 通常のカード採点は単語全体のSRS復習。個別チェックは独立し、採点やレベル4到達で自動的に両方を習得済みへしない。undoは採点前スナップショットへ戻す。
 - 正規化した状態は次の通常保存で永続化する。一括破壊的マイグレーションは行わない。
 - 拼音と音声ボタンに本文テキストを追加しない。検索はハイライトの分割に左右されないUTF-16位置を使う。
