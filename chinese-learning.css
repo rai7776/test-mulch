@@ -44,3 +44,22 @@
 .chinese-pinyin-label { color: #505d79; font-weight: 500; }
 .chinese-study-check { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.95em; }
 .chinese-study-check input { width: auto; margin: 0; }
+
+.chinese-character.is-speaking { background:#fff0b8; border-radius:3px; }
+#chinese-reader-options { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
+#chinese-reader-options button,#chinese-reader-options select { min-height:40px; }
+.chinese-study-help { font-size:0.78rem; color:#666; }
+.anki-mask-reading .compact-card:not(.revealed) .chinese-pinyin-label,
+.anki-mask-learning .compact-card:not(.revealed) .chinese-pinyin-label,
+.anki-mask-both .compact-card:not(.revealed) .chinese-pinyin-label,
+.anki-mask-learning .compact-card:not(.revealed) .meaning-right { filter:blur(5px); user-select:none; }
+.search-match-part { background:#fff09c; border-radius:2px; }
+.search-match-part.current-search-match { background:#ffc266; }
+
+.chinese-pinyin-visible .chinese-manual-reading { display:inline-block; position:relative; margin-top:1.2em; }
+.chinese-pinyin-visible .chinese-manual-reading::before {
+    content:attr(data-manual-pinyin); position:absolute; left:50%; bottom:100%; transform:translateX(-50%);
+    white-space:nowrap; font-size:0.55em; color:#606983; pointer-events:none; user-select:none;
+}
+.chinese-pinyin-visible .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
+.chinese-pinyin-visible .chinese-manual-reading .chinese-character::before { content:none; }

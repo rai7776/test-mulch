@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css?v=1.4">
     <link rel="stylesheet" href="study-center.css?v=10">
     <link rel="stylesheet" href="workspace-ui.css?v=2">
-    <link rel="stylesheet" href="chinese-learning.css?v=2">
+    <link rel="stylesheet" href="chinese-learning.css?v=3">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
@@ -198,6 +198,7 @@
                     <div id="import-review-status" class="file-import-message" role="status" aria-live="polite"></div>
                     <div id="import-review-action-feedback" class="import-review-action-feedback" role="status" aria-live="polite"></div>
                 </div>
+                <span id="import-review-language" aria-live="polite"></span>
                 <span id="import-review-source" class="import-review-source"></span>
             </div>
 
@@ -300,6 +301,13 @@
             <div id="text-display" onclick="handleReaderClick(event)" onkeydown="handleReaderKeydown(event)"></div>
             <div id="chinese-reader-options" hidden>
                 <label><input id="chinese-reader-pinyin-visible" type="checkbox" checked onchange="setChinesePinyinVisibility(this.checked)"> 拼音を表示する</label>
+                <button type="button" onclick="SmartReaderChinese.playAllSentences(document.getElementById('text-display'))">▶ 連続再生</button>
+                <button type="button" onclick="SmartReaderChinese.stopSentenceAudio()">■ 停止</button>
+                <label>速度 <select id="chinese-speech-rate" onchange="setChineseSpeechRate(this.value)">
+                    <option value="0.7">0.7×</option><option value="0.85" selected>0.85×</option>
+                    <option value="1">1.0×</option><option value="1.2">1.2×</option>
+                </select></label>
+                <span id="chinese-audio-status" role="status" aria-live="polite"></span>
             </div>
 
         <div id="reading-status-bar">
@@ -406,6 +414,8 @@
                         </div>
                         <small>中国語Workspaceでのみ表示されます。声調を含めて編集できます。</small>
                     </div>
+                    <label>意味</label>
+                    <input type="text" id="input-word-meaning" required>
                     <label for="input-word-surface-text">本文での表現（surfaceText）</label>
                     <input type="text" id="input-word-surface-text" placeholder="本文中に実際に出現した表現">
                     <label for="input-word-part-of-speech">品詞</label>
@@ -422,8 +432,6 @@
                     </select>
                     <label for="input-word-tags">タグ（カンマ区切り）</label>
                     <input type="text" id="input-word-tags" placeholder="英語, 語彙, 苦手">
-                    <label>意味</label>
-                    <input type="text" id="input-word-meaning" required>
                     <label>メモ (任意)</label>
                     <textarea id="input-word-memo" rows="2"></textarea>
                     <label>Context / 例文 (任意)</label>
@@ -431,9 +439,9 @@
                 </div>
 
                 <div id="form-note-section" style="display:none;">
-                    <label>対象の英文 (原文)</label>
+                    <label>対象の原文</label>
                     <textarea id="input-note-eng" rows="3" required></textarea>
-                    <label>和訳・意味</label>
+                    <label>訳・意味</label>
                     <textarea id="input-note-trans" rows="3"></textarea>
                     <label>解説・解釈 (文法など)</label> <textarea id="input-note-extra" rows="3"></textarea>
                 </div>
@@ -535,23 +543,24 @@
 
     <script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="importers.js?v=1.1"></script>
-    <script src="workspace-core.js?v=1"></script>
+    <script src="workspace-core.js?v=5"></script>
     <script src="https://unpkg.com/pinyin-pro@3.29.4/dist/index.js"></script>
-    <script src="chinese-learning.js?v=2"></script>
-    <script src="workspace-samples.js?v=3"></script>
+    <script src="speech-language-core.js?v=1" id="smart-reader-speech-language-core-loader" data-smart-reader-loaded="true"></script>
+    <script src="language-profile.js?v=1"></script>
+    <script src="chinese-learning.js?v=3"></script>
+    <script src="workspace-samples.js?v=4"></script>
     <script src="sample-data-v2.js?v=3"></script>
-    <script src="app.js?v=4.6"></script>
+    <script src="app.js?v=4.7"></script>
     <script src="workspace-ui.js?v=2"></script>
-    <script src="speech-language-core.js?v=1"></script>
-    <script src="speech-language-adapter.js?v=1"></script>
+    <script src="speech-language-adapter.js?v=2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
     <script src="bulk-import.js?v=2.0"></script>
     <script src="bulk-import-mobile-fix.js?v=1.0"></script>
     <script src="chapter-scope-ui.js?v=1.0"></script>
-    <script src="flashcard-study.js?v=1.17"></script>
+    <script src="flashcard-study.js?v=1.18"></script>
     <script src="study-reward-ui.js?v=5"></script>
     <script src="flashcard-ui-tuning.js?v=1.1"></script>
-    <script src="study-center.js?v=12"></script>
+    <script src="study-center.js?v=13"></script>
     <script src="study-word-detail.js?v=1"></script>
     <script src="article-flashcard-launcher.js?v=2"></script>
     <script src="global-vocab-mobile-ui.js?v=1.0"></script>

@@ -189,6 +189,7 @@
     }
 
     function wordView(word) {
+        window.SmartReaderChinese?.normalizeLearning(word);
         const apiView = window.SmartReaderStudy?.getWordView?.(word);
         if (apiView) return apiView;
         const study = fallbackStudy(word);
@@ -205,7 +206,7 @@
         const due = next !== null && next < tomorrow;
         const suspended = !!study.suspended;
         const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
-        const mastered = manualMastered || !!word?.memorized || study.level >= 4;
+        const mastered=window.SmartReaderChinese?.isChinese()?!!word?.memorized:manualMastered || !!word?.memorized || study.level>=4;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
         const weakScore = localWeaknessScore(study);
         const difficult = !suspended && !manualMastered && weakScore >= 65;
@@ -881,6 +882,7 @@
             entry.word.memorized = true;
         }
         entry.word.study = study;
+        if(window.SmartReaderChinese?.isChinese()) window.SmartReaderChinese.setAllLearning(entry.word,!currentlyManual,entry.article);
         persistStudyChanges();
         render();
     }

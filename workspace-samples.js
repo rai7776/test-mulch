@@ -1,10 +1,11 @@
 /* A small, optional sample for Mandarin-learning Workspaces.
    Do not seed on page loads: otherwise deleting one's last article would recreate it. */
 (function (root, factory) {
-    const api = factory();
+    const profiles=typeof module === 'object' && module.exports?require('./language-profile.js'):root.SmartReaderLanguageProfile;
+    const api = factory(profiles);
     if (typeof module === 'object' && module.exports) module.exports = api;
     if (root) root.SmartReaderWorkspaceSamples = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (profiles) {
     'use strict';
 
     const SAMPLE_KEY = 'chinese-mandarin-intro-v1';
@@ -19,10 +20,7 @@
         return 'workspace:' + String(workspace.id) + LEGACY_ARCHIVE_SUFFIX;
     }
 
-    function isChineseWorkspace(workspace) {
-        return workspace?.kind === 'language'
-            && /^zh(?:-|$)/i.test(String(workspace.contentLanguage || ''));
-    }
+    function isChineseWorkspace(workspace) { return profiles.active({activeWorkspace:workspace}).id==='zh'; }
 
     function createChineseSample(workspace, now = Date.now()) {
         if (!isChineseWorkspace(workspace)) return [];

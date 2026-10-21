@@ -243,6 +243,7 @@
     }
 
     async function switchWorkspace(database, targetId, localStore = null) {
+        if(typeof window !== 'undefined') window.SmartReaderChinese?.stopSentenceAudio();
         if (!database || typeof database.getItem !== 'function' || typeof database.setItem !== 'function') {
             throw new TypeError('A LocalForage-compatible database instance is required.');
         }

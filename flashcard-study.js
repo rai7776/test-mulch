@@ -277,6 +277,7 @@
     }
 
     function readStudy(word) {
+        window.SmartReaderChinese?.normalizeLearning(word);
         const base = studyDefaults(word);
         const raw = word && word.study && typeof word.study === 'object' ? word.study : {};
         const merged = { ...base, ...raw };
@@ -389,7 +390,7 @@
         const due = next !== null && next < tomorrow;
         const suspended = !!study.suspended;
         const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
-        const mastered = manualMastered || !!word?.memorized || study.level >= 4;
+        const mastered = window.SmartReaderChinese?.isChinese() ? !!word?.memorized : manualMastered || !!word?.memorized || study.level >= 4;
         const learning = !suspended && !isNew && !mastered;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
         const weakScore = weaknessScore(study);
@@ -674,8 +675,8 @@
             word.memorized = manualMasteredBeforeAnswer && result !== 'wrong'
                 ? true
                 : study.level >= 4;
-            // SRS grades the whole word; reflect whole-word mastery in Chinese sub-targets.
-            window.SmartReaderChinese?.mirrorMastery(word, entry.article);
+            // SRS updates the schedule without overwriting individual learning flags.
+            window.SmartReaderChinese?.normalizeLearning(word,entry.article);
             promoted = study.level > previousLevel;
             demoted = study.level < previousLevel;
         } else {
@@ -934,6 +935,16 @@
                 <div class="study-card-source study-card-selectable">${escapeHtml(entry.articleTitle)}${entry.chapterTitle ? ` / ${escapeHtml(entry.chapterTitle)}` : ''}</div>
                 <div class="study-card-studyline study-card-selectable">Lv.${study.level} · 苦手度 ${escapeHtml(difficultyLabel(study.difficultyScore))} · ×${study.wrongCount} · 忘却${study.lapseCount} · 次回 ${escapeHtml(formatShortDate(study.nextReviewAt))}</div>
             `;
+        }
+        if (back && window.SmartReaderChinese?.isChinese()) {
+            const help=document.createElement('p');
+            help.className='chinese-study-help';
+            help.textContent='判定は単語全体の復習予定を更新します。拼音・意味の習得は個別にチェックします。';
+            back.appendChild(help);
+            window.SmartReaderChinese.attachStudyControls(back,word,entry.article,(target,learned)=>{
+                window.SmartReaderChinese.setLearning(word,target,learned,entry.article);
+                scheduleSave();
+            });
         }
     }
 

@@ -50,7 +50,7 @@
     }
 
     const workspaceReady = loadScriptPromise(
-        'workspace-core.js?v=4',
+        'workspace-core.js?v=5',
         'smart-reader-workspace-core-loader'
     );
     const foundationReady = loadScriptPromise(
@@ -131,7 +131,7 @@
         .catch(error => console.error('Failed to load workspace management feature', error));
 
     loadScriptPromise('speech-language-core.js?v=1', 'smart-reader-speech-language-core-loader')
-        .then(() => loadScript('speech-language-adapter.js?v=1', 'smart-reader-speech-language-adapter-loader'))
+        .then(() => loadScript('speech-language-adapter.js?v=2', 'smart-reader-speech-language-adapter-loader'))
         .catch(error => console.error('Failed to load multilingual speech support', error));
 
     loadScriptPromise('bulk-prompt-context-core.js?v=1', 'smart-reader-bulk-prompt-context-core-loader')

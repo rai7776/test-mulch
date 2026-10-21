@@ -1,25 +1,20 @@
 /* Chinese reading and vocabulary adapter. Non-Chinese articles retain legacy data/behavior. */
 (function (root, factory) {
-    const api = factory();
+    const profile = typeof module === 'object' && module.exports ? require('./language-profile.js') : root.SmartReaderLanguageProfile;
+    const api = factory(profile);
     if (typeof module === 'object' && module.exports) module.exports = api;
-    if (root) root.SmartReaderChinese = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+    if (root) {
+        root.SmartReaderChinese=api;
+        root.addEventListener?.('pagehide',api.stopSentenceAudio);
+        root.addEventListener?.('smartreader:workspace-ready',api.stopSentenceAudio);
+    }
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (profiles) {
     'use strict';
 
     const PINYIN = 'pinyin';
     let activeSpeech = null;
 
-    function splitSentences(text) {
-        const value = String(text || '');
-        const parts = typeof Intl?.Segmenter === 'function'
-            ? [...new Intl.Segmenter('zh', { granularity: 'sentence' }).segment(value)]
-                .map(part => ({ text: part.segment, start: part.index }))
-            : [...value.matchAll(/[^。！？!?]+[。！？!?]+[”’」』】）)]*|[^。！？!?]+$/gu)]
-                .map(match => ({ text: match[0], start: match.index }));
-        return parts.filter(part => part.text.trim()).map(part => ({
-            ...part, end: part.start + part.text.length
-        }));
-    }
+    function splitSentences(text) { return profiles.sentences(text); }
 
     function characterReadings(text, engine) {
         const api = engine || (typeof window !== 'undefined' ? window.pinyinPro : null);
@@ -38,45 +33,80 @@
         return readings;
     }
 
+    let sequenceToken = 0;
+    let speechRate = 0.85;
+    const sentenceRecords = new WeakMap();
+    const buttonRecords = new WeakMap();
+    function setSpeechRate(value) {
+        const rate = Number(value);
+        if ([0.7,0.85,1,1.2].includes(rate)) speechRate = rate;
+        return speechRate;
+    }
+    function clearSpeech(speech) {
+        speech?.button?.setAttribute('aria-pressed','false');
+        speech?.parts?.forEach(part => part.classList.remove('is-speaking'));
+    }
     function stopSentenceAudio() {
+        sequenceToken++;
         if (!activeSpeech) return;
-        const previous = activeSpeech;
-        activeSpeech = null;
-        previous.button?.setAttribute('aria-pressed', 'false');
-        previous.synthesis.cancel();
+        const previous = activeSpeech; activeSpeech = null;
+        clearSpeech(previous); previous.synthesis.cancel();
     }
-
-    function playSentence(text, button) {
-        if (typeof window === 'undefined' || !isChinese()) return false;
-        const synthesis = window.speechSynthesis;
-        if (!synthesis || !window.SpeechSynthesisUtterance) return false;
-        const sameButton = activeSpeech?.button === button;
-        stopSentenceAudio();
-        if (sameButton) return true;
-        synthesis.cancel();
+    function audioStatus(message) {
+        if (typeof document === 'undefined') return;
+        const node = document.getElementById('chinese-audio-status');
+        if (node) node.textContent = message;
+    }
+    function speakSentence(text, button, onEnd) {
+        const synthesis = typeof window !== 'undefined' ? window.speechSynthesis : null;
+        if (!isChinese() || !synthesis || !window.SpeechSynthesisUtterance || !String(text).trim()) {
+            audioStatus('この端末では中国語の読み上げを利用できません。'); return false;
+        }
         const utterance = new window.SpeechSynthesisUtterance(String(text).trim());
-        utterance.lang = window.SmartReaderSpeechLanguage?.speechLocaleFromState(window.SmartReaderWorkspaceState) || 'zh-CN';
-        const speech = { synthesis, button, utterance };
-        activeSpeech = speech;
-        button?.setAttribute('aria-pressed', 'true');
-        const done = () => {
+        utterance.lang = profiles.active().locale; utterance.rate = speechRate;
+        const speech = { synthesis, button, utterance, parts:buttonRecords.get(button)?.parts || [] };
+        activeSpeech = speech; button?.setAttribute('aria-pressed','true');
+        speech.parts.forEach(part => part.classList.add('is-speaking'));
+        utterance.onend = () => {
             if (activeSpeech !== speech) return;
-            button?.setAttribute('aria-pressed', 'false');
-            activeSpeech = null;
+            clearSpeech(speech); activeSpeech = null;
+            if (onEnd) onEnd();
         };
-        utterance.onend = done;
-        utterance.onerror = done;
-        try { synthesis.speak(utterance); } catch (_) { done(); return false; }
-        return true;
+        utterance.onerror = () => {
+            if (activeSpeech !== speech) return;
+            clearSpeech(speech); activeSpeech = null; sequenceToken++;
+            audioStatus('読み上げできませんでした。中国語音声の設定をご確認ください。');
+        };
+        try { synthesis.speak(utterance); return true; }
+        catch (_) { utterance.onerror(); return false; }
+    }
+    function playSentence(text, button) {
+        const sameButton = !!activeSpeech && activeSpeech.button === button;
+        stopSentenceAudio(); if (sameButton) return true;
+        if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+        audioStatus(''); return speakSentence(text,button);
+    }
+    function playAllSentences(display) {
+        stopSentenceAudio();
+        const records = sentenceRecords.get(display) || [];
+        const token = sequenceToken; let index = 0;
+        const next = () => {
+            if (token !== sequenceToken || index >= records.length) return;
+            const record = records[index++];
+            record.parts[0]?.scrollIntoView?.({ block:'nearest', behavior:'smooth' });
+            speakSentence(record.text,record.button,next);
+        };
+        audioStatus('');
+        if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+        next();
+    }
+    function beforeSpeech(utterance) {
+        if (activeSpeech && activeSpeech.utterance !== utterance) stopSentenceAudio();
     }
 
-    function language(article, state) {
-        const workspace = state || (typeof window !== 'undefined' ? window.SmartReaderWorkspaceState : null);
-        return String(workspace?.activeWorkspace?.kind === 'language' ? workspace.activeWorkspace.contentLanguage : 'en').toLowerCase();
-    }
-    function isChinese(article, state) {
-        return /^zh(?:-|$)/.test(language(article, state));
-    }
+    function language(article, state) { return profiles.active(state).language; }
+    function isChinese(article,state) { return profiles.active(state).id === 'zh'; }
+
     function reading(word) {
         return String((Array.isArray(word?.annotations) ? word.annotations : [])
             .find(item => item?.id === PINYIN)?.value || '').trim();
@@ -93,28 +123,37 @@
     }
     function applyReading(word, previousWord, article, value) {
         if (!word || !isChinese(article)) return word;
-        const previous = previousWord && Array.isArray(previousWord.annotations) ? previousWord.annotations : word.annotations;
-        const annotations = (Array.isArray(previous) ? previous : [])
-            .filter(item => item && item.id !== PINYIN).map(item => ({ ...item }));
+        const state = learning(previousWord || word);
+        const previousReading = reading(previousWord || word);
+        const previous = previousWord?.annotations || word.annotations;
+        const annotations = (Array.isArray(previous) ? previous : []).filter(item => item && item.id !== PINYIN).map(item => ({...item}));
         const input = String(value || '').trim();
-        if (input) annotations.push({ id: PINYIN, category: 'reading', system: PINYIN, value: input, learnable: true, display: 'ruby' });
+        if (input) annotations.push({ id:PINYIN, category:'reading', system:PINYIN, value:input, learnable:true, display:'ruby' });
         word.annotations = annotations;
-        if (word.study?.chinese) {
-            const learned = learning(word);
-            if (reading(previousWord) !== input) learned.pinyin = false;
-            word.study.chinese = learned;
-            word.memorized = !!learned.meaning && (!input || !!learned.pinyin);
-        }
+        if (previousReading !== input) state.pinyin = false;
+        word.study = { ...(word.study || {}), chinese:state };
+        normalizeLearning(word, article);
         return word;
     }
+
     function learning(word) {
         const legacy = !!word?.memorized;
         const state = word?.study?.chinese;
+        const old = word?.study;
         return {
-            pinyin: typeof state?.pinyin === 'boolean' ? state.pinyin : legacy,
-            meaning: typeof state?.meaning === 'boolean' ? state.meaning : legacy
+            pinyin: typeof state?.pinyin === 'boolean' ? state.pinyin : typeof old?.annotations?.pinyin === 'boolean' ? old.annotations.pinyin : legacy && !!reading(word),
+            meaning: typeof state?.meaning === 'boolean' ? state.meaning : typeof old?.meaning === 'boolean' ? old.meaning : legacy
         };
     }
+    function normalizeLearning(word, article) {
+        if (!word || !isChinese(article)) return word;
+        const state = learning(word);
+        if (!word.study || typeof word.study !== 'object' || Array.isArray(word.study)) word.study = {};
+        word.study.chinese = state;
+        word.memorized = !!reading(word) && state.pinyin && state.meaning;
+        return word;
+    }
+
     function setLearning(word, target, learned, article) {
         if (!word || !isChinese(article) || (target !== 'pinyin' && target !== 'meaning')) return;
         if (target === 'pinyin' && !reading(word)) return;
@@ -122,7 +161,7 @@
         state[target] = !!learned;
         if (!word.study || typeof word.study !== 'object' || Array.isArray(word.study)) word.study = {};
         word.study.chinese = state;
-        word.memorized = !!state.meaning && (!reading(word) || !!state.pinyin);
+        word.memorized = !!reading(word) && !!state.meaning && !!state.pinyin;
     }
     function setAllLearning(word, learned, article) {
         if (!word || !isChinese(article)) {
@@ -130,29 +169,44 @@
             return;
         }
         if (!word.study || typeof word.study !== 'object' || Array.isArray(word.study)) word.study = {};
-        word.study.chinese = { pinyin: !!learned, meaning: !!learned };
-        word.memorized = !!learned;
+        word.study.chinese = { pinyin: !!learned && !!reading(word), meaning: !!learned };
+        normalizeLearning(word, article);
     }
     function mirrorMastery(word, article) {
         if (word && isChinese(article)) setAllLearning(word, !!word.memorized, article);
     }
-    function countWords(text, article, state) {
-        const value = String(text || '');
-        if (!isChinese(article, state)) {
-            return (value.match(/[A-Za-z]+(?:['’][A-Za-z]+)*(?:-[A-Za-z]+(?:['’][A-Za-z]+)*)*/g) || []).length;
-        }
-        if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-            const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' });
-            return [...segmenter.segment(value)].filter(part => part.isWordLike).length;
-        }
-        return (value.match(/[\p{Script=Han}]/gu) || []).length;
-    }
+    function countWords(text, article,state) { return profiles.wordSegments(text,state).length; }
+
     function groupKey(word, article, state) {
         return language(article, state) + '::' + String(word?.word || '').trim().toLocaleLowerCase() + '::'
             + (isChinese(article, state) ? reading(word).toLocaleLowerCase() : '');
     }
 
+    function syncMaskOptions(select) {
+        if (!select) return;
+        const chinese = isChinese();
+        if (select.dataset.languageProfile === String(chinese)) return;
+        const value = select.value;
+        select.replaceChildren();
+        const options = chinese
+            ? [['learning','拼音と意味を隠す'],['reading','拼音を隠す'],['meaning','意味を隠す'],['word','単語を隠す']]
+            : [['both','両方隠す'],['word','単語を隠す'],['meaning','意味を隠す']];
+        options.forEach(([id,label]) => {
+            const option = select.ownerDocument.createElement('option');
+            option.value=id; option.textContent=label; select.appendChild(option);
+        });
+        select.value=options.some(([id])=>id===value)?value:options[0][0];
+        select.dataset.languageProfile=String(chinese);
+    }
+
     // UI entry points; no DOM work during module load.
+    function generationHint(text, value) {
+        if (typeof document === 'undefined') return;
+        const hint=document.querySelector('#chinese-word-field small');
+        if(hint)hint.textContent=/\p{Script=Han}/u.test(text) && !value
+            ? '拼音を自動生成できませんでした。手動で入力できます。'
+            : '声調を含めて手動で編集できます。';
+    }
     function syncEditor(article, word) {
         if (typeof document === 'undefined') return;
         const box = document.getElementById('chinese-word-field');
@@ -166,6 +220,7 @@
         const automatic = !saved ? generate(text) : '';
         input.value = saved || automatic;
         input.dataset.generated = automatic;
+        generationHint(text,input.value);
     }
     function wordTextChanged() {
         if (typeof document === 'undefined') return;
@@ -174,6 +229,7 @@
         if (input.value.trim() && input.value !== (input.dataset.generated || '')) return;
         input.value = generate(document.getElementById('input-word-text')?.value || '');
         input.dataset.generated = input.value;
+        generationHint(document.getElementById('input-word-text')?.value || '',input.value);
     }
     function regenerate() {
         if (typeof document === 'undefined') return;
@@ -181,6 +237,7 @@
         if (!input) return;
         input.value = generate(document.getElementById('input-word-text')?.value || '');
         input.dataset.generated = input.value;
+        generationHint(document.getElementById('input-word-text')?.value || '',input.value);
     }
     function syncReaderControls(article, visible) {
         if (typeof document === 'undefined') return;
@@ -197,8 +254,9 @@
         display.classList.toggle('chinese-pinyin-visible', enabled && visible !== false);
         if (!enabled) return;
         const doc = display.ownerDocument;
+        const records = [];
         display.querySelectorAll('p[data-paragraph-index]').forEach(paragraph => {
-            if (paragraph.dataset.chineseDecorated) return;
+            if (paragraph.dataset.chineseDecorated) { records.push(...(sentenceRecords.get(paragraph) || [])); return; }
             const walker = doc.createTreeWalker(paragraph, 4);
             const nodes = [];
             while (walker.nextNode()) {
@@ -206,7 +264,33 @@
             }
             const text = nodes.map(node => node.nodeValue).join('');
             const readings = characterReadings(text);
-            const endings = new Map(splitSentences(text).map(sentence => [sentence.end, sentence.text]));
+            const wordRanges=new Map();
+            let sourceOffset=0;
+            nodes.forEach(node=>{
+                const element=node.parentElement.closest('.word-highlight[data-word-index]');
+                if(element){
+                    const range=wordRanges.get(element) || {start:sourceOffset,text:''};
+                    range.text+=node.nodeValue; wordRanges.set(element,range);
+                }
+                sourceOffset+=node.nodeValue.length;
+            });
+            wordRanges.forEach((range,element)=>{
+                const value=reading(article?.words?.[Number(element.dataset.wordIndex)]);
+                if(!value)return;
+                const syllables=value.split(/\s+/).filter(Boolean);
+                const chars=Array.from(range.text);
+                if(syllables.length===chars.length){
+                    let index=range.start;
+                    chars.forEach((char,i)=>{readings.set(index,syllables[i]);index+=char.length;});
+                }else{
+                    element.dataset.manualPinyin=value;
+                    element.classList.add('chinese-manual-reading');
+                }
+            });
+            const sentences = splitSentences(text).map(sentence => ({...sentence,parts:[]}));
+            sentenceRecords.set(paragraph,sentences); records.push(...sentences);
+            const endings = new Map(sentences.map(sentence => [sentence.end,sentence]));
+            let sentenceIndex = 0;
             let offset = 0;
             nodes.forEach(node => {
                 const fragment = doc.createDocumentFragment();
@@ -223,17 +307,21 @@
                         span.className = 'chinese-character';
                         span.dataset.pinyin = pinyin;
                         span.textContent = char;
+                        while (sentences[sentenceIndex] && offset >= sentences[sentenceIndex].end) sentenceIndex++;
+                        sentences[sentenceIndex]?.parts.push(span);
                         fragment.appendChild(span);
                     } else fragment.appendChild(doc.createTextNode(char));
                     offset += char.length;
                     if (endings.has(offset)) {
-                        const sentence = endings.get(offset);
+                        const record = endings.get(offset);
+                        const sentence = record.text;
                         const button = doc.createElement('button');
                         button.type = 'button';
                         button.className = 'chinese-sentence-audio';
                         button.setAttribute('aria-label', 'この文を再生: ' + sentence.trim());
                         button.setAttribute('aria-pressed', 'false');
                         button.title = 'この文を再生／停止';
+                        record.button = button; buttonRecords.set(button,record);
                         button.disabled = !window.speechSynthesis || !window.SpeechSynthesisUtterance;
                         button.addEventListener('click', event => {
                             event.stopPropagation();
@@ -246,10 +334,12 @@
             });
             paragraph.dataset.chineseDecorated = 'true';
         });
+        sentenceRecords.set(display,records);
     }
     function attachStudyControls(card, word, article, onChange) {
         if (!card || !isChinese(article) || typeof document === 'undefined') return;
         const value = reading(word);
+        normalizeLearning(word,article);
         const status = learning(word);
         const controls = document.createElement('div');
         controls.className = 'chinese-study-controls';
@@ -278,10 +368,10 @@
     }
 
     return Object.freeze({
-        language, isChinese, reading, generate, applyReading, learning,
+        language, isChinese, reading, generate, applyReading, learning, normalizeLearning,
         setLearning, setAllLearning, mirrorMastery, countWords, groupKey,
         syncEditor, wordTextChanged, regenerate, syncReaderControls,
-        decorateReader, attachStudyControls, splitSentences, characterReadings,
-        playSentence, stopSentenceAudio
+        decorateReader, attachStudyControls, syncMaskOptions, splitSentences, characterReadings,
+        playSentence, stopSentenceAudio, playAllSentences, setSpeechRate, beforeSpeech
     });
 });
