@@ -3770,6 +3770,8 @@ function collectGlobalVocabulary() {
                     sourceIndex,
                     word,
                     wordText: String(word?.word || ''),
+                    language: window.SmartReaderChinese?.language(article) || 'en',
+                    reading: window.SmartReaderChinese?.reading(word) || '',
                     surfaceText: metadata.surfaceText,
                     tags: metadata.tags,
                     partOfSpeech: metadata.partOfSpeech,
@@ -3843,6 +3845,7 @@ function getFilteredGlobalVocabulary() {
         if (!query) return true;
         return [
             entry.wordText,
+            entry.reading,
             entry.surfaceText,
             entry.meaning,
             entry.memo,
@@ -3888,7 +3891,7 @@ function getGlobalVocabularyStatistics(entries = globalVocabularyState.entries) 
 function groupGlobalVocabularyEntries(entries) {
     const groups = new Map();
     (entries || []).forEach(entry => {
-        const key = normalizeVocabularyWord(entry.wordText) || `__empty__${entry.key}`;
+        const key = window.SmartReaderChinese?.groupKey(entry.word) || normalizeVocabularyWord(entry.wordText) || `__empty__${entry.key}`;
         if (!groups.has(key)) groups.set(key, { key, wordText: entry.wordText, entries: [] });
         groups.get(key).entries.push(entry);
     });
@@ -4234,6 +4237,14 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
     meaning.textContent = entry.meaning;
     summary.append(left, meaning);
     card.appendChild(summary);
+    window.SmartReaderChinese?.attachStudyControls(card, entry.word, null, async (target, learned) => {
+        const source = getGlobalEntrySource(entry);
+        if (!source) return;
+        window.SmartReaderChinese.setLearning(source.word, target, learned, source.article);
+        await saveToDB();
+        globalVocabularyState.entries = collectGlobalVocabulary();
+        renderGlobalVocabulary();
+    });
 
     const isExpanded = !globalVocabularyState.ankiMode && (forceExpanded || globalVocabularyState.expandedKey === entry.key);
     if (isExpanded) {
@@ -4634,7 +4645,7 @@ function exportGlobalVocabularyCSV() {
         alert('データなし');
         return;
     }
-    const header = ['Word', 'SurfaceText', 'Meaning', 'PartOfSpeech', 'Tags', 'Memo', 'Context', 'Article', 'Chapter', 'Memorized', 'CreatedAt', 'UpdatedAt'];
+    const header = ['Word', 'SurfaceText', 'Meaning', 'PartOfSpeech', 'Tags', 'Memo', 'Context', 'Article', 'Chapter', 'Memorized', 'CreatedAt', 'UpdatedAt', 'Language', 'Reading', 'PinyinLearned', 'MeaningLearned'];
     const rows = entries.map(entry => [
         entry.wordText,
         entry.surfaceText,
@@ -4647,7 +4658,11 @@ function exportGlobalVocabularyCSV() {
         entry.chapterTitle,
         entry.memorized ? 'true' : 'false',
         entry.createdAt || '',
-        entry.updatedAt || ''
+        entry.updatedAt || '',
+        entry.language || 'en',
+        entry.reading || '',
+        window.SmartReaderChinese?.isChinese() && entry.reading ? String(!!window.SmartReaderChinese.learning(entry.word).pinyin) : '',
+        window.SmartReaderChinese?.isChinese() ? String(!!window.SmartReaderChinese.learning(entry.word).meaning) : ''
     ]);
     const csv = [header, ...rows].map(row => row.map(globalCsvValue).join(',')).join('\r\n') + '\r\n';
     downloadGlobalVocabularyCsv(csv, 'global-vocabulary.csv');
