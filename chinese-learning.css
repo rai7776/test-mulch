@@ -1,0 +1,35 @@
+/* Chinese-only interface: annotations are generated content, not text nodes. */
+#chinese-word-field[hidden],
+#chinese-reader-options[hidden] { display: none !important; }
+#chinese-word-field { margin: 0.6rem 0; }
+#chinese-word-field > label { display: block; margin-bottom: 0.25rem; font-weight: 600; }
+.chinese-pinyin-input-row { display: flex; align-items: center; gap: 0.5rem; }
+.chinese-pinyin-input-row input { min-width: 0; flex: 1; }
+.chinese-pinyin-input-row button { flex: 0 0 auto; }
+#chinese-word-field small { display: block; color: #666; margin-top: 0.25rem; }
+#chinese-reader-options { margin: 0.55rem 1rem; font-size: 0.9rem; }
+#chinese-reader-options label { display: inline-flex; gap: 0.4rem; align-items: center; cursor: pointer; }
+.chinese-pinyin-visible .word-highlight[data-pinyin] {
+    display: inline-block;
+    position: relative;
+    margin-top: 1.2em;
+    vertical-align: baseline;
+}
+.chinese-pinyin-visible .word-highlight[data-pinyin]::before {
+    content: attr(data-pinyin);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 0.05em);
+    transform: translateX(-50%);
+    font-size: 0.55em;
+    line-height: 1.2;
+    font-weight: 500;
+    color: #606983;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+.chinese-study-controls { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.35rem 0; font-size: 0.85em; }
+.chinese-pinyin-label { color: #505d79; font-weight: 500; }
+.chinese-study-check { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.95em; }
+.chinese-study-check input { width: auto; margin: 0; }
