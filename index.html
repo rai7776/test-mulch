@@ -8,11 +8,13 @@
     <link rel="stylesheet" href="study-center.css?v=10">
     <link rel="stylesheet" href="workspace-ui.css?v=2">
     <link rel="stylesheet" href="chinese-learning.css?v=6">
+    <link rel="stylesheet" href="reader-header.css?v=1">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
 <body>
     <header class="app-header">
+        <nav id="reader-breadcrumbs" aria-label="記事の場所" hidden></nav>
         <div class="header-left">
             <button id="back-to-library" onclick="showLibrary()" style="display:none;">📖 本棚</button>
             <h1 id="app-title">英読</h1>
@@ -20,9 +22,9 @@
         <div id="article-meta" style="display:none;">
             <button onclick="editCurrentArticle()" class="small-edit-btn">編集</button>
             <button onclick="showCurrentArticleVocabulary()" class="small-edit-btn">この資料の単語</button>
-            <button onclick="showGlobalProblems()" class="small-edit-btn">Problems</button>
-            <button onclick="openWordStatistics()" class="small-edit-btn">📊 統計</button>
-            <a id="display-url" href="#" target="_blank">🔗 元記事</a>
+            <button onclick="showGlobalProblems()" class="small-edit-btn" title="問題一覧を開く">問題</button>
+            <button onclick="openWordStatistics()" class="small-edit-btn">統計</button>
+            <a id="display-url" href="#" target="_blank" rel="noopener noreferrer">元記事 ↗</a>
         </div>
     </header>
 
@@ -552,7 +554,8 @@
     <script src="chinese-learning.js?v=6"></script>
     <script src="workspace-samples.js?v=4"></script>
     <script src="sample-data-v2.js?v=3"></script>
-    <script src="app.js?v=4.9"></script>
+    <script src="reader-header.js?v=1"></script>
+    <script src="app.js?v=4.10"></script>
     <script src="workspace-ui.js?v=2"></script>
     <script src="speech-language-adapter.js?v=2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>

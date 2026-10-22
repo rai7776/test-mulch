@@ -1817,7 +1817,7 @@ function openArticle(id) {
     document.getElementById('back-to-library').style.display = 'inline-block';
     document.getElementById('article-meta').style.display = 'flex';
     document.getElementById('display-url').href = currentArticle.url || '#';
-    document.getElementById('display-url').style.display = currentArticle.url ? 'inline' : 'none';
+    document.getElementById('display-url').style.display = currentArticle.url ? 'inline-flex' : 'none';
 
     renderChapterNavigation();
     renderArticleText();
@@ -1896,6 +1896,7 @@ function renderQuestionMarkerText(selected, question, chapterId, questionIndex =
 function renderArticleText() {
     window.SmartReaderChinese?.stopSentenceAudio();
     if(!currentArticle) return;
+    window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems, goToFolder);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
     const content = getCurrentChapterContent();
@@ -2855,7 +2856,7 @@ async function addChineseSampleToActiveWorkspace() {
     return true;
 }
 window.addChineseSampleToActiveWorkspace = addChineseSampleToActiveWorkspace;
-function hideAllSections() { window.SmartReaderChinese?.stopSentenceAudio(); ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
+function hideAllSections() { window.SmartReaderChinese?.stopSentenceAudio(); window.SmartReaderReaderHeader?.hide(document); ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 function lockReaderScrollForModal() {
     const display = document.getElementById('text-display');
     if (!display || !currentArticle || readerScrollLockState) return;

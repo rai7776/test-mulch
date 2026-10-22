@@ -1,0 +1,79 @@
+/* Reading navigation: a location row and a quiet, consistent action row. */
+#reader-breadcrumbs[hidden] { display:none; }
+.app-header.reader-header {
+    display:grid; grid-template-columns:minmax(0, 1fr) auto auto;
+    align-items:center; gap:7px 10px; padding:8px 16px;
+    padding-top:max(8px, env(safe-area-inset-top));
+    border-bottom:1px solid #e9e2d9; background:#fffdfa;
+}
+.reader-header #reader-breadcrumbs { grid-column:1; grid-row:1; min-width:0; }
+#reader-breadcrumbs ol { display:flex; align-items:center; gap:0; padding:0; margin:0; list-style:none; min-width:0; }
+#reader-breadcrumbs li { display:flex; align-items:center; min-width:0; flex:0 1 auto; }
+#reader-breadcrumbs li:first-child { flex-shrink:0; }
+#reader-breadcrumbs li:last-child { flex:1 1 auto; }
+#reader-breadcrumbs li + li::before { content:'›'; flex-shrink:0; margin:0 6px; color:#b5a99c; }
+#reader-breadcrumbs button, #reader-breadcrumbs span {
+    display:block; min-width:0; max-width:28ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    margin:0; padding:7px 0; border:0; background:transparent; color:#877461;
+    font:inherit; font-size:12px; line-height:20px; text-align:left;
+}
+#reader-breadcrumbs button { cursor:pointer; }
+#reader-breadcrumbs button:hover { color:#61462d; text-decoration:underline; }
+#reader-breadcrumbs [aria-current] { color:#3f352d; font-weight:600; }
+.reader-header .header-left { grid-column:2; grid-row:1; min-width:0; gap:0; }
+.reader-header #app-title, .reader-header #back-to-library,
+.reader-header .workspace-add-button { display:none !important; }
+.reader-header .workspace-control { flex:0 1 auto; min-width:0; margin:0; gap:0; }
+.reader-header .workspace-select {
+    width:110px; min-width:0 !important; max-width:140px !important; height:34px;
+    padding:0 24px 0 9px; border:1px solid #e4dbd0; border-radius:8px;
+    background:#fffdfa; color:#72604f; font-weight:500; box-shadow:none;
+}
+.reader-header .settings-hub-open-button {
+    grid-column:3; grid-row:1; width:34px; height:34px; min-height:34px;
+    margin:0; padding:0; border:1px solid #e4dbd0; border-radius:8px;
+    background:#fffdfa; color:#72604f; font-size:0; box-shadow:none;
+}
+.reader-header .settings-hub-open-button::before { content:'⚙\FE0E'; font-size:20px; }
+.reader-header #article-meta {
+    grid-column:1 / -1; grid-row:2; display:flex; flex-wrap:nowrap;
+    width:100%; min-width:0; gap:6px; padding:0; overflow-x:auto; scrollbar-width:none;
+}
+.reader-header #article-meta .small-edit-btn, .reader-header #article-meta #display-url {
+    display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+    min-height:34px; height:34px; margin:0; padding:0 13px;
+    border:1px solid #e4dbd0; border-radius:8px; background:#fffdfa;
+    color:#6e5844; font:inherit; font-size:13px; font-weight:500; line-height:1;
+    text-decoration:none; white-space:nowrap; box-shadow:none; cursor:pointer;
+}
+.reader-header #article-meta .small-edit-btn:hover, .reader-header #article-meta #display-url:hover { background:#f3ede5; }
+.reader-header button:focus-visible, #reader-breadcrumbs button:focus-visible { outline:2px solid #a68768; outline-offset:2px; }
+
+/* Keep text inputs at 16px for iOS, while reducing padding and control height. */
+#reader-wrapper #reader-search-bar { padding:6px 12px 5px; border-color:#e9e2d9; }
+#reader-wrapper .reader-search-main { gap:4px; }
+#reader-wrapper #reader-search-input {
+    height:34px; min-height:34px; margin:0; padding:5px 9px;
+    border:1px solid #e4dfd7; border-radius:8px; background:#faf8f5; line-height:22px;
+}
+#reader-wrapper #search-clear-btn, #reader-wrapper #search-prev-btn, #reader-wrapper #search-next-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:0 0 32px; width:32px; min-width:32px; height:34px; min-height:34px;
+    padding:0; margin:0; border:1px solid #e4dfd7; border-radius:8px;
+    background:#fffdfa; color:#7b6b59; font-size:16px; line-height:1; box-shadow:none;
+}
+#reader-wrapper #search-clear-btn { flex-basis:26px; min-width:26px; width:26px; border-color:transparent; background:transparent; }
+#reader-wrapper #search-count { min-width:40px; font-size:12px; color:#85786b; }
+#reader-wrapper #search-prev-btn:disabled, #reader-wrapper #search-next-btn:disabled { opacity:.4; }
+#reader-wrapper .reader-search-options { align-items:center; gap:12px; margin:3px auto 0; min-height:22px; font-size:11px; }
+#reader-wrapper .reader-search-options label { margin:0; gap:4px; font-size:11px; font-weight:400; }
+#reader-wrapper .reader-search-options input { width:14px; height:14px; margin:0; accent-color:#8c7157; }
+#reader-wrapper #reader-search-scope { height:26px; min-height:26px; margin:0 auto 0 0; padding:0 4px; border:0; background:transparent; color:#85786b; }
+@media (max-width:767px) {
+    .app-header.reader-header { gap:5px 7px; padding:5px 12px 7px; padding-top:max(5px, env(safe-area-inset-top)); }
+    .reader-header .workspace-select { width:94px; }
+    #reader-breadcrumbs li + li::before { margin:0 4px; }
+    #reader-breadcrumbs button, #reader-breadcrumbs span { font-size:11px; }
+    .reader-header #article-meta .small-edit-btn, .reader-header #article-meta #display-url { padding:0 12px; }
+    #reader-wrapper #reader-search-bar { padding:5px 12px 4px; }
+}
