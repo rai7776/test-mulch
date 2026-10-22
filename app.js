@@ -2397,6 +2397,7 @@ function renderList(type, filter = '') {
                 renderList('words', document.getElementById('list-search')?.value || '');
             });
         }
+        if (type === 'notes') window.SmartReaderChinese?.decorateNote(card, currentArticle);
         container.appendChild(card);
     });
 }

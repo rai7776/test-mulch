@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css?v=1.4">
     <link rel="stylesheet" href="study-center.css?v=10">
     <link rel="stylesheet" href="workspace-ui.css?v=2">
-    <link rel="stylesheet" href="chinese-learning.css?v=5">
+    <link rel="stylesheet" href="chinese-learning.css?v=6">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
@@ -302,6 +302,7 @@
             <div id="chinese-reader-options" hidden>
                 <label><input id="chinese-reader-pinyin-visible" type="checkbox" checked onchange="setChinesePinyinVisibility(this.checked)"> 拼音を表示する</label>
                 <button type="button" onclick="SmartReaderChinese.playAllSentences(document.getElementById('text-display'))">▶ 連続再生</button>
+                <button id="chinese-selection-audio" type="button" aria-pressed="false" disabled title="本文の単語や句を長押しで選択して再生">選択範囲を再生</button>
                 <button type="button" onclick="SmartReaderChinese.stopSentenceAudio()">■ 停止</button>
                 <label>速度 <select id="chinese-speech-rate" onchange="setChineseSpeechRate(this.value)">
                     <option value="0.7">0.7×</option><option value="0.85" selected>0.85×</option>
@@ -548,14 +549,14 @@
     <script src="speech-language-core.js?v=1" id="smart-reader-speech-language-core-loader" data-smart-reader-loaded="true"></script>
     <script src="language-profile.js?v=1"></script>
     <script src="learning-targets.js?v=1"></script>
-    <script src="chinese-learning.js?v=5"></script>
+    <script src="chinese-learning.js?v=6"></script>
     <script src="workspace-samples.js?v=4"></script>
     <script src="sample-data-v2.js?v=3"></script>
-    <script src="app.js?v=4.8"></script>
+    <script src="app.js?v=4.9"></script>
     <script src="workspace-ui.js?v=2"></script>
     <script src="speech-language-adapter.js?v=2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
-    <script src="bulk-import.js?v=2.0"></script>
+    <script src="bulk-import.js?v=2.1"></script>
     <script src="bulk-import-mobile-fix.js?v=1.0"></script>
     <script src="chapter-scope-ui.js?v=1.0"></script>
     <script src="flashcard-study.js?v=1.19"></script>
@@ -566,7 +567,7 @@
     <script src="article-flashcard-launcher.js?v=2"></script>
     <script src="global-vocab-mobile-ui.js?v=1.0"></script>
     <script src="folder-panel-context.js?v=1.0"></script>
-    <script src="note-structure-ui.js?v=2.3"></script>
+    <script src="note-structure-ui.js?v=2.4"></script>
     <script src="word-senses.js?v=8"></script>
 </body>
 </html>

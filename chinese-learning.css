@@ -117,3 +117,14 @@
 }
 
 .learning-target-summary { color:#7b715f; font-size:0.85em; }
+
+/* Notes share the original-text decorator; no saved note content is rewritten. */
+.block-english.chinese-reader { line-height:2.4; overflow-wrap:break-word; }
+.block-english.chinese-reader .chinese-character { min-width:1.35em; margin-top:0.8em; }
+.block-english.chinese-reader .chinese-character::before { font-size:0.46em; }
+.chinese-note-controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0; font-size:12px; color:#72604f; }
+.chinese-note-controls label { display:inline-flex; gap:5px; align-items:center; margin:0; }
+.chinese-note-controls input { width:16px; height:16px; margin:0; accent-color:#7b958c; }
+.chinese-note-controls button { min-height:36px; padding:5px 8px; border:1px solid #e4dbcf; border-radius:8px; background:#fff; color:#72604f; }
+[data-chinese-selection-audio]:disabled { opacity:0.45; }
+[data-chinese-selection-audio][aria-pressed="true"] { background:#eee7dc; }

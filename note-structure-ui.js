@@ -134,7 +134,7 @@
         .then(() => loadScript('speech-language-adapter.js?v=2', 'smart-reader-speech-language-adapter-loader'))
         .catch(error => console.error('Failed to load multilingual speech support', error));
 
-    loadScriptPromise('bulk-prompt-context-core.js?v=1', 'smart-reader-bulk-prompt-context-core-loader')
+    loadScriptPromise('bulk-prompt-context-core.js?v=2', 'smart-reader-bulk-prompt-context-core-loader')
         .then(() => loadScript('bulk-prompt-context-adapter.js?v=1', 'smart-reader-bulk-prompt-context-adapter-loader'))
         .catch(error => console.error('Failed to load contextual bulk import prompt support', error));
 

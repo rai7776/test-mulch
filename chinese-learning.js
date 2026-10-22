@@ -226,6 +226,79 @@
         if (select) select.value = isChinese(article) ? 'zh' : 'en';
         if (wrap) wrap.hidden = !isChinese(article);
         if (toggle) toggle.checked = visible !== false;
+        const selectionButton = document.getElementById('chinese-selection-audio');
+        const display = document.getElementById('text-display');
+        if (selectionButton && display) installSelectionAudio(display, selectionButton);
+    }
+    const selectionSources = new WeakMap();
+    const selectionValues = new WeakMap();
+    const selectionPresses = new WeakSet();
+    const selectionDocuments = new WeakSet();
+    function selectedSourceText(source, selection) {
+        if (!source || !selection?.rangeCount || selection.isCollapsed) return '';
+        const range = selection.getRangeAt(0);
+        return source.contains(range.startContainer) && source.contains(range.endContainer)
+            ? String(selection.toString()).trim() : '';
+    }
+    function installSelectionAudio(source, button) {
+        const doc = source.ownerDocument;
+        if (!selectionDocuments.has(doc)) {
+            selectionDocuments.add(doc);
+            doc.addEventListener('selectionchange', () => {
+                const selection = doc.defaultView?.getSelection();
+                doc.querySelectorAll('[data-chinese-selection-audio]').forEach(control => {
+                    const text = isChinese() ? selectedSourceText(selectionSources.get(control), selection) : '';
+                    selectionValues.set(control, text);
+                    control.disabled = (!text && !selectionPresses.has(control)) || !doc.defaultView?.speechSynthesis;
+                });
+            });
+        }
+        if (!selectionSources.has(button)) {
+            button.dataset.chineseSelectionAudio = 'true';
+            let pending = '';
+            // Mobile focus can collapse the selection before click fires.
+            button.addEventListener('pointerdown', event => {
+                pending = selectionValues.get(button) || '';
+                if (pending) { selectionPresses.add(button); event.preventDefault(); }
+            });
+            button.addEventListener('click', event => {
+                event.stopPropagation();
+                const value = pending || selectionValues.get(button);
+                pending = '';
+                selectionPresses.delete(button);
+                if (value) playSentence(value, button);
+            });
+            const cancelPress = () => {
+                pending = ''; selectionPresses.delete(button);
+                button.disabled = !selectionValues.get(button);
+            };
+            button.addEventListener('pointercancel', cancelPress);
+            button.addEventListener('pointerleave', cancelPress);
+        }
+        selectionSources.set(button, source);
+        selectionValues.set(button, '');
+        selectionPresses.delete(button);
+        button.disabled = true;
+    }
+    function decorateNote(card, article) {
+        if (!card || !isChinese(article) || card.querySelector('.chinese-note-controls')) return;
+        const source = card.querySelector('.block-english');
+        if (!source) return;
+        source.dataset.chineseNoteSource = 'true';
+        decorateReader(source, article, true);
+        const doc = card.ownerDocument;
+        const controls = doc.createElement('div');
+        controls.className = 'chinese-note-controls';
+        const label = doc.createElement('label');
+        const toggle = doc.createElement('input'); toggle.type = 'checkbox'; toggle.checked = true;
+        toggle.addEventListener('change', () => source.classList.toggle('chinese-pinyin-visible', toggle.checked));
+        label.append(toggle, doc.createTextNode('拼音'));
+        const selected = doc.createElement('button'); selected.type = 'button'; selected.textContent = '選択範囲を再生';
+        selected.title = '原文の単語や句を長押しで選択して再生';
+        selected.setAttribute('aria-pressed', 'false');
+        controls.append(label, selected);
+        source.insertAdjacentElement('afterend', controls);
+        installSelectionAudio(source, selected);
     }
     function decorateReader(display, article, visible) {
         if (!display) return;
@@ -235,7 +308,8 @@
         if (!enabled) return;
         const doc = display.ownerDocument;
         const records = [];
-        display.querySelectorAll('p[data-paragraph-index]').forEach(paragraph => {
+        const paragraphs = display.dataset?.chineseNoteSource ? [display] : display.querySelectorAll('p[data-paragraph-index]');
+        paragraphs.forEach(paragraph => {
             if (paragraph.dataset.chineseDecorated) { records.push(...(sentenceRecords.get(paragraph) || [])); return; }
             const walker = doc.createTreeWalker(paragraph, 4);
             const nodes = [];
@@ -366,7 +440,7 @@
         language, isChinese, reading, generate, applyReading, learning, normalizeLearning,
         setLearning, setAllLearning, mirrorMastery, countWords, groupKey,
         syncEditor, wordTextChanged, readingEdited, regenerate, syncReaderControls,
-        decorateReader, attachStudyControls, syncMaskOptions, splitSentences, characterReadings,
+        decorateReader, decorateNote, selectedSourceText, attachStudyControls, syncMaskOptions, splitSentences, characterReadings,
         playSentence, stopSentenceAudio, playAllSentences, setSpeechRate, beforeSpeech
     });
 });
