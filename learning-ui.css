@@ -61,7 +61,7 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
 .learning-ui .vocabulary-count { color:#7b6f64; font-size:13px; }
 .learning-ui #global-vocab-statistics, .learning-ui #global-problems-statistics { margin:0 0 14px; color:#8b7b6e; }
 .learning-ui #global-vocabulary-list, .learning-ui #global-problems-list { max-width:none; margin:0; padding:0; gap:12px; }
-.learning-ui .global-vocabulary-card, .learning-ui .global-problem-card { padding:18px; border:1px solid var(--ui-border); border-radius:16px; background:#fff; box-shadow:none; }
+.learning-ui .global-problem-card { padding:18px; border:1px solid var(--ui-border); border-radius:16px; background:#fff; box-shadow:none; }
 .learning-ui .global-vocabulary-card:hover, .learning-ui .global-problem-card:hover { border-color:#bfae9e; box-shadow:0 3px 12px #483a2e06; }
 .learning-ui .global-problem-card button, .learning-ui #vocabulary-section .vocabulary-controls button { min-height:36px; padding:8px 12px; border:1px solid var(--ui-border); border-radius:9px; background:#fffdfa; color:#6b594a; font-weight:600; cursor:pointer; }
 .learning-ui #vocabulary-section .vocabulary-controls { gap:8px; padding:16px; margin:0 0 18px; border:1px solid var(--ui-border); border-radius:16px; background:#fff; }
@@ -135,11 +135,51 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
     .learning-resume strong { font-size:14px; }
     .learning-resume button { padding:8px 10px; font-size:12px; }
     .learning-ui .learning-filters .problems-controls { grid-template-columns:1fr 1fr; padding:12px; }
-    .learning-ui .global-vocabulary-card, .learning-ui .global-problem-card { padding:14px; }
+    .learning-ui .global-problem-card { padding:14px; }
     .learning-ui #reader-wrapper #reader-search-bar { padding:5px 12px; gap:3px; }
     .learning-ui #reader-wrapper #chinese-reader-options { padding:4px 12px 7px; }
     .learning-ui .app-header.reader-header { padding:5px 12px; gap:8px; }
     .learning-ui #reader-breadcrumbs button, .learning-ui #reader-breadcrumbs span { font-size:12px; }
     .learning-ui .reader-audio-controls { gap:5px; }
     .learning-ui #chinese-reader-options button, .learning-ui .reader-audio-settings > summary { padding:6px 8px; font-size:11px; }
+}
+
+/* Dense Library and vocabulary lists; Reader sizing intentionally stays separate. */
+.learning-ui #library-section { padding-top:12px; }
+.learning-ui #library-section .learning-page-heading { margin-bottom:10px; }
+.learning-ui #library-section .learning-page-heading .study-center-eyebrow,
+.learning-ui #library-section .learning-page-heading p { display:none; }
+.learning-ui #library-section .learning-page-heading h2 { font-size:18px; margin:0; }
+.learning-ui #library-section .library-header { margin-bottom:8px; }
+.learning-ui #library-section .library-actions { gap:6px; }
+.learning-ui #library-section .library-primary-tabs { gap:6px; margin-bottom:0; }
+.learning-ui #library-section .library-primary-tab { flex-direction:row; align-items:center; min-height:32px; padding:6px 8px; border-radius:8px; font-size:13px; gap:4px; }
+.learning-ui #library-section .library-primary-tab .study-center-nav-badge { position:static; margin-left:3px; }
+.learning-ui #library-section .library-actions > button { min-height:32px; padding:6px 8px; font-size:12px; border-radius:8px; }
+.learning-ui #library-section .library-search-control { margin-top:0; border-radius:8px; min-height:34px; }
+.learning-ui #library-section #global-search-input { height:34px; min-height:34px; padding:5px 9px; font-size:14px; }
+.learning-ui #library-section #global-search-clear-btn { height:30px; min-height:30px; }
+.learning-ui #library-section .library-grid { margin-top:8px; gap:10px; }
+.learning-ui #library-section .item-card { min-height:126px; padding:14px 13px 12px; border-radius:14px; border-top-width:4px; }
+.learning-ui #library-section .item-card.folder-icon { border-top-color:#d2a064; }
+.learning-ui #library-section .item-card.article-icon { border-top-color:#8fa7b4; }
+.learning-ui #library-section .item-card h3 { font-size:14px; line-height:1.35; }
+.learning-ui #library-section .learning-resume { padding:4px 8px; margin:0 0 8px; gap:8px; border-radius:8px; }
+.learning-ui #library-section .learning-resume > div { display:flex; align-items:center; gap:6px; overflow:hidden; }
+.learning-ui #library-section .learning-resume small { flex:none; font-size:10px; }
+.learning-ui #library-section .learning-resume strong { font-size:12px; }
+.learning-ui #library-section .learning-resume button { min-height:28px; padding:4px 7px; font-size:11px; background:transparent; color:#6f5a48; }
+.learning-ui #global-vocabulary-list { gap:6px; }
+.learning-ui #global-vocabulary-list .global-vocabulary-card { padding:8px 10px; border-radius:8px; }
+.learning-ui #global-vocabulary-list .global-vocabulary-summary { min-height:32px; }
+@media(max-width:700px) {
+    .learning-ui #library-section { padding:8px 10px 70px; }
+    .learning-ui #library-section .learning-page-heading { display:none; }
+    .learning-ui #library-section .library-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .learning-ui #library-section .item-card { padding:10px 8px; }
+    .learning-ui #library-section .card-actions { gap:4px; }
+    .learning-ui #library-section .card-actions .small-btn { padding:5px 2px; font-size:10px; min-height:30px; }
+    .learning-ui #library-section #breadcrumbs { margin-bottom:6px; }
+    .learning-ui #vocabulary-section { padding:10px 10px 70px; }
+    .learning-ui #vocabulary-section .vocabulary-title-row { margin-bottom:8px; }
 }
