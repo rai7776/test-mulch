@@ -174,7 +174,7 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
 .learning-ui #global-vocabulary-list .global-vocabulary-summary { min-height:32px; }
 @media(max-width:700px) {
     .learning-ui #library-section { padding:8px 10px 70px; }
-    .learning-ui #library-section .learning-page-heading { display:none; }
+    .learning-ui #library-section .learning-page-heading { display:flex; margin-bottom:4px; }
     .learning-ui #library-section .library-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .learning-ui #library-section .item-card { padding:10px 8px; }
     .learning-ui #library-section .card-actions { gap:4px; }
@@ -183,3 +183,13 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
     .learning-ui #vocabulary-section { padding:10px 10px 70px; }
     .learning-ui #vocabulary-section .vocabulary-title-row { margin-bottom:8px; }
 }
+
+/* Navigation, search and creation have distinct visual roles and reading order. */
+.learning-ui #library-section .library-primary-tabs { grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; border-bottom:1px solid #d8cbbf; margin-bottom:3px; }
+.learning-ui #library-section .library-primary-tab { border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; box-shadow:none; padding:6px 2px; min-height:32px; font-size:12px; color:#8b7b6e; }
+.learning-ui #library-section .library-primary-tab.is-active { border-bottom-color:#6f5a48; color:#514031; font-weight:800; background:transparent; }
+.learning-ui #library-section .library-primary-tab:hover { background:#eee7de; border-bottom-color:#b59b84; }
+.learning-ui #library-section .library-search-control { order:1; }
+.learning-ui #library-section .library-search-options { order:2; }
+.learning-ui #library-section .library-actions > button { order:3; background:transparent; border-style:dashed; border-color:#cdbdab; color:#6f5a48; }
+.learning-ui #library-section .library-actions > .start-btn { background:#eee5da; border-style:solid; border-color:#d8c9b9; color:#604b3b; }
