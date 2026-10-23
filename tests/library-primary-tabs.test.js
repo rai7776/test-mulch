@@ -2,21 +2,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-
 const root = path.resolve(__dirname, '..');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'library-toolbar-polish.css'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'learning-ui.css'), 'utf8');
 
-test('Library exposes four primary tabs in a single equal-width navigation', () => {
-  assert.match(index, /class="library-primary-tab is-active"[^>]*>Library<\/button>/);
-  assert.match(index, /class="library-primary-tab"[^>]*>Vocabulary<\/button>/);
-  assert.match(index, /id="study-center-library-button"[^>]*class="library-primary-tab study-center-entry-button"[^>]*onclick="window\.showStudyCenter\?\.\(\)"[^>]*>Study<\/button>/);
-  assert.match(index, /class="library-primary-tab"[^>]*>Problems<\/button>/);
-  assert.match(css, /grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+test('Library home exposes three learning destinations without a redundant Library tab', () => {
+  const navigation = index.split('<nav class="library-primary-tabs"')[1].split('</nav>')[0];
+  assert.equal((navigation.match(/<button/g) || []).length, 3);
+  for (const name of ['Vocabulary', 'Study', 'Problems']) assert.ok(navigation.includes('>' + name + '</strong>'));
+  assert.ok(navigation.includes('window.showStudyCenter?.()'));
+  assert.ok(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))'));
 });
-
-test('root Library breadcrumb no longer duplicates the current Library tab', () => {
-  assert.doesNotMatch(app, /🏠 本棚/);
-  assert.match(app, /bc\.style\.display = path\.length \? '' : 'none'/);
+test('folder breadcrumbs are accessible and hidden only at Library home', () => {
+  assert.ok(index.includes('id="breadcrumbs" class="breadcrumbs" aria-label="フォルダの場所"'));
+  assert.ok(css.includes('#library-section:not(.in-folder) #breadcrumbs { display:none; }'));
 });
