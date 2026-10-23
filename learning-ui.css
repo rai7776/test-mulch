@@ -193,3 +193,14 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
 .learning-ui #library-section .library-search-options { order:2; }
 .learning-ui #library-section .library-actions > button { order:3; background:transparent; border-style:dashed; border-color:#cdbdab; color:#6f5a48; }
 .learning-ui #library-section .library-actions > .start-btn { background:#eee5da; border-style:solid; border-color:#d8c9b9; color:#604b3b; }
+
+/* Global destinations share the compact Library navigation. */
+.learning-ui .learning-section-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; border-bottom:1px solid #d8cbbf; margin:0 0 10px; width:100%; }
+.learning-ui .learning-section-tabs > button, .learning-ui .learning-section-tabs > span { display:flex; align-items:center; justify-content:center; min-width:0; min-height:32px; padding:6px 2px; margin:0; border:0; border-bottom:2px solid transparent; border-radius:0; background:transparent; box-shadow:none; color:#8b7b6e; font-family:inherit; font-size:12px; line-height:1.3; font-weight:700; text-decoration:none; white-space:nowrap; }
+.learning-ui .learning-section-tabs > [aria-current="page"] { border-bottom-color:#6f5a48; color:#514031; font-weight:800; }
+.learning-ui .learning-section-tabs > button { cursor:pointer; }
+.learning-ui .learning-section-tabs > button:hover { background:#eee7de; border-bottom-color:#b59b84; }
+@media(max-width:700px) {
+    .learning-ui #vocabulary-section, .learning-ui #problems-section { padding-top:8px; }
+    .learning-ui .study-center-shell { padding-top:8px; }
+}
