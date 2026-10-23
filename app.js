@@ -1220,19 +1220,7 @@ function showLibrary() {
     const bc = document.getElementById('breadcrumbs');
     list.innerHTML = '';
 
-    let path = [], tempId = currentFolderId;
-    while(tempId) {
-        let f = libraryItems.find(i => i.id === tempId);
-        if(f) { path.unshift(f); tempId = f.parentId; } else break;
-    }
-    let html = '';
-    path.forEach((f, idx) => {
-        const separator = idx === 0 ? '' : ' > ';
-        if(idx === path.length - 1) html += `${separator}<b>${escapeHtml(f.name)}</b>`;
-        else html += `${separator}<span onclick="goToFolder(${f.id})">${escapeHtml(f.name)}</span>`;
-    });
-    bc.innerHTML = html;
-    bc.style.display = path.length ? '' : 'none';
+    window.SmartReaderLearningUI?.renderLibrary(document, libraryItems, currentFolderId, goToFolder, openArticle, window.localStorage, window.SmartReaderWorkspaceState);
 
     libraryItems.filter(i => i.parentId === currentFolderId).forEach(item => {
         const card = document.createElement('div');
@@ -1807,6 +1795,7 @@ function openArticle(id) {
     if (currentArticle && currentArticle.id !== nextArticle.id) flushReadingPositionSave();
 
     currentArticle = nextArticle;
+    window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
     ensureArticleCollections(currentArticle);
     if (!currentArticle) return;
     currentChapterId = getInitialChapterId(currentArticle);
@@ -3981,7 +3970,7 @@ function renderGlobalVocabularyControls() {
     const selectedArticle = state.sourceId === 'all'
         ? null
         : state.entries.find(entry => String(entry.articleId) === String(state.sourceId));
-    if (title) title.textContent = selectedArticle ? `Global Vocabulary · ${selectedArticle.articleTitle}` : 'Global Vocabulary';
+    if (title) title.textContent = selectedArticle ? `単語帳 · ${selectedArticle.articleTitle}` : '単語帳';
 
     const articles = [];
     state.entries.forEach(entry => {

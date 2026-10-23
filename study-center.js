@@ -970,7 +970,7 @@
             <div class="study-center-shell">
                 <header class="study-center-header">
                     <div><span class="study-center-eyebrow">STUDY</span><h1>学習</h1><p>いつ、何を復習するかをここで管理します。</p></div>
-                    <button type="button" class="study-center-library-link" data-back-library>Library</button>
+                    <button type="button" class="study-center-library-link" data-back-library>← Library</button>
                 </header>
                 <nav class="study-center-tabs" aria-label="学習メニュー">
                     <button type="button" data-study-tab="home" class="active">ホーム</button>
@@ -1006,15 +1006,7 @@
             else libraryActions.prepend(studyButton);
         }
 
-        const vocabTitle = document.querySelector('#vocabulary-section .vocabulary-title-row');
-        if (vocabTitle && !document.getElementById('study-center-vocab-button')) {
-            vocabTitle.insertBefore(makeStudyNavButton('study-center-vocab-button'), vocabTitle.firstChild);
-        }
 
-        const problemsNav = document.querySelector('#problems-section .problems-navigation');
-        if (problemsNav && !document.getElementById('study-center-problems-button')) {
-            problemsNav.appendChild(makeStudyNavButton('study-center-problems-button'));
-        }
     }
 
     function bindEvents() {
@@ -1032,7 +1024,7 @@
             }
 
             if (event.target.closest('[data-back-library]')) {
-                if (typeof window.showLibrary === 'function') window.showLibrary();
+                if (typeof window.goToFolder === 'function') window.goToFolder(null);
                 return;
             }
 

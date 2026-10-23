@@ -86,29 +86,7 @@
             addButton.setAttribute('aria-label', '新しい学習スペースを作成');
             addButton.addEventListener('click', openCreateModal);
 
-            const sampleButton = document.createElement('button');
-            sampleButton.type = 'button';
-            sampleButton.className = 'workspace-add-button workspace-sample-button';
-            sampleButton.textContent = '例文';
-            sampleButton.title = 'この中国語スペースに練習用の文章を追加';
-            sampleButton.setAttribute('aria-label', '中国語サンプル記事を追加');
-            sampleButton.addEventListener('click', async () => {
-                sampleButton.disabled = true;
-                try {
-                    if (typeof window.addChineseSampleToActiveWorkspace !== 'function') {
-                        throw new Error('Chinese sample importer is unavailable.');
-                    }
-                    const added = await window.addChineseSampleToActiveWorkspace();
-                    if (!added) alert('中国語サンプルは既に追加されています。');
-                } catch (error) {
-                    console.error('Chinese sample creation failed', error);
-                    alert('中国語サンプルの追加に失敗しました。元の記事は変更されていません。');
-                } finally {
-                    sampleButton.disabled = false;
-                }
-            });
-
-            control.append(select, addButton, sampleButton);
+            control.append(select, addButton);
             headerLeft.appendChild(control);
         }
         renderControl();
@@ -123,8 +101,6 @@
             select.appendChild(createOption(item.id, item.name || 'スペース'));
         });
         select.value = state.activeWorkspaceId || '';
-        const sampleButton = document.querySelector(`#${CONTROL_ID} .workspace-sample-button`);
-        if (sampleButton) sampleButton.hidden = !window.SmartReaderWorkspaceSamples?.isChineseWorkspace(state.activeWorkspace);
     }
 
     function labeledField(labelText, control) {
