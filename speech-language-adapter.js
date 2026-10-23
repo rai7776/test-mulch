@@ -9,6 +9,7 @@
 
         const originalSpeak = synthesis.speak.bind(synthesis);
         const wrappedSpeak = function (utterance) {
+            window.SmartReaderChinese?.beforeSpeech(utterance);
             try {
                 const locale = api.speechLocaleFromState(window.SmartReaderWorkspaceState);
                 if (locale && utterance && api.shouldApplyWorkspaceLanguage(utterance.lang)) {

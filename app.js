@@ -141,12 +141,38 @@ let readerScrollLockState = null;
 
 // --- 初期化関数 (1つに統合) ---
 async function init() {
-    // DBからデータを取得
+    let workspaceState = null;
+    if (window.SmartReaderWorkspace?.readWorkspaceState) {
+        try {
+            workspaceState = await window.SmartReaderWorkspace.readWorkspaceState(db);
+            window.SmartReaderWorkspaceState = workspaceState;
+        } catch (error) {
+            console.error('Workspace initialization failed; existing data was not modified.', error);
+            return;
+        }
+    }
+    // Always use the active Workspace library. Repair only Chinese sample data;
+    // never seed the default English tutorial into a Chinese Workspace.
     libraryItems = await db.getItem('library_items') || [];
+    if (workspaceState?.activeWorkspace && window.SmartReaderWorkspaceSamples?.repairActiveChineseWorkspace) {
+        try {
+            const repaired = await window.SmartReaderWorkspaceSamples.repairActiveChineseWorkspace(
+                db, workspaceState.activeWorkspace,
+                [...SAMPLE_DATA, ...(window.SmartReaderSampleDataV2?.data || [])]
+            );
+            if (Array.isArray(repaired)) libraryItems = repaired;
+        } catch (error) {
+            // Preserve all existing articles if local storage is unavailable.
+            console.error('Chinese Workspace sample repair failed without deleting user data.', error);
+        }
+    }
 
-    // データが空ならサンプルを投入
-    if (libraryItems.length === 0) {
-        libraryItems = SAMPLE_DATA; // SAMPLE_DATAが定義されている前提
+    libraryItems.filter(item => item?.type === 'article').forEach(article =>
+        (article.words || []).forEach(word => window.SmartReaderChinese?.normalizeLearning(word,article)));
+    // Keep the legacy sample fallback only for truly legacy installations
+    // without the Workspace API, not for Workspace-managed user libraries.
+    if (libraryItems.length === 0 && !window.SmartReaderWorkspace) {
+        libraryItems = SAMPLE_DATA;
         await db.setItem('library_items', libraryItems);
     }
 
@@ -159,6 +185,7 @@ async function init() {
     showLibrary(); 
     renderList('words');
     setupEventListeners(); // リスナー設定を呼び出す
+    if (workspaceState) window.dispatchEvent(new CustomEvent('smartreader:workspace-ready', { detail: workspaceState }));
 }
 
 // --- イベントリスナー設定 ---
@@ -793,6 +820,8 @@ function renderImportReview() {
     if (source) source.textContent = isSavedBookEditor()
         ? '保存済み書籍'
         : `${importReviewState.sourceType || 'text'} · ${importReviewState.sourceName || 'document'}`;
+    const language=document.getElementById('import-review-language');
+    if (language) language.textContent='学習対象言語: '+window.SmartReaderLanguageProfile.active().label;
     renderImportReviewChapterList();
     renderImportReviewEditor();
     updateImportReviewSearch(false, false);
@@ -1176,6 +1205,7 @@ async function readPDF(file) {
 
 // --- 本棚・ライブラリ管理 (参考サイトのカードデザイン再現) ---
 function showLibrary() {
+    window.SmartReaderChinese?.stopSentenceAudio();
     flushReadingPositionSave();
     hideAllSections();
     document.getElementById('side-panel')?.classList.remove('is-open');
@@ -1190,19 +1220,7 @@ function showLibrary() {
     const bc = document.getElementById('breadcrumbs');
     list.innerHTML = '';
 
-    let path = [], tempId = currentFolderId;
-    while(tempId) {
-        let f = libraryItems.find(i => i.id === tempId);
-        if(f) { path.unshift(f); tempId = f.parentId; } else break;
-    }
-    let html = '';
-    path.forEach((f, idx) => {
-        const separator = idx === 0 ? '' : ' > ';
-        if(idx === path.length - 1) html += `${separator}<b>${escapeHtml(f.name)}</b>`;
-        else html += `${separator}<span onclick="goToFolder(${f.id})">${escapeHtml(f.name)}</span>`;
-    });
-    bc.innerHTML = html;
-    bc.style.display = path.length ? '' : 'none';
+    window.SmartReaderLearningUI?.renderLibrary(document, libraryItems, currentFolderId, goToFolder, openArticle, window.localStorage, window.SmartReaderWorkspaceState);
 
     libraryItems.filter(i => i.parentId === currentFolderId).forEach(item => {
         const card = document.createElement('div');
@@ -1396,7 +1414,9 @@ function getGlobalSearchMatches(value, options) {
         !!options?.caseSensitive
     );
     return options?.prefixOnly
-        ? matches.filter(match => match.index === 0 || !isSearchWordCharacter(text[match.index - 1]))
+        ? matches.filter(match => window.SmartReaderChinese?.isChinese()
+            ? window.SmartReaderLanguageProfile.wordSegments(text).some(part=>part.index===match.index)
+            : match.index === 0 || !isSearchWordCharacter(text[match.index - 1]))
         : matches;
 }
 
@@ -1775,6 +1795,7 @@ function openArticle(id) {
     if (currentArticle && currentArticle.id !== nextArticle.id) flushReadingPositionSave();
 
     currentArticle = nextArticle;
+    window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
     ensureArticleCollections(currentArticle);
     if (!currentArticle) return;
     currentChapterId = getInitialChapterId(currentArticle);
@@ -1785,7 +1806,7 @@ function openArticle(id) {
     document.getElementById('back-to-library').style.display = 'inline-block';
     document.getElementById('article-meta').style.display = 'flex';
     document.getElementById('display-url').href = currentArticle.url || '#';
-    document.getElementById('display-url').style.display = currentArticle.url ? 'inline' : 'none';
+    document.getElementById('display-url').style.display = currentArticle.url ? 'inline-flex' : 'none';
 
     renderChapterNavigation();
     renderArticleText();
@@ -1862,7 +1883,9 @@ function renderQuestionMarkerText(selected, question, chapterId, questionIndex =
 }
 
 function renderArticleText() {
+    window.SmartReaderChinese?.stopSentenceAudio();
     if(!currentArticle) return;
+    window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems, goToFolder);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
     const content = getCurrentChapterContent();
@@ -1908,7 +1931,28 @@ function renderArticleText() {
     });
 
     display.innerHTML = html;
+    const showPinyin = readerSettings.annotationVisibility?.pinyin !== false;
+    window.SmartReaderChinese?.decorateReader(display, currentArticle, showPinyin);
+    window.SmartReaderChinese?.syncReaderControls(currentArticle, showPinyin);
+    window.SmartReaderChinese?.setSpeechRate(readerSettings.speechRate || 0.85);
+    const rate=document.getElementById('chinese-speech-rate');
+    if (rate) rate.value=String(readerSettings.speechRate || 0.85);
     updateProgress(null, true);
+}
+
+function setChinesePinyinVisibility(visible) {
+    if (!readerSettings.annotationVisibility || typeof readerSettings.annotationVisibility !== 'object') {
+        readerSettings.annotationVisibility = {};
+    }
+    const position=captureReadingPosition();
+    readerSettings.annotationVisibility.pinyin = !!visible;
+    void db.setItem('reader_settings', readerSettings);
+    window.SmartReaderChinese?.decorateReader(document.getElementById('text-display'), currentArticle, visible);
+    restoreReadingPosition(position);
+}
+async function setChineseSpeechRate(value) {
+    readerSettings.speechRate=window.SmartReaderChinese.setSpeechRate(value);
+    await db.setItem('reader_settings',readerSettings);
 }
 
 function hasActiveReaderTextSelection() {
@@ -2268,6 +2312,7 @@ function renderQuestionCard(card, question, sourceIndex, filter) {
 }
 
 function renderList(type, filter = '') {
+    window.SmartReaderChinese?.syncMaskOptions(document.getElementById('anki-target-select'));
     const container = document.getElementById('panel-content');
     if (!container || !currentArticle) return;
     container.innerHTML = '';
@@ -2290,7 +2335,7 @@ function renderList(type, filter = '') {
         list = list.filter(({ item }) => {
             if (type === 'words') {
                 const otherSenseText = Array.isArray(item.senses) ? item.senses.map(sense => sense?.meaning || '').join(' ') : '';
-                return `${item.word || ''} ${item.meaning || ''} ${otherSenseText} ${item.memo || ''}`.toLowerCase().includes(q);
+                return `${item.word || ''} ${item.meaning || ''} ${otherSenseText} ${item.memo || ''} ${window.SmartReaderChinese?.reading(item) || ''}`.toLowerCase().includes(q);
             }
             if (type === 'notes') return `${item.originalText || ''} ${item.translation || ''} ${item.extra || ''}`.toLowerCase().includes(q);
             return `${item.selectedText || item.anchor?.selectedText || ''} ${item.question || ''} ${item.answer || ''} ${item.explanation || ''} ${item.memo || ''} ${normalizeQuestionTags(item.tags).join(' ')}`.toLowerCase().includes(q);
@@ -2334,6 +2379,15 @@ function renderList(type, filter = '') {
         } else {
             renderQuestionCard(card, item, sourceIndex, filter);
         }
+        if (type === 'words') {
+            window.SmartReaderLearningTargets?.syncCheckbox(card.querySelector('.word-left input[type="checkbox"]'),item);
+            window.SmartReaderChinese?.attachStudyControls(card, item, currentArticle, async (target, learned) => {
+                window.SmartReaderChinese.setLearning(item, target, learned, currentArticle);
+                await saveToDB();
+                renderList('words', document.getElementById('list-search')?.value || '');
+            });
+        }
+        if (type === 'notes') window.SmartReaderChinese?.decorateNote(card, currentArticle);
         container.appendChild(card);
     });
 }
@@ -2390,6 +2444,7 @@ async function handleUnifiedSave(e) {
                     currentArticle.words = currentArticle.words.map((i, index) => {
                         if (index !== editIndex) return i;
                         const updated = Object.assign({}, i, values);
+                        applyChineseWordForm(updated, i, currentArticle);
                         if ((updated.chapterId === undefined || updated.chapterId === null) && activeChapterId) {
                             updated.chapterId = activeChapterId;
                         }
@@ -2398,6 +2453,7 @@ async function handleUnifiedSave(e) {
                 }
             } else {
                 const word = Object.assign({ id: Date.now(), memorized: false, createdAt: Date.now() }, values);
+                applyChineseWordForm(word, null, currentArticle);
                 if (activeChapterId) word.chapterId = activeChapterId;
                 if (selectedReaderCapture?.anchor && selectedText === selectedReaderCapture.anchor.selectedText) {
                     word.anchor = selectedReaderCapture.anchor;
@@ -2484,6 +2540,7 @@ function editItem(id, type, sourceIndex = null) {
         setQuestionFormValues(item);
     }
     showUnifiedModal();
+    if (type === 'word') window.SmartReaderChinese?.syncEditor(currentArticle, item);
 }
 
 // --- ＋ボタンを押した時にモーダルを新規状態で開く ---
@@ -2522,6 +2579,7 @@ function openUnifiedModal() {
 
     // モーダルを表示
     showUnifiedModal();
+    window.SmartReaderChinese?.syncEditor(currentArticle, null);
 }
 
 
@@ -2574,7 +2632,12 @@ function getTextOffsetInElement(element, node, offset) {
 }
 
 function extractSentenceContext(text, startOffset = 0, endOffset = startOffset) {
-    const value = String(text ?? '').replace(/\s+/g, ' ').trim();
+    const raw=String(text ?? '');
+    if (window.SmartReaderChinese?.isChinese()) {
+        const sentence=window.SmartReaderLanguageProfile.sentences(raw).find(part=>startOffset>=part.start && startOffset<part.end);
+        return sentence?sentence.text.trim():raw;
+    }
+    const value=raw.replace(/\s+/g,' ').trim();
     if (!value) return '';
     const start = Math.max(0, Math.min(Number(startOffset) || 0, value.length));
     const end = Math.max(start, Math.min(Number(endOffset) || start, value.length));
@@ -2612,7 +2675,7 @@ function captureReaderSelection(range, selected) {
 
 function applyAnkiMaskClass(container, active, target) {
     if (!container) return;
-    container.classList.remove('anki-mask-both', 'anki-mask-word', 'anki-mask-meaning');
+    container.classList.remove('anki-mask-both','anki-mask-word','anki-mask-meaning','anki-mask-reading','anki-mask-learning');
     if (active) container.classList.add('anki-mask-' + (target || 'both'));
 }
 
@@ -2762,7 +2825,27 @@ function flushReadingPositionSave() {
 }
 
 async function saveToDB() { await db.setItem('library_items', libraryItems); }
-function hideAllSections() { ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
+
+// Existing Chinese Workspaces can opt in to the sample without replacing any articles.
+async function addChineseSampleToActiveWorkspace() {
+    const workspace = window.SmartReaderWorkspaceState?.activeWorkspace;
+    const samples = window.SmartReaderWorkspaceSamples;
+    if (!samples?.isChineseWorkspace(workspace)) return false;
+    if (samples.hasChineseSample(libraryItems)) return false;
+    const additions = samples.createChineseSample(workspace);
+    const original = libraryItems;
+    libraryItems = [...libraryItems, ...additions];
+    try {
+        await saveToDB();
+    } catch (error) {
+        libraryItems = original;
+        throw error;
+    }
+    showLibrary();
+    return true;
+}
+window.addChineseSampleToActiveWorkspace = addChineseSampleToActiveWorkspace;
+function hideAllSections() { window.SmartReaderChinese?.stopSentenceAudio(); window.SmartReaderReaderHeader?.hide(document); ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 function lockReaderScrollForModal() {
     const display = document.getElementById('text-display');
     if (!display || !currentArticle || readerScrollLockState) return;
@@ -2842,9 +2925,10 @@ function getReaderWordCounts(article = currentArticle) {
     const bookChars = hasStoredChapters(article)
         ? getArticleChapters(article).reduce((sum, chapter) => sum + String(chapter.content || '').length, 0)
         : bookText.length;
+    const wordCount = text => window.SmartReaderChinese?.countWords(text, article) ?? countEnglishWords(text);
     return {
-        chapter: countEnglishWords(chapterText),
-        book: countEnglishWords(bookText),
+        chapter: wordCount(chapterText),
+        book: wordCount(bookText),
         chapterChars: chapterText.length,
         bookChars
     };
@@ -2915,7 +2999,7 @@ function updateProgress(event, forceWordCount = false) {
     const bookProgress = getBookScrollProgress(currentArticle, chapterProgress);
     const hasMultipleChapters = hasStoredChapters(currentArticle) && getCurrentChapters().length > 1;
     const wordCount = document.getElementById('word-count');
-    if (wordCount) wordCount.innerText = `${readerWordCounts.chapter.toLocaleString()} words`;
+    if (wordCount) wordCount.innerText = `${readerWordCounts.chapter.toLocaleString()} ${window.SmartReaderLanguageProfile.active().wordUnit}`;
     const charCount = document.getElementById('char-count');
     if (charCount) charCount.innerText = `${readerWordCounts.chapterChars.toLocaleString()}文字`;
     const progress = Math.round(chapterProgress * 100);
@@ -2929,7 +3013,7 @@ function updateProgress(event, forceWordCount = false) {
     const bookWordCount = document.getElementById('book-word-count');
     const bookCharCount = document.getElementById('book-char-count');
     const bookReadProgress = document.getElementById('book-read-progress');
-    if (bookWordCount) bookWordCount.innerText = `${readerWordCounts.book.toLocaleString()} words`;
+    if (bookWordCount) bookWordCount.innerText = `${readerWordCounts.book.toLocaleString()} ${window.SmartReaderLanguageProfile.active().wordUnit}`;
     if (bookCharCount) bookCharCount.innerText = `${readerWordCounts.bookChars.toLocaleString()}文字`;
     if (bookReadProgress) bookReadProgress.innerText = `${Math.round(bookProgress * 100)}%`;
     if (event && event.type === 'scroll') scheduleReadingPositionSave();
@@ -2942,11 +3026,12 @@ async function toggleMemorized(id, e, sourceIndex = null) {
     if (!w) return;
     const readingPosition = rememberReadingPosition();
     w.memorized = !w.memorized;
+    window.SmartReaderChinese?.mirrorMastery(w, currentArticle);
     await saveToDB();
     renderList('words', document.getElementById('list-search').value);
     restoreReadingPosition(readingPosition);
 }
-function speakWord(t) { if ('speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; speechSynthesis.speak(u); } }
+function speakWord(t) { if ('speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = window.SmartReaderSpeechLanguage?.speechLocaleFromState(window.SmartReaderWorkspaceState) || 'en-US'; speechSynthesis.speak(u); } }
 function applySettings() { document.documentElement.style.setProperty('--reader-font-size', readerSettings.fontSize+'px'); document.documentElement.style.setProperty('--reader-line-height', readerSettings.lineHeight); }
 function renderSettingsUI(c) { c.innerHTML = `<div class="settings-group"><p>文字: ${readerSettings.fontSize}px</p><input type="range" min="14" max="30" value="${readerSettings.fontSize}" oninput="updateSetting('font', this.value)"><p>行間: ${readerSettings.lineHeight}</p><input type="range" min="1.2" max="2.5" step="0.1" value="${readerSettings.lineHeight}" oninput="updateSetting('line', this.value)"></div>`; }
 function updateSetting(t, v) { if (t==='font') readerSettings.fontSize=v; else readerSettings.lineHeight=v; applySettings(); db.setItem('reader_settings', readerSettings); renderList('settings'); }
@@ -2975,13 +3060,22 @@ function switchTab(t) {
 }
 function openMoveModal(id) { movingItemId = id; const item = libraryItems.find(i => i.id === id); if(!item) return; document.getElementById('move-target-name').innerText = item.name; const s = document.getElementById('move-select'); s.innerHTML = '<option value="">🏠 Root</option>'; libraryItems.filter(i=>i.type==='folder'&&i.id!==id).forEach(f=>{ const o=document.createElement('option'); o.value=f.id; o.innerText=f.name; s.appendChild(o); }); document.getElementById('move-modal-overlay').classList.add('show'); }
 async function submitMove() { if(!movingItemId) return; const val = document.getElementById('move-select').value; const pid = val?parseInt(val):null; const item = libraryItems.find(i=>i.id===movingItemId); if(item){ item.parentId=pid; await saveToDB(); document.getElementById('move-modal-overlay').classList.remove('show'); showLibrary(); } }
-function exportToCSV() { if (!currentArticle || currentArticle.words.length === 0) { alert("データなし"); return; } let csv = "Word,Meaning,Memo\n"; currentArticle.words.forEach(i => { const e=t=>t?`"${t.replace(/"/g, '""')}"`:""; csv+=`${e(i.word)},${e(i.meaning)},${e(i.memo)}\n`; }); const b = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv' }); const l = document.createElement("a"); l.href=URL.createObjectURL(b); l.download="words.csv"; l.click(); }
+function exportToCSV() {
+    if (!currentArticle?.words?.length) { alert('データなし'); return; }
+    const chinese=window.SmartReaderChinese;
+    const header=['Word','Meaning','Memo','Language','ReadingSystem','Reading','ReadingLearned','MeaningLearned'];
+    const rows=currentArticle.words.map(word=>[word.word,word.meaning,word.memo,
+        chinese.language(),chinese.isChinese() && chinese.reading(word)?'pinyin':'',chinese.reading(word),
+        chinese.isChinese()?String(chinese.learning(word).pinyin):'',
+        chinese.isChinese()?String(chinese.learning(word).meaning):String(!!word.memorized)]);
+    downloadGlobalVocabularyCsv([header,...rows].map(row=>row.map(globalCsvValue).join(',')).join('\r\n')+'\r\n','words.csv');
+}
 
 const COMMON_FREQUENCY_WORDS = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'of', 'to', 'in', 'on', 'for', 'with', 'at', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'it', 'that', 'this', 'as', 'i', 'you', 'he', 'she', 'we', 'they', 'his', 'her', 'their', 'my', 'your', 'not', 'do', 'does', 'did', 'have', 'has', 'had']);
 
 function getWordFrequency(article, excludeCommon = false) {
     const counts = new Map();
-    getEnglishTokens(getArticleFullText(article)).forEach(token => {
+    window.SmartReaderLanguageProfile.wordSegments(getArticleFullText(article)).map(part=>part.text).forEach(token => {
         const word = token.toLocaleLowerCase();
         if (excludeCommon && COMMON_FREQUENCY_WORDS.has(word)) return;
         counts.set(word, (counts.get(word) || 0) + 1);
@@ -3006,8 +3100,8 @@ function renderWordStatistics() {
     if (!container || !currentArticle) return;
     const excludeCommon = !!document.getElementById('frequency-exclude-common')?.checked;
     const frequency = getWordFrequency(currentArticle, excludeCommon).slice(0, 80);
-    const total = countEnglishWords(getArticleFullText(currentArticle));
-    if (summary) summary.textContent = `${total.toLocaleString()} words · ${frequency.length} 件を表示`;
+    const total = window.SmartReaderChinese.countWords(getArticleFullText(currentArticle));
+    if (summary) summary.textContent = `${total.toLocaleString()} ${window.SmartReaderLanguageProfile.active().wordUnit} · ${frequency.length} 件を表示`;
     container.innerHTML = '';
     frequency.forEach(entry => {
         const row = document.createElement('button');
@@ -3431,8 +3525,10 @@ function updateSearchCount() {
 }
 
 function isSearchWordCharacter(char) {
-    return !!char && /[A-Za-z]/.test(char);
+    return !!char && /[\p{L}\p{M}\p{N}]/u.test(char);
 }
+
+function isWholeWordMatch(text,index,length) { return window.SmartReaderLanguageProfile.wholeWord(text,index,length); }
 
 function findSearchMatches(text, query, wholeWord, caseSensitive) {
     const haystack = caseSensitive ? text : text.toLocaleLowerCase();
@@ -3446,7 +3542,7 @@ function findSearchMatches(text, query, wholeWord, caseSensitive) {
         if (index === -1) break;
         const before = text[index - 1];
         const after = text[index + needle.length];
-        if (!wholeWord || (!isSearchWordCharacter(before) && !isSearchWordCharacter(after))) {
+        if (!wholeWord || isWholeWordMatch(text, index, needle.length)) {
             matches.push({ index, length: needle.length });
         }
         start = index + Math.max(needle.length, 1);
@@ -3483,35 +3579,35 @@ function applySearchHighlights() {
         return;
     }
 
-    const walker = document.createTreeWalker(display, NodeFilter.SHOW_TEXT);
-    const textNodes = [];
-    let node;
-    while ((node = walker.nextNode())) textNodes.push(node);
-
-    const matches = [];
-    textNodes.forEach(textNode => {
-        const text = textNode.nodeValue;
-        const hits = findSearchMatches(
-            text,
-            readerSearchState.query,
-            readerSearchState.wholeWord,
-            readerSearchState.caseSensitive
-        );
-        if (hits.length === 0) return;
-
-        const fragment = document.createDocumentFragment();
-        let cursor = 0;
-        hits.forEach(hit => {
-            if (hit.index > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, hit.index)));
-            const span = document.createElement('span');
-            span.className = 'search-match';
-            span.textContent = text.slice(hit.index, hit.index + hit.length);
-            fragment.appendChild(span);
-            matches.push(span);
-            cursor = hit.index + hit.length;
+    display.querySelectorAll('.search-match,.search-match-part').forEach(span=>span.replaceWith(...span.childNodes));
+    const matches=[];
+    display.querySelectorAll('p[data-paragraph-index]').forEach(paragraph=>{
+        const walker=document.createTreeWalker(paragraph,NodeFilter.SHOW_TEXT);
+        const nodes=[]; let node; let length=0;
+        while ((node=walker.nextNode())) {
+            if (node.parentElement.closest('button')) continue;
+            nodes.push({node,start:length,end:length+node.nodeValue.length});
+            length+=node.nodeValue.length;
+        }
+        const text=nodes.map(part=>part.node.nodeValue).join('');
+        const hits=findSearchMatches(text,readerSearchState.query,readerSearchState.wholeWord,readerSearchState.caseSensitive);
+        const groups=hits.map(()=>[]);
+        nodes.forEach(part=>{
+            const fragment=document.createDocumentFragment(); let cursor=0;
+            hits.forEach((hit,hitIndex)=>{
+                const from=Math.max(hit.index,part.start)-part.start;
+                const to=Math.min(hit.index+hit.length,part.end)-part.start;
+                if(from>=to)return;
+                if(from>cursor)fragment.appendChild(document.createTextNode(part.node.nodeValue.slice(cursor,from)));
+                const span=document.createElement('span');
+                span.className=groups[hitIndex].length?'search-match-part':'search-match';
+                span.textContent=part.node.nodeValue.slice(from,to);fragment.appendChild(span);
+                groups[hitIndex].push(span);cursor=to;
+            });
+            if(cursor<part.node.nodeValue.length)fragment.appendChild(document.createTextNode(part.node.nodeValue.slice(cursor)));
+            part.node.replaceWith(fragment);
         });
-        if (cursor < text.length) fragment.appendChild(document.createTextNode(text.slice(cursor)));
-        textNode.parentNode.replaceChild(fragment, textNode);
+        groups.forEach(parts=>{if(parts.length){parts[0].searchParts=parts;matches.push(parts[0]);}});
     });
 
     readerSearchState.matches = matches;
@@ -3531,10 +3627,10 @@ function setActiveSearchResult(index, shouldScroll = true) {
         return;
     }
 
-    matches.forEach(match => match.classList.remove('current-search-match'));
+    matches.forEach(match => (match.searchParts || [match]).forEach(part=>part.classList.remove('current-search-match')));
     readerSearchState.currentIndex = (index + matches.length) % matches.length;
     const match = matches[readerSearchState.currentIndex];
-    match.classList.add('current-search-match');
+    (match.searchParts || [match]).forEach(part=>part.classList.add('current-search-match'));
     if (shouldScroll) match.scrollIntoView({ behavior: 'smooth', block: 'center' });
     updateSearchCount();
 }
@@ -3556,7 +3652,7 @@ async function setBookSearchResult(index, shouldScroll = true) {
     const match = paragraph ? paragraph.querySelectorAll('.search-match')[result.matchIndexInParagraph] : null;
     document.querySelectorAll('.current-search-match').forEach(element => element.classList.remove('current-search-match'));
     if (match) {
-        match.classList.add('current-search-match');
+        (match.searchParts || [match]).forEach(part=>part.classList.add('current-search-match'));
         if (shouldScroll) match.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     updateSearchCount();
@@ -3656,6 +3752,14 @@ function getVocabularyWordRuntimeMetadata(word) {
     };
 }
 
+function applyChineseWordForm(word, previousWord = null, article = currentArticle) {
+    const chinese = window.SmartReaderChinese;
+    if (chinese?.isChinese(article)) {
+        chinese.applyReading(word, previousWord, article, document.getElementById('input-word-pinyin')?.value || '');
+    }
+    return word;
+}
+
 function getVocabularyFormValues() {
     const canonical = String(document.getElementById('input-word-text')?.value || '').trim();
     const enteredSurfaceText = String(document.getElementById('input-word-surface-text')?.value || '').trim();
@@ -3697,6 +3801,7 @@ function collectGlobalVocabulary() {
         .forEach(article => {
             const words = Array.isArray(article.words) ? article.words : [];
             words.forEach((word, sourceIndex) => {
+                window.SmartReaderChinese?.normalizeLearning(word,article);
                 const chapter = getGlobalChapterInfo(article, word);
                 const wordId = word?.id;
                 const metadata = getVocabularyWordRuntimeMetadata(word);
@@ -3714,6 +3819,8 @@ function collectGlobalVocabulary() {
                     sourceIndex,
                     word,
                     wordText: String(word?.word || ''),
+                    language: window.SmartReaderChinese?.language(article) || 'en',
+                    reading: window.SmartReaderChinese?.reading(word) || '',
                     surfaceText: metadata.surfaceText,
                     tags: metadata.tags,
                     partOfSpeech: metadata.partOfSpeech,
@@ -3787,6 +3894,7 @@ function getFilteredGlobalVocabulary() {
         if (!query) return true;
         return [
             entry.wordText,
+            entry.reading,
             entry.surfaceText,
             entry.meaning,
             entry.memo,
@@ -3832,7 +3940,7 @@ function getGlobalVocabularyStatistics(entries = globalVocabularyState.entries) 
 function groupGlobalVocabularyEntries(entries) {
     const groups = new Map();
     (entries || []).forEach(entry => {
-        const key = normalizeVocabularyWord(entry.wordText) || `__empty__${entry.key}`;
+        const key = window.SmartReaderChinese?.groupKey(entry.word) || normalizeVocabularyWord(entry.wordText) || `__empty__${entry.key}`;
         if (!groups.has(key)) groups.set(key, { key, wordText: entry.wordText, entries: [] });
         groups.get(key).entries.push(entry);
     });
@@ -3849,6 +3957,9 @@ function appendGlobalVocabularyOption(select, value, label) {
 
 function renderGlobalVocabularyControls() {
     const state = globalVocabularyState;
+    const maskSelect=document.getElementById('global-vocab-anki-target');
+    window.SmartReaderChinese?.syncMaskOptions(maskSelect);
+    if (maskSelect && ![...maskSelect.options].some(option=>option.value===state.ankiTarget)) state.ankiTarget=maskSelect.value;
     const sourceSelect = document.getElementById('global-vocab-source');
     const chapterSelect = document.getElementById('global-vocab-chapter');
     const tagSelect = document.getElementById('global-vocab-tag');
@@ -3859,7 +3970,7 @@ function renderGlobalVocabularyControls() {
     const selectedArticle = state.sourceId === 'all'
         ? null
         : state.entries.find(entry => String(entry.articleId) === String(state.sourceId));
-    if (title) title.textContent = selectedArticle ? `Global Vocabulary · ${selectedArticle.articleTitle}` : 'Global Vocabulary';
+    if (title) title.textContent = selectedArticle ? `単語帳 · ${selectedArticle.articleTitle}` : '単語帳';
 
     const articles = [];
     state.entries.forEach(entry => {
@@ -4151,6 +4262,7 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
     const check = document.createElement('input');
     check.type = 'checkbox';
     check.checked = entry.memorized;
+    window.SmartReaderLearningTargets?.syncCheckbox(check,entry.word);
     check.title = '暗記済み';
     check.addEventListener('click', event => event.stopPropagation());
     check.addEventListener('change', event => toggleGlobalMemorized(entry.key, event));
@@ -4178,6 +4290,14 @@ function createGlobalVocabularyCard(entry, { forceExpanded = false } = {}) {
     meaning.textContent = entry.meaning;
     summary.append(left, meaning);
     card.appendChild(summary);
+    window.SmartReaderChinese?.attachStudyControls(card, entry.word, null, async (target, learned) => {
+        const source = getGlobalEntrySource(entry);
+        if (!source) return;
+        window.SmartReaderChinese.setLearning(source.word, target, learned, source.article);
+        await saveToDB();
+        globalVocabularyState.entries = collectGlobalVocabulary();
+        renderGlobalVocabulary();
+    });
 
     const isExpanded = !globalVocabularyState.ankiMode && (forceExpanded || globalVocabularyState.expandedKey === entry.key);
     if (isExpanded) {
@@ -4367,16 +4487,21 @@ async function toggleGlobalMemorized(key, event) {
     const source = getGlobalEntrySource(entry);
     if (!source) return;
     source.word.memorized = !source.word.memorized;
+    window.SmartReaderChinese?.mirrorMastery(source.word, source.article);
     await saveToDB();
     globalVocabularyState.entries = collectGlobalVocabulary();
     renderGlobalVocabulary();
 }
 
 async function setGlobalGroupMemorized(groupKey, memorized) {
-    const entries = globalVocabularyState.entries.filter(entry => normalizeVocabularyWord(entry.wordText) === groupKey);
+    const entries = globalVocabularyState.entries.filter(entry =>
+        (window.SmartReaderChinese?.groupKey(entry.word) || normalizeVocabularyWord(entry.wordText)) === groupKey);
     entries.forEach(entry => {
         const source = getGlobalEntrySource(entry);
-        if (source) source.word.memorized = memorized;
+        if (source) {
+            source.word.memorized = memorized;
+            window.SmartReaderChinese?.mirrorMastery(source.word, source.article);
+        }
     });
     await saveToDB();
     globalVocabularyState.entries = collectGlobalVocabulary();
@@ -4403,6 +4528,7 @@ function openGlobalVocabularyWordEditor(key) {
     document.getElementById('input-word-memo').value = source.word.memo || '';
     document.getElementById('input-word-context').value = source.word.context || '';
     showUnifiedModal();
+    window.SmartReaderChinese?.syncEditor(source.article, source.word);
 }
 
 async function saveGlobalVocabularyWordFromModal() {
@@ -4421,7 +4547,9 @@ async function saveGlobalVocabularyWordFromModal() {
         return;
     }
 
-    article.words[wordIndex] = Object.assign({}, oldWord, getVocabularyFormValues(), { updatedAt: Date.now() });
+    const updatedWord = Object.assign({}, oldWord, getVocabularyFormValues(), { updatedAt: Date.now() });
+    applyChineseWordForm(updatedWord, oldWord, article);
+    article.words[wordIndex] = updatedWord;
     await saveToDB();
     closeModal();
     globalVocabularyState.entries = collectGlobalVocabulary();
@@ -4570,7 +4698,7 @@ function exportGlobalVocabularyCSV() {
         alert('データなし');
         return;
     }
-    const header = ['Word', 'SurfaceText', 'Meaning', 'PartOfSpeech', 'Tags', 'Memo', 'Context', 'Article', 'Chapter', 'Memorized', 'CreatedAt', 'UpdatedAt'];
+    const header = ['Word', 'SurfaceText', 'Meaning', 'PartOfSpeech', 'Tags', 'Memo', 'Context', 'Article', 'Chapter', 'Memorized', 'CreatedAt', 'UpdatedAt', 'Language', 'Reading', 'PinyinLearned','MeaningLearned','ReadingSystem','ReadingLearned'];
     const rows = entries.map(entry => [
         entry.wordText,
         entry.surfaceText,
@@ -4583,7 +4711,13 @@ function exportGlobalVocabularyCSV() {
         entry.chapterTitle,
         entry.memorized ? 'true' : 'false',
         entry.createdAt || '',
-        entry.updatedAt || ''
+        entry.updatedAt || '',
+        entry.language || 'en',
+        entry.reading || '',
+        window.SmartReaderChinese?.isChinese() && entry.reading ? String(!!window.SmartReaderChinese.learning(entry.word).pinyin) : '',
+        window.SmartReaderChinese?.isChinese() ? String(!!window.SmartReaderChinese.learning(entry.word).meaning) : '',
+        window.SmartReaderChinese?.isChinese() && entry.reading ? 'pinyin' : '',
+        window.SmartReaderChinese?.isChinese() ? String(!!window.SmartReaderChinese.learning(entry.word).pinyin) : ''
     ]);
     const csv = [header, ...rows].map(row => row.map(globalCsvValue).join(',')).join('\r\n') + '\r\n';
     downloadGlobalVocabularyCsv(csv, 'global-vocabulary.csv');

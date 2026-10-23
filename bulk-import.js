@@ -133,7 +133,7 @@
     }
 
     function parseTsvWords(raw) {
-        const rows = String(raw || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const rows = String(raw || '').split(/\r?\n/).filter(line => line.trim());
         if (!rows.length || !rows.some(line => line.includes('\t'))) return null;
         const words = rows.map(line => {
             const cols = line.split('\t');
@@ -144,7 +144,8 @@
                 tags: uniqStrings(cols[3]),
                 memo: text(cols[4]),
                 context: text(cols[5]),
-                surfaceText: text(cols[6]) || text(cols[0])
+                surfaceText: text(cols[6]) || text(cols[0]),
+                ...(cols.length > 7 ? { pinyin: text(cols[7]) } : {})
             };
         }).filter(item => item.word && item.meaning);
         return words.length ? { format: BULK_FORMAT, version: BULK_VERSION, words, notes: [], questions: [] } : null;
@@ -182,7 +183,7 @@
         const meaning = text(raw?.meaning);
         if (!word || !meaning) return null;
         const partOfSpeech = text(raw?.partOfSpeech);
-        return {
+        const result = {
             word,
             surfaceText: text(raw?.surfaceText) || word,
             meaning,
@@ -191,6 +192,14 @@
             memo: text(raw?.memo),
             context: text(raw?.context)
         };
+        if (window.SmartReaderChinese?.isChinese()) {
+            const supplied = Array.isArray(raw?.annotations) ? raw.annotations.find(a => a?.id === 'pinyin') : null;
+            if (Object.hasOwn(raw, 'pinyin') || supplied) {
+                const value = text(Object.hasOwn(raw, 'pinyin') ? raw.pinyin : supplied.value);
+                result.annotations = value ? [{ id:'pinyin', category:'reading', system:'pinyin', display:'ruby', learnable:true, value }] : [];
+            }
+        }
+        return result;
     }
 
     function normalizeStructure(raw) {
@@ -363,7 +372,7 @@
     }
 
     function itemSubtitle(item) {
-        if (item.type === 'word') return [item.data.surfaceText, item.data.partOfSpeech, item.data.tags.map(t => `#${t}`).join(' ')].filter(Boolean).join(' · ');
+        if (item.type === 'word') return [item.data.surfaceText, window.SmartReaderChinese?.reading(item.data), item.data.partOfSpeech, item.data.tags.map(t => `#${t}`).join(' ')].filter(Boolean).join(' · ');
         if (item.type === 'note') return [
             item.data.translation,
             item.data.structure ? `文構造 ${item.data.structure.annotations.length} annotation` : ''
@@ -486,7 +495,7 @@
             return;
         }
         try {
-            const prompt = buildAiPrompt();
+            const prompt = window.buildSmartReaderBulkAiPrompt();
             if (!navigator.clipboard?.writeText) throw new Error('クリップボードへコピーできません。');
             await navigator.clipboard.writeText(prompt);
             setStatus('AI用プロンプトをコピーしました。出力サンプルJSONも含まれています。');
@@ -499,6 +508,7 @@
         if (type === 'word') {
             const item = { id, memorized: false, createdAt: now, updatedAt: now, ...data };
             if (chapterId) item.chapterId = chapterId;
+            if (window.SmartReaderChinese?.isChinese()) window.SmartReaderChinese.normalizeLearning(item);
             return item;
         }
         if (type === 'note') {
@@ -520,6 +530,14 @@
         if (type === 'word') {
             preserved.id = old.id;
             preserved.memorized = !!old.memorized;
+            if (window.SmartReaderChinese?.isChinese()) {
+                // Omission leaves the saved reading unchanged. Explicit empty input removes it.
+                preserved.annotations = old.annotations;
+                if (Object.hasOwn(data, 'annotations')) {
+                    window.SmartReaderChinese.applyReading(preserved, old, currentArticle, window.SmartReaderChinese.reading(data));
+                } else window.SmartReaderChinese.normalizeLearning(preserved);
+                if (old.meaning !== data.meaning) window.SmartReaderLearningTargets?.changed(preserved, 'meaning');
+            }
             if (old.createdAt !== undefined) preserved.createdAt = old.createdAt;
         }
         if (type === 'question') {
@@ -590,7 +608,12 @@
         const target = document.getElementById('bulk-import-target');
         const input = document.getElementById('bulk-import-input');
         if (target) target.textContent = targetLabel();
-        if (input) input.value = '';
+        if (input) {
+            input.value = '';
+            input.placeholder = window.SmartReaderChinese?.isChinese()
+                ? 'JSON、またはTSV: 単語・意味・品詞・タグ・メモ・例文・本文表記・拼音（8列目、任意）\n学习\t学ぶ\tverb\t\t\t\t学习\txué xí'
+                : 'JSON、またはTSV: 単語・意味・品詞・タグ・メモ・例文・本文表記';
+        }
         setStatus('AIの出力を貼り付けるか、「AI用プロンプトをコピー」を使ってください。');
         renderReview();
         modal()?.classList.add('show');

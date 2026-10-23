@@ -286,11 +286,12 @@
         try {
             if (modalMode === 'setup' && isInitialSetupPending()) {
                 if (typeof api.completeInitialWorkspaceSetup !== 'function') throw new Error('Initial setup API is unavailable.');
-                await api.completeInitialWorkspaceSetup(dbRef, {
+                const completed = await api.completeInitialWorkspaceSetup(dbRef, {
                     name,
                     kind,
                     contentLanguage: kind === 'language' ? contentLanguage : ''
                 });
+                await window.SmartReaderWorkspaceSamples?.seedNewChineseWorkspace(dbRef, completed, { initialSetup: true });
                 window.location.reload();
                 return;
             }
@@ -301,6 +302,7 @@
                 kind,
                 contentLanguage: kind === 'language' ? contentLanguage : ''
             });
+            await window.SmartReaderWorkspaceSamples?.seedNewChineseWorkspace(dbRef, created);
             await api.switchWorkspace(dbRef, created.id, window.localStorage);
             window.location.reload();
         } catch (error) {

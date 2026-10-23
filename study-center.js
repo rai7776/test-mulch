@@ -189,6 +189,7 @@
     }
 
     function wordView(word) {
+        window.SmartReaderChinese?.normalizeLearning(word);
         const apiView = window.SmartReaderStudy?.getWordView?.(word);
         if (apiView) return apiView;
         const study = fallbackStudy(word);
@@ -205,7 +206,7 @@
         const due = next !== null && next < tomorrow;
         const suspended = !!study.suspended;
         const manualMastered = !!study.manualMasteredAt && !!word?.memorized;
-        const mastered = manualMastered || !!word?.memorized || study.level >= 4;
+        const mastered=window.SmartReaderLearningTargets?.managed(word)?!!word?.memorized:manualMastered || !!word?.memorized || study.level>=4;
         const accuracy = study.seenCount ? study.knownCount / study.seenCount : null;
         const weakScore = localWeaknessScore(study);
         const difficult = !suspended && !manualMastered && weakScore >= 65;
@@ -881,6 +882,7 @@
             entry.word.memorized = true;
         }
         entry.word.study = study;
+        if(window.SmartReaderLearningTargets?.managed(entry.word)) window.SmartReaderChinese.setAllLearning(entry.word,!currentlyManual,entry.article);
         persistStudyChanges();
         render();
     }
@@ -966,9 +968,9 @@
         section.style.display = 'none';
         section.innerHTML = `
             <div class="study-center-shell">
+                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showGlobalVocabulary()">Vocabulary</button><span aria-current="page">Study</span><button type="button" onclick="showGlobalProblems()">Problems</button></nav>
                 <header class="study-center-header">
                     <div><span class="study-center-eyebrow">STUDY</span><h1>学習</h1><p>いつ、何を復習するかをここで管理します。</p></div>
-                    <button type="button" class="study-center-library-link" data-back-library>Library</button>
                 </header>
                 <nav class="study-center-tabs" aria-label="学習メニュー">
                     <button type="button" data-study-tab="home" class="active">ホーム</button>
@@ -1004,15 +1006,7 @@
             else libraryActions.prepend(studyButton);
         }
 
-        const vocabTitle = document.querySelector('#vocabulary-section .vocabulary-title-row');
-        if (vocabTitle && !document.getElementById('study-center-vocab-button')) {
-            vocabTitle.insertBefore(makeStudyNavButton('study-center-vocab-button'), vocabTitle.firstChild);
-        }
 
-        const problemsNav = document.querySelector('#problems-section .problems-navigation');
-        if (problemsNav && !document.getElementById('study-center-problems-button')) {
-            problemsNav.appendChild(makeStudyNavButton('study-center-problems-button'));
-        }
     }
 
     function bindEvents() {
@@ -1030,7 +1024,7 @@
             }
 
             if (event.target.closest('[data-back-library]')) {
-                if (typeof window.showLibrary === 'function') window.showLibrary();
+                if (typeof window.goToFolder === 'function') window.goToFolder(null);
                 return;
             }
 
