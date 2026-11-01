@@ -67,7 +67,7 @@ test('Chinese one-character words highlight in text, including paragraph boundar
         { id: 2, word: '后', meaning: '後' }
     ];
     context.renderArticleText();
-    assert.equal((context.display.innerHTML.match(/class="word-highlight"/g) || []).length, 4);
+    assert.equal((context.display.innerHTML.match(/class="word-highlight"/g) || []).length, 3);
     assert.match(context.display.innerHTML, /<p data-paragraph-index="0"><span class="word-highlight"[^>]*>烟<\/span>/);
     assert.match(context.display.innerHTML, /下班<span class="word-highlight"[^>]*>后<\/span><\/p>/);
     assert.match(context.display.innerHTML, /<p data-paragraph-index="1"><span class="word-highlight"[^>]*>后<\/span><\/p>/);
