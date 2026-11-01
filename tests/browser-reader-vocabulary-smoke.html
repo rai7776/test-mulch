@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>Reader vocabulary highlight regression</title></head>
+<body>
+<div id="fixture">
+    <p id="note-overlap" data-paragraph-index="0"><span class="note-highlight" data-jump-id="90">按</span>照刻板印象。烟后</p>
+    <p id="question-within" data-paragraph-index="1"><span class="question-marker problem-highlight" data-question-id="8"><button type="button">Q</button><span class="problem-marker-text">按照</span></span>的办法。</p>
+    <p id="question-cross" data-paragraph-index="2">按<span class="question-marker problem-highlight" data-question-id="9"><button type="button">Q</button><span class="problem-marker-text">照</span></span>。</p>
+</div>
+<script src="../reader-vocabulary-highlights.js"></script>
+<script>
+try {
+    const root = document.getElementById('fixture');
+    const words = [
+        { id: 1, word: '按照', surfaceText: '按 照' },
+        { id: 2, word: '刻板印象' },
+        { id: 3, word: '烟' },
+        { id: 4, word: '后' }
+    ];
+    const annotated = SmartReaderVocabularyHighlights.apply(root, words, 'legacy-main',
+        { isChinese: true });
+    function assert(condition, message) { if (!condition) throw new Error(message); }
+    const first = document.getElementById('note-overlap');
+    const within = document.getElementById('question-within');
+    const across = document.getElementById('question-cross');
+    assert(annotated === 6, 'Expected 6 highlighted vocabulary occurrences, got ' + annotated);
+    assert(first.textContent === '按照刻板印象。烟后', 'Paragraph source text changed');
+    assert(first.querySelector('.note-highlight'), 'Note annotation was removed');
+    const noteWord = first.querySelector('.word-highlight[data-word-index="0"]');
+    assert(noteWord && noteWord.textContent === '按照', 'Phrase across note boundary not highlighted');
+    assert(first.querySelectorAll('.word-highlight').length === 4, 'Incorrect word highlight count in note paragraph');
+    assert(within.querySelector('button').closest('.question-marker'), 'Problem button moved outside marker');
+    assert(within.querySelector('.word-highlight').textContent === '按照', 'Problem text not highlighted');
+    assert(within.querySelector('button').closest('.word-highlight') === null, 'Problem button entered word span');
+    assert(across.querySelector('button').closest('.question-marker'), 'Cross-boundary problem button moved');
+    const crossParts = Array.from(across.querySelectorAll('.word-highlight'));
+    assert(crossParts.length === 2 && crossParts.map(node => node.textContent).join('') === '按照',
+        'Phrase across problem marker not highlighted safely');
+    assert(crossParts.every(node => node.dataset.jumpId === '1'), 'Word fragment links differ');
+    document.body.dataset.result = 'reader-vocab-smoke-ok';
+} catch (error) {
+    document.body.dataset.result = 'reader-vocab-smoke-failed: ' + error.message;
+}
+</script>
+</body>
+</html>

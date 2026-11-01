@@ -57,6 +57,20 @@ jobs:
             http://127.0.0.1:4173/tests/browser-source-link-smoke.html \
             > /tmp/smart-reader-source-link-dom.html \
             2> /tmp/smart-reader-source-link.log
+      - name: Exercise text-offset highlights across notes and problem markers
+        run: |
+          CHROME_BIN="$(cat /tmp/smart-reader-chrome-bin)"
+          timeout 20s "$CHROME_BIN" \
+            --headless \
+            --virtual-time-budget=1000 \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --user-data-dir=/tmp/smart-reader-vocabulary-profile \
+            --dump-dom \
+            http://127.0.0.1:4173/tests/browser-reader-vocabulary-smoke.html \
+            > /tmp/smart-reader-vocabulary-dom.html \
+            2> /tmp/smart-reader-vocabulary.log
       - name: Verify rendered app
         run: |
           # These nodes are created by JavaScript, so their presence proves that the app scripts executed.
@@ -71,9 +85,11 @@ jobs:
           ! grep -F 'showCurrentArticleVocabulary()' /tmp/smart-reader-dom.html
           grep -F 'https://unpkg.com/localforage@1.10.0/dist/localforage.min.js' /tmp/smart-reader-dom.html
           grep -F 'source-link-smoke-ok' /tmp/smart-reader-source-link-dom.html
+          grep -F 'reader-vocab-smoke-ok' /tmp/smart-reader-vocabulary-dom.html
           ! grep -F 'user-scalable=no' /tmp/smart-reader-dom.html
           ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)|Smart Reader workspace/storage foundation failed to initialize' /tmp/smart-reader-chrome.log
           ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)' /tmp/smart-reader-source-link.log
+          ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)' /tmp/smart-reader-vocabulary.log
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -84,4 +100,6 @@ jobs:
             /tmp/smart-reader-chrome.log
             /tmp/smart-reader-source-link-dom.html
             /tmp/smart-reader-source-link.log
+            /tmp/smart-reader-vocabulary-dom.html
+            /tmp/smart-reader-vocabulary.log
             /tmp/smart-reader-http.log
