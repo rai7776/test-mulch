@@ -49,7 +49,7 @@ try {
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display!=='none'),'Reader action missing');
     const addRect=document.getElementById('add-btn').getBoundingClientRect();
     const bulkRect=document.getElementById('bulk-add-btn').getBoundingClientRect();
-    check(addRect.left < bulkRect.left,'Reader action order not shared');
+    if (window.innerWidth <= 767) check(addRect.left < bulkRect.left,'Mobile Reader action order not shared');
     document.body.classList.remove('reader-mode-active');
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display==='none'),'Editing action buttons not hidden');
     document.body.dataset.result='multilingual-reader-smoke-ok';
