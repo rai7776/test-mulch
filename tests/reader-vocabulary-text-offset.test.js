@@ -66,6 +66,6 @@ test('regex punctuation in registered words is escaped rather than interpreted',
 test('UTF-16 offsets remain aligned with source text containing supplementary Unicode', () => {
     const text='📚按照。📖烟';
     const found=highlighter.findMatches(text,[{word:'按照'}, {word:'烟'}],null,chinese);
-    assert.deepEqual(found.map(m=>[m.start,m.end]),[[2,4],[8,9]]);
+    assert.deepEqual(found.map(m=>[m.start,m.end]),[[2,4],[7,8]]);
     assert.deepEqual(found.map(m=>text.slice(m.start,m.end)),['按照','烟']);
 });
