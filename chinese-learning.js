@@ -16,6 +16,10 @@
     let activeSpeech = null;
 
     function splitSentences(text) { return profiles.sentences(text); }
+    function hasReaderSpeech(state) {
+        const profile = profiles.active(state);
+        return !!(profile.language && profile.locale);
+    }
 
     function characterReadings(text, engine) {
         const api = engine || (typeof window !== 'undefined' ? window.pinyinPro : null);
@@ -60,8 +64,8 @@
     }
     function speakSentence(text, button, onEnd) {
         const synthesis = typeof window !== 'undefined' ? window.speechSynthesis : null;
-        if (!isChinese() || !synthesis || !window.SpeechSynthesisUtterance || !String(text).trim()) {
-            audioStatus('この端末では中国語の読み上げを利用できません。'); return false;
+        if (!hasReaderSpeech() || !synthesis || !window.SpeechSynthesisUtterance || !String(text).trim()) {
+            audioStatus('このWorkspaceでは読み上げを利用できません。音声機能または学習言語を確認してください。'); return false;
         }
         const utterance = new window.SpeechSynthesisUtterance(String(text).trim());
         utterance.lang = profiles.active().locale; utterance.rate = speechRate;
@@ -76,7 +80,7 @@
         utterance.onerror = () => {
             if (activeSpeech !== speech) return;
             clearSpeech(speech); activeSpeech = null; sequenceToken++;
-            audioStatus('読み上げできませんでした。中国語音声の設定をご確認ください。');
+            audioStatus('読み上げできませんでした。端末の音声設定と言語を確認してください。');
         };
         try { synthesis.speak(utterance); return true; }
         catch (_) { utterance.onerror(); return false; }
@@ -224,7 +228,9 @@
         const toggle = document.getElementById('chinese-reader-pinyin-visible');
         const select = document.getElementById('reader-article-language');
         if (select) select.value = isChinese(article) ? 'zh' : 'en';
-        if (wrap) wrap.hidden = !isChinese(article);
+        if (wrap) wrap.hidden = !hasReaderSpeech();
+        const displayOptions = wrap?.querySelector('.reader-display-options');
+        if (displayOptions) displayOptions.hidden = !isChinese(article);
         if (toggle) toggle.checked = visible !== false;
         const selectionButton = document.getElementById('chinese-selection-audio');
         const display = document.getElementById('text-display');
@@ -247,7 +253,7 @@
             doc.addEventListener('selectionchange', () => {
                 const selection = doc.defaultView?.getSelection();
                 doc.querySelectorAll('[data-chinese-selection-audio]').forEach(control => {
-                    const text = isChinese() ? selectedSourceText(selectionSources.get(control), selection) : '';
+                    const text = hasReaderSpeech() ? selectedSourceText(selectionSources.get(control), selection) : '';
                     selectionValues.set(control, text);
                     control.disabled = (!text && !selectionPresses.has(control)) || !doc.defaultView?.speechSynthesis;
                 });
@@ -281,7 +287,7 @@
         button.disabled = true;
     }
     function decorateNote(card, article) {
-        if (!card || !isChinese(article) || card.querySelector('.chinese-note-controls')) return;
+        if (!card || !hasReaderSpeech() || card.querySelector('.chinese-note-controls')) return;
         const source = card.querySelector('.block-english');
         if (!source) return;
         source.dataset.chineseNoteSource = 'true';
@@ -293,6 +299,7 @@
         const toggle = doc.createElement('input'); toggle.type = 'checkbox'; toggle.checked = true;
         toggle.addEventListener('change', () => source.classList.toggle('chinese-pinyin-visible', toggle.checked));
         label.append(toggle, doc.createTextNode('拼音'));
+        label.hidden = !isChinese(article);
         const selected = doc.createElement('button'); selected.type = 'button'; selected.textContent = '選択範囲を再生';
         selected.title = '原文の単語や句を長押しで選択して再生';
         selected.setAttribute('aria-pressed', 'false');
@@ -300,17 +307,87 @@
         source.insertAdjacentElement('afterend', controls);
         installSelectionAudio(source, selected);
     }
+
+    // Plain-language Reader speech: leave original text untouched while attaching
+    // sentence-level playback at native text offsets. No pinyin spans are created.
+    function decoratePlainSpeechParagraph(paragraph, doc) {
+        const walker = doc.createTreeWalker(paragraph, 4);
+        const nodes = [];
+        while (walker.nextNode()) {
+            if (!walker.currentNode.parentElement?.closest?.('button, .chinese-character')) {
+                nodes.push(walker.currentNode);
+            }
+        }
+        const text = nodes.map(node => node.nodeValue).join('');
+        const sentences = splitSentences(text).map(sentence => ({ ...sentence, parts: [] }));
+        const endings = new Map(sentences.map(sentence => [sentence.end, sentence]));
+        let offset = 0;
+        nodes.forEach(node => {
+            const value = node.nodeValue;
+            const fragment = doc.createDocumentFragment();
+            const nodeEnd = offset + value.length;
+            const boundaries = sentences.filter(sentence => sentence.end > offset && sentence.end <= nodeEnd);
+            let cursor = 0;
+            const appendSegment = (end, record) => {
+                if (end <= cursor) return;
+                const part = doc.createElement('span');
+                part.className = 'reader-speech-segment';
+                part.textContent = value.slice(cursor, end);
+                fragment.appendChild(part);
+                if (record) record.parts.push(part);
+                cursor = end;
+            };
+            boundaries.forEach(record => {
+                appendSegment(record.end - offset, record);
+                const button = doc.createElement('button');
+                button.type = 'button';
+                button.className = 'chinese-sentence-audio';
+                button.setAttribute('aria-label', 'この文を再生: ' + record.text.trim());
+                button.setAttribute('aria-pressed', 'false');
+                button.title = 'この文を再生／停止';
+                button.disabled = !window.speechSynthesis || !window.SpeechSynthesisUtterance;
+                record.button = button;
+                buttonRecords.set(button, record);
+                button.addEventListener('click', event => {
+                    event.stopPropagation();
+                    playSentence(record.text, button);
+                });
+                fragment.appendChild(button);
+            });
+            const remaining = value.slice(cursor);
+            if (remaining) {
+                const part = doc.createElement('span');
+                part.className = 'reader-speech-segment';
+                part.textContent = remaining;
+                // Only the current sentence should be highlighted during playback.
+                const current = sentences.find(sentence =>
+                    sentence.start < nodeEnd && sentence.end > offset + cursor);
+                if (current) current.parts.push(part);
+                fragment.appendChild(part);
+            }
+            node.replaceWith(fragment);
+            offset = nodeEnd;
+        });
+        paragraph.dataset.chineseDecorated = 'true';
+        sentenceRecords.set(paragraph, sentences);
+        return sentences;
+    }
+
     function decorateReader(display, article, visible) {
         if (!display) return;
         const enabled = isChinese(article);
         display.classList.toggle('chinese-reader', enabled);
         display.classList.toggle('chinese-pinyin-visible', enabled && visible !== false);
-        if (!enabled) return;
+        if (!hasReaderSpeech()) return;
         const doc = display.ownerDocument;
         const records = [];
         const paragraphs = display.dataset?.chineseNoteSource ? [display] : display.querySelectorAll('p[data-paragraph-index]');
         paragraphs.forEach(paragraph => {
             if (paragraph.dataset.chineseDecorated) { records.push(...(sentenceRecords.get(paragraph) || [])); return; }
+            if (!enabled) {
+                records.push(...decoratePlainSpeechParagraph(paragraph, doc));
+                return;
+            }
             const walker = doc.createTreeWalker(paragraph, 4);
             const nodes = [];
             while (walker.nextNode()) {
@@ -437,7 +514,7 @@
     }
 
     return Object.freeze({
-        language, isChinese, reading, generate, applyReading, learning, normalizeLearning,
+        language, isChinese, hasReaderSpeech, reading, generate, applyReading, learning, normalizeLearning,
         setLearning, setAllLearning, mirrorMastery, countWords, groupKey,
         syncEditor, wordTextChanged, readingEdited, regenerate, syncReaderControls,
         decorateReader, decorateNote, selectedSourceText, attachStudyControls, syncMaskOptions, splitSentences, characterReadings,
