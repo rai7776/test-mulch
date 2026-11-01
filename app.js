@@ -1894,7 +1894,9 @@ function highlightReaderVocabularyHtml(html, words, chapterId) {
 
 function renderQuestionMarkerText(selected, question, chapterId, questionIndex = null) {
     const text = String(selected || '');
-    const content = highlightReaderVocabularyHtml(escapeHtml(text), currentArticle?.words, chapterId);
+    const content = window.SmartReaderVocabularyHighlights?.apply
+        ? escapeHtml(text)
+        : highlightReaderVocabularyHtml(escapeHtml(text), currentArticle?.words, chapterId);
     const questionId = hasGlobalProblemId(question.id) ? escapeHtml(String(question.id)) : '';
     const sourceIndex = Number.isInteger(questionIndex) ? ` data-question-index="${questionIndex}"` : '';
     return `<span class="question-marker problem-highlight" data-question-id="${questionId}"${sourceIndex} data-type="question"><button type="button" class="problem-marker-badge" aria-label="問題を開く" data-question-id="${questionId}"${sourceIndex} data-type="question">Q</button><span class="problem-marker-text">${content}</span></span>`;
@@ -1931,7 +1933,11 @@ function renderArticleText() {
         html = html.replace(new RegExp(`(${escaped})`, 'gi'), `<span class="note-highlight" data-jump-id="${n.id}" data-type="note">$1</span>`);
     });
 
-    html = highlightReaderVocabularyHtml(html, currentArticle.words, currentChapterIdForHighlight);
+    // The text-offset decorator can match across note spans, problem markers and
+    // stale surfaceText values. Retain the legacy HTML fallback if it is unavailable.
+    if (!window.SmartReaderVocabularyHighlights?.apply) {
+        html = highlightReaderVocabularyHtml(html, currentArticle.words, currentChapterIdForHighlight);
+    }
 
     questionTokens.forEach(({ token, question, selected, questionIndex }) => {
         const marker = renderQuestionMarkerText(selected, question, currentChapterIdForHighlight, questionIndex);
@@ -1939,6 +1945,11 @@ function renderArticleText() {
     });
 
     display.innerHTML = html;
+    window.SmartReaderVocabularyHighlights?.apply(display, currentArticle.words, currentChapterIdForHighlight, {
+        isChinese: !!window.SmartReaderChinese?.isChinese(currentArticle),
+        getSurfaceText: getVocabularyWordSurfaceText,
+        hasWordId: hasGlobalWordId
+    });
     const showPinyin = readerSettings.annotationVisibility?.pinyin !== false;
     window.SmartReaderChinese?.decorateReader(display, currentArticle, showPinyin);
     window.SmartReaderChinese?.syncReaderControls(currentArticle, showPinyin);
