@@ -12,7 +12,7 @@
 <div id="reader-wrapper" style="display:flex;flex-direction:column">
     <div id="reader-search-bar">検索</div>
     <div id="chapter-navigation">章</div>
-    <div id="text-display"><p data-paragraph-index="0">First sentence. Second sentence!</p></div>
+    <div id="text-display"><p data-paragraph-index="0">First <span class="word-highlight" data-word-index="0">sentence</span>. Second sentence!</p></div>
     <div id="chinese-reader-options" hidden>
         <div class="reader-display-options"><label><input id="chinese-reader-pinyin-visible" type="checkbox" checked>拼音を表示</label></div>
         <div class="reader-audio-controls"><button type="button">▶ 連続再生</button><button id="chinese-selection-audio" type="button" disabled>選択範囲</button><button>停止</button>
@@ -44,6 +44,7 @@ try {
     check(display.querySelectorAll('button.chinese-sentence-audio').length===2,'English sentences missing audio buttons');
     check(display.textContent==='First sentence. Second sentence!','Audio spans modified source text');
     check(!display.querySelector('.chinese-character'),'English text received Chinese pinyin spans');
+    check(display.querySelector('.word-highlight')?.textContent==='sentence','Speech decoration damaged vocabulary highlight');
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display==='none'),'Editor has floating Reader actions');
     document.body.classList.add('reader-mode-active');
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display!=='none'),'Reader action missing');
