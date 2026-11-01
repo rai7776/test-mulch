@@ -1849,34 +1849,52 @@ function getQuestionMarkerEntries(paragraphs, chapterId) {
     return byParagraph;
 }
 
-function renderQuestionMarkerText(selected, question, chapterId, questionIndex = null) {
-    const text = String(selected || '');
-    const words = (Array.isArray(currentArticle?.words) ? currentArticle.words : [])
-        .map((word, wordIndex) => ({ word, wordIndex }))
-        .filter(({ word }) => {
-            if (!word || typeof word.word !== 'string' || word.word.length < 2) return false;
-            return word.chapterId === undefined || word.chapterId === null || String(word.chapterId) === String(chapterId);
-        })
-        .filter(({ word }) => getVocabularyWordSurfaceText(word).length >= 2)
-        .sort((left, right) => getVocabularyWordSurfaceText(right.word).length - getVocabularyWordSurfaceText(left.word).length);
-    const matches = [];
-    words.forEach(({ word, wordIndex }) => {
-        findSearchMatches(text, getVocabularyWordSurfaceText(word), false, false).forEach(match => {
-            if (!matches.some(existing => match.index < existing.index + existing.length && existing.index < match.index + match.length)) {
-                matches.push({ ...match, word, wordIndex });
+// Build word highlights only inside escaped text segments, never HTML tags.
+// This also supports one-character Han words and paragraph-edge matches.
+function isReaderVocabularyHighlightable(surfaceText) {
+    const text = String(surfaceText || '').trim();
+    return !!text && (Array.from(text).length >= 2
+        || (window.SmartReaderChinese?.isChinese() && /^\p{Script=Han}$/u.test(text)));
+}
+
+function highlightReaderVocabularyHtml(html, words, chapterId) {
+    const entries = (Array.isArray(words) ? words : [])
+        .map((word, wordIndex) => ({ word, wordIndex, surfaceText: getVocabularyWordSurfaceText(word) }))
+        .filter(({ word, surfaceText }) => word
+            && (word.chapterId === undefined || word.chapterId === null || String(word.chapterId) === String(chapterId))
+            && isReaderVocabularyHighlightable(surfaceText))
+        .sort((left, right) => right.surfaceText.length - left.surfaceText.length);
+
+    if (!entries.length) return html;
+    return String(html).split(/(<[^>]*>)/g).map(segment => {
+        if (!segment || segment.startsWith('<')) return segment;
+        const matches = [];
+        entries.forEach(({ word, wordIndex, surfaceText }) => {
+            const regex = new RegExp(escapeRegExp(escapeHtml(surfaceText)), 'gi');
+            for (const match of segment.matchAll(regex)) {
+                const start = match.index;
+                const end = start + match[0].length;
+                if (matches.some(existing => start < existing.end && existing.start < end)) continue;
+                matches.push({ start, end, word, wordIndex });
             }
         });
-    });
-    matches.sort((left, right) => left.index - right.index);
-    let cursor = 0;
-    let content = '';
-    matches.forEach(match => {
-        if (match.index > cursor) content += escapeHtml(text.slice(cursor, match.index));
-        const wordId = hasGlobalWordId(match.word.id) ? ` data-jump-id="${escapeHtml(String(match.word.id))}"` : '';
-        content += `<span class="word-highlight"${wordId} data-word-index="${match.wordIndex}" data-type="word">${escapeHtml(text.slice(match.index, match.index + match.length))}</span>`;
-        cursor = match.index + match.length;
-    });
-    if (cursor < text.length) content += escapeHtml(text.slice(cursor));
+        if (!matches.length) return segment;
+        matches.sort((left, right) => left.start - right.start);
+        let result = '';
+        let cursor = 0;
+        matches.forEach(({ start, end, word, wordIndex }) => {
+            result += segment.slice(cursor, start);
+            const wordId = hasGlobalWordId(word.id) ? ` data-jump-id="${escapeHtml(String(word.id))}"` : '';
+            result += `<span class="word-highlight"${wordId} data-word-index="${wordIndex}" data-type="word">${segment.slice(start, end)}</span>`;
+            cursor = end;
+        });
+        return result + segment.slice(cursor);
+    }).join('');
+}
+
+function renderQuestionMarkerText(selected, question, chapterId, questionIndex = null) {
+    const text = String(selected || '');
+    const content = highlightReaderVocabularyHtml(escapeHtml(text), currentArticle?.words, chapterId);
     const questionId = hasGlobalProblemId(question.id) ? escapeHtml(String(question.id)) : '';
     const sourceIndex = Number.isInteger(questionIndex) ? ` data-question-index="${questionIndex}"` : '';
     return `<span class="question-marker problem-highlight" data-question-id="${questionId}"${sourceIndex} data-type="question"><button type="button" class="problem-marker-badge" aria-label="問題を開く" data-question-id="${questionId}"${sourceIndex} data-type="question">Q</button><span class="problem-marker-text">${content}</span></span>`;
@@ -1913,17 +1931,7 @@ function renderArticleText() {
         html = html.replace(new RegExp(`(${escaped})`, 'gi'), `<span class="note-highlight" data-jump-id="${n.id}" data-type="note">$1</span>`);
     });
 
-    const sw = currentArticle.words
-        .map((word, wordIndex) => ({ word, wordIndex }))
-        .sort((a, b) => getVocabularyWordSurfaceText(b.word).length - getVocabularyWordSurfaceText(a.word).length);
-    sw.forEach(({ word: w, wordIndex }) => {
-        if (w.chapterId !== undefined && w.chapterId !== null && String(w.chapterId) !== currentChapterIdForHighlight) return;
-        const surfaceText = getVocabularyWordSurfaceText(w);
-        if (surfaceText.length < 2) return;
-        const escaped = escapeRegExp(escapeHtml(surfaceText));
-        const wordId = hasGlobalWordId(w.id) ? ` data-jump-id="${escapeHtml(String(w.id))}"` : '';
-        html = html.replace(new RegExp(`(?<!>)${escaped}(?!<)`, 'gi'), `<span class="word-highlight"${wordId} data-word-index="${wordIndex}" data-type="word">$&</span>`);
-    });
+    html = highlightReaderVocabularyHtml(html, currentArticle.words, currentChapterIdForHighlight);
 
     questionTokens.forEach(({ token, question, selected, questionIndex }) => {
         const marker = renderQuestionMarkerText(selected, question, currentChapterIdForHighlight, questionIndex);
