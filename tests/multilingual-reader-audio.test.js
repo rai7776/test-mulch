@@ -87,7 +87,7 @@ test('English Reader receives sentence buttons and continuous playback without p
         assert.equal(paragraph.children.filter(n=>n.tagName==='button').length,2);
         chinese.playAllSentences(display);
         assert.equal(spoken.length,1);
-        assert.equal(spoken[0].text,'Hello world. ');
+        assert.equal(spoken[0].text,'Hello world.');
         assert.equal(spoken[0].lang,'en-US');
         spoken[0].onend();
         assert.equal(spoken.length,2);
