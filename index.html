@@ -6,34 +6,37 @@
     <title>英読 - Smart Reader</title>
     <link rel="stylesheet" href="style.css?v=1.4">
     <link rel="stylesheet" href="study-center.css?v=10">
+    <link rel="stylesheet" href="workspace-ui.css?v=2">
+    <link rel="stylesheet" href="chinese-learning.css?v=6">
+    <link rel="stylesheet" href="reader-header.css?v=1">
+    <link rel="stylesheet" href="learning-ui.css?v=4">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
-<body>
+<body class="learning-ui">
     <header class="app-header">
+        <nav id="reader-breadcrumbs" aria-label="記事の場所" hidden></nav>
         <div class="header-left">
             <button id="back-to-library" onclick="showLibrary()" style="display:none;">📖 本棚</button>
-            <h1 id="app-title">英読</h1>
+            <h1 id="app-title">Smart Reader</h1>
         </div>
         <div id="article-meta" style="display:none;">
             <button onclick="editCurrentArticle()" class="small-edit-btn">編集</button>
             <button onclick="showCurrentArticleVocabulary()" class="small-edit-btn">この資料の単語</button>
-            <button onclick="showGlobalProblems()" class="small-edit-btn">Problems</button>
-            <button onclick="openWordStatistics()" class="small-edit-btn">📊 統計</button>
-            <a id="display-url" href="#" target="_blank">🔗 元記事</a>
+            <a id="display-url" href="#" target="_blank" rel="noopener noreferrer">元記事 ↗</a>
         </div>
     </header>
 
     <main id="main-reader">
         <div id="library-section">
             <div class="library-header">
-                <div id="breadcrumbs" class="breadcrumbs"></div>
+                <nav id="breadcrumbs" class="breadcrumbs" aria-label="フォルダの場所"></nav>
                 <div class="library-actions">
                     <nav class="library-primary-tabs" aria-label="メインセクション">
-                        <button type="button" class="library-primary-tab is-active" aria-current="page" onclick="showLibrary()">Library</button>
-                        <button type="button" class="library-primary-tab" onclick="showGlobalVocabulary()">Vocabulary</button>
-                        <button type="button" id="study-center-library-button" class="library-primary-tab study-center-entry-button" onclick="window.showStudyCenter?.()">Study</button>
-                        <button type="button" class="library-primary-tab" onclick="showGlobalProblems()">Problems</button>
+                        <span class="library-primary-tab is-active" aria-current="page">Library</span>
+                        <button type="button" class="library-primary-tab" onclick="showGlobalVocabulary()"><strong>Vocabulary</strong></button>
+                        <button type="button" id="study-center-library-button" class="library-primary-tab study-center-entry-button" onclick="window.showStudyCenter?.()"><strong>Study</strong></button>
+                        <button type="button" class="library-primary-tab" onclick="showGlobalProblems()"><strong>Problems</strong></button>
                     </nav>
                     <div class="library-search-control">
                         <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
@@ -53,20 +56,21 @@
                             <span>Aa 区別</span>
                         </label>
                     </div>
-                    <button class="btn-sub" onclick="createNewFolder()">＋ フォルダ</button>
-                    <button class="start-btn" onclick="showInputArea()">＋ 記事作成</button>
+                    <button class="btn-sub" onclick="createNewFolder()">＋ フォルダ作成</button>
+                    <button class="start-btn" onclick="showInputArea()">＋ 記事・ファイル追加</button>
                     <input type="file" id="backup-file-input" accept="application/json,.json" onchange="handleSmartReaderRestore(event)" style="display:none;">
                 </div>
             </div>
+            <div id="recent-article" class="learning-resume" hidden></div>
             <div id="library-list" class="library-grid"></div>
         </div>
 
         <div id="vocabulary-section" style="display:none;">
             <div class="vocabulary-header">
+                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><span aria-current="page">Vocabulary</span><button type="button" onclick="window.showStudyCenter?.()">Study</button><button type="button" onclick="showGlobalProblems()">Problems</button></nav>
                 <div class="vocabulary-title-row">
-                    <button class="btn-sub" onclick="showGlobalProblems()">Problems</button>
-                    <button class="btn-sub" onclick="showLibrary()">📚 Library</button>
                     <div>
+                        <span class="study-center-eyebrow">VOCABULARY</span>
                         <h2 id="global-vocab-title">Global Vocabulary</h2>
                         <span id="global-vocab-count" class="vocabulary-count">0 words</span>
                     </div>
@@ -105,19 +109,19 @@
 
         <div id="problems-section" style="display:none;">
             <div class="problems-header">
+                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showGlobalVocabulary()">Vocabulary</button><button type="button" onclick="window.showStudyCenter?.()">Study</button><span aria-current="page">Problems</span></nav>
                 <div class="problems-title-row">
-                    <div class="problems-navigation">
-                        <button class="btn-sub" onclick="showLibrary()">📚 Library</button>
-                        <button class="btn-sub" onclick="showGlobalVocabulary()">Vocabulary</button>
-                    </div>
                     <div>
-                        <h2>Global Problems</h2>
+                        <span class="study-center-eyebrow">PROBLEMS</span>
+                        <h2>問題</h2>
                         <span id="global-problems-count" class="vocabulary-count">0 problems</span>
                     </div>
                 </div>
                 <div id="global-problems-statistics" class="vocabulary-statistics" aria-live="polite"></div>
-                <div class="problems-controls">
+                <div class="learning-problem-search">
                     <input type="search" id="global-problems-search" placeholder="問題・回答・タグ・出典を検索" oninput="updateGlobalProblems('query', this.value)">
+                </div>
+                <details class="learning-filters"><summary>絞り込み・並び順</summary><div class="problems-controls">
                     <select id="global-problems-status" onchange="updateGlobalProblems('status', this.value)" aria-label="問題ステータス">
                         <option value="all">すべて</option>
                         <option value="unattempted">未挑戦</option>
@@ -159,7 +163,7 @@
                         <option value="mostIncorrect">間違い回数が多い順</option>
                         <option value="lowestAccuracy">正答率が低い順</option>
                     </select>
-                </div>
+                </div></details>
             </div>
             <div id="global-problems-list" class="global-problems-list"></div>
         </div>
@@ -196,6 +200,7 @@
                     <div id="import-review-status" class="file-import-message" role="status" aria-live="polite"></div>
                     <div id="import-review-action-feedback" class="import-review-action-feedback" role="status" aria-live="polite"></div>
                 </div>
+                <span id="import-review-language" aria-live="polite"></span>
                 <span id="import-review-source" class="import-review-source"></span>
             </div>
 
@@ -274,14 +279,14 @@
                     <button type="button" id="search-prev-btn" onclick="previousSearchResult()" aria-label="前の検索結果">↑</button>
                     <button type="button" id="search-next-btn" onclick="nextSearchResult()" aria-label="次の検索結果">↓</button>
                 </div>
-                <div class="reader-search-options">
+                <details class="reader-search-options-menu"><summary aria-label="検索条件">条件</summary><div class="reader-search-options">
                     <select id="reader-search-scope" onchange="changeReaderSearchScope(this.value)" aria-label="検索範囲">
                         <option value="chapter">現在の章</option>
                         <option value="book">書籍全体</option>
                     </select>
                     <label><input type="checkbox" id="search-whole-word" onchange="searchInText()"> 単語一致</label>
                     <label><input type="checkbox" id="search-case-sensitive" onchange="searchInText()"> Aa</label>
-                </div>
+                </div></details>
             </div>
 
             <div id="chapter-navigation" class="chapter-navigation" style="display:none;">
@@ -296,6 +301,21 @@
             </div>
 
             <div id="text-display" onclick="handleReaderClick(event)" onkeydown="handleReaderKeydown(event)"></div>
+            <div id="chinese-reader-options" hidden>
+                <div class="reader-display-options"><label><input id="chinese-reader-pinyin-visible" type="checkbox" checked onchange="setChinesePinyinVisibility(this.checked)"> 拼音を表示</label></div>
+                <div class="reader-audio-controls" role="group" aria-label="音声再生">
+                <button type="button" onclick="SmartReaderChinese.playAllSentences(document.getElementById('text-display'))">▶ 連続再生</button>
+                <button id="chinese-selection-audio" type="button" aria-label="選択範囲を再生" aria-pressed="false" disabled title="本文の単語や句を長押しで選択して再生">選択範囲</button>
+                <button type="button" onclick="SmartReaderChinese.stopSentenceAudio()">■ 停止</button>
+                <details class="reader-audio-settings"><summary>音声設定</summary><div>
+                <label>速度 <select id="chinese-speech-rate" onchange="setChineseSpeechRate(this.value)">
+                    <option value="0.7">0.7×</option><option value="0.85" selected>0.85×</option>
+                    <option value="1">1.0×</option><option value="1.2">1.2×</option>
+                </select></label>
+                <p>本文やノートの単語・句を選択すると、その範囲だけを再生できます。</p>
+                </div></details></div>
+                <span id="chinese-audio-status" role="status" aria-live="polite"></span>
+            </div>
 
         <div id="reading-status-bar">
             <div class="reading-status-main">
@@ -392,7 +412,17 @@
             <form onsubmit="handleUnifiedSave(event)">
                 <div id="form-word-section">
                     <label>単語 / フレーズ</label>
-                    <input type="text" id="input-word-text" required>
+                    <input type="text" id="input-word-text" required oninput="SmartReaderChinese.wordTextChanged()">
+                    <div id="chinese-word-field" hidden>
+                        <label for="input-word-pinyin">拼音（ピンイン・任意）</label>
+                        <div class="chinese-pinyin-input-row">
+                            <input type="text" id="input-word-pinyin" oninput="SmartReaderChinese.readingEdited()" placeholder="例: xuéxí" autocomplete="off">
+                            <button type="button" class="small-btn" onclick="SmartReaderChinese.regenerate()">自動生成</button>
+                        </div>
+                        <small>中国語Workspaceでのみ表示されます。声調を含めて編集できます。</small>
+                    </div>
+                    <label>意味</label>
+                    <input type="text" id="input-word-meaning" required>
                     <label for="input-word-surface-text">本文での表現（surfaceText）</label>
                     <input type="text" id="input-word-surface-text" placeholder="本文中に実際に出現した表現">
                     <label for="input-word-part-of-speech">品詞</label>
@@ -409,8 +439,6 @@
                     </select>
                     <label for="input-word-tags">タグ（カンマ区切り）</label>
                     <input type="text" id="input-word-tags" placeholder="英語, 語彙, 苦手">
-                    <label>意味</label>
-                    <input type="text" id="input-word-meaning" required>
                     <label>メモ (任意)</label>
                     <textarea id="input-word-memo" rows="2"></textarea>
                     <label>Context / 例文 (任意)</label>
@@ -418,9 +446,9 @@
                 </div>
 
                 <div id="form-note-section" style="display:none;">
-                    <label>対象の英文 (原文)</label>
+                    <label>対象の原文</label>
                     <textarea id="input-note-eng" rows="3" required></textarea>
-                    <label>和訳・意味</label>
+                    <label>訳・意味</label>
                     <textarea id="input-note-trans" rows="3"></textarea>
                     <label>解説・解釈 (文法など)</label> <textarea id="input-note-extra" rows="3"></textarea>
                 </div>
@@ -522,20 +550,32 @@
 
     <script src="https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="importers.js?v=1.1"></script>
-    <script src="app.js?v=4.3"></script>
+    <script src="workspace-core.js?v=5"></script>
+    <script src="https://unpkg.com/pinyin-pro@3.29.4/dist/index.js"></script>
+    <script src="speech-language-core.js?v=1" id="smart-reader-speech-language-core-loader" data-smart-reader-loaded="true"></script>
+    <script src="language-profile.js?v=1"></script>
+    <script src="learning-targets.js?v=1"></script>
+    <script src="chinese-learning.js?v=6"></script>
+    <script src="workspace-samples.js?v=4"></script>
+    <script src="sample-data-v2.js?v=3"></script>
+    <script src="reader-header.js?v=1"></script>
+    <script src="learning-ui.js?v=1"></script>
+    <script src="app.js?v=4.11"></script>
+    <script src="workspace-ui.js?v=4"></script>
+    <script src="speech-language-adapter.js?v=2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
-    <script src="bulk-import.js?v=2.0"></script>
+    <script src="bulk-import.js?v=2.1"></script>
     <script src="bulk-import-mobile-fix.js?v=1.0"></script>
     <script src="chapter-scope-ui.js?v=1.0"></script>
-    <script src="flashcard-study.js?v=1.17"></script>
+    <script src="flashcard-study.js?v=1.19"></script>
     <script src="study-reward-ui.js?v=5"></script>
     <script src="flashcard-ui-tuning.js?v=1.1"></script>
-    <script src="study-center.js?v=12"></script>
+    <script src="study-center.js?v=16"></script>
     <script src="study-word-detail.js?v=1"></script>
     <script src="article-flashcard-launcher.js?v=2"></script>
     <script src="global-vocab-mobile-ui.js?v=1.0"></script>
     <script src="folder-panel-context.js?v=1.0"></script>
-    <script src="note-structure-ui.js?v=2.2"></script>
+    <script src="note-structure-ui.js?v=2.5"></script>
     <script src="word-senses.js?v=8"></script>
 </body>
 </html>

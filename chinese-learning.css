@@ -1,0 +1,130 @@
+/* Chinese-only interface: annotations are generated content, not text nodes. */
+#chinese-word-field[hidden],
+#chinese-reader-options[hidden] { display: none !important; }
+#chinese-word-field { margin: 0.6rem 0; }
+#chinese-word-field > label { display: block; margin-bottom: 0.25rem; font-weight: 600; }
+.chinese-pinyin-input-row { display: flex; align-items: center; gap: 0.5rem; }
+.chinese-pinyin-input-row input { min-width: 0; flex: 1; }
+.chinese-pinyin-input-row button { flex: 0 0 auto; }
+#chinese-word-field small { display: block; color: #666; margin-top: 0.25rem; }
+#chinese-reader-options { margin: 0.55rem 1rem; font-size: 0.9rem; }
+#chinese-reader-options label { display: inline-flex; gap: 0.4rem; align-items: center; cursor: pointer; }
+.chinese-pinyin-visible .chinese-character[data-pinyin] {
+    display: inline-block;
+    position: relative;
+    margin-top: 1.2em;
+    vertical-align: baseline;
+}
+.chinese-pinyin-visible .chinese-character[data-pinyin]::before {
+    content: attr(data-pinyin);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 0.05em);
+    transform: translateX(-50%);
+    font-size: 0.55em;
+    line-height: 1.2;
+    font-weight: 500;
+    color: #606983;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+.chinese-pinyin-visible .chinese-character { min-width: 1.8em; text-align: center; }
+.chinese-sentence-audio {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; margin: 0 0.25rem;
+    padding: 0; border: 1px solid #cbd4e2; border-radius: 50%;
+    background: #f3f6fc; color: #385886; cursor: pointer;
+    vertical-align: middle; user-select: none;
+}
+.chinese-sentence-audio::before { content: '▶'; font-size: 0.75rem; }
+.chinese-sentence-audio[aria-pressed="true"]::before { content: '■'; }
+.chinese-sentence-audio:disabled { opacity: 0.45; cursor: default; }
+.chinese-study-controls { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.35rem 0; font-size: 0.85em; }
+.chinese-pinyin-label { color: #505d79; font-weight: 500; }
+.chinese-study-check { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.95em; }
+.chinese-study-check input { width: auto; margin: 0; }
+
+.chinese-character.is-speaking { background:#fff0b8; border-radius:3px; }
+#chinese-reader-options { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; }
+#chinese-reader-options button,#chinese-reader-options select { min-height:40px; }
+.chinese-study-help { font-size:0.78rem; color:#666; }
+.anki-mask-reading .compact-card:not(.revealed) .chinese-pinyin-label,
+.anki-mask-learning .compact-card:not(.revealed) .chinese-pinyin-label,
+.anki-mask-both .compact-card:not(.revealed) .chinese-pinyin-label,
+.anki-mask-learning .compact-card:not(.revealed) .meaning-right { filter:blur(5px); user-select:none; }
+.search-match-part { background:#fff09c; border-radius:2px; }
+.search-match-part.current-search-match { background:#ffc266; }
+
+.chinese-pinyin-visible .chinese-manual-reading { display:inline-block; position:relative; margin-top:1.2em; }
+.chinese-pinyin-visible .chinese-manual-reading::before {
+    content:attr(data-manual-pinyin); position:absolute; left:50%; bottom:100%; transform:translateX(-50%);
+    white-space:nowrap; font-size:0.55em; color:#606983; pointer-events:none; user-select:none;
+}
+.chinese-pinyin-visible .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
+.chinese-pinyin-visible .chinese-manual-reading .chinese-character::before { content:none; }
+
+/* Chinese Reader: typography and controls outside the reading area. */
+#text-display.chinese-reader {
+    font-weight:400; line-height:max(var(--reader-line-height), 2);
+    word-break:normal; overflow-wrap:break-word; line-break:strict;
+    padding:12px 22px 40px;
+}
+#text-display.chinese-reader p { margin:0.75em 0 1.15em; }
+#text-display.chinese-reader .chinese-character { min-width:1.35em; margin-top:0.75em; }
+#text-display.chinese-reader .chinese-character::before { font-size:0.46em; font-weight:400; color:#7a776f; }
+#text-display.chinese-reader .chinese-word-unit { display:inline-block; white-space:nowrap; border-radius:3px; }
+#text-display.chinese-reader .word-highlight { background-color:#d9eee9; }
+#text-display.chinese-reader .note-highlight { background:rgba(190,153,93,0.045); border-bottom:1px dotted #c6ad87; }
+#text-display.chinese-reader .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
+#text-display.chinese-reader .chinese-sentence-audio {
+    width:1.45em; min-width:32px; height:40px; margin:0 0.08em;
+    padding:0; border:0; border-radius:8px; background:transparent; color:#95806a;
+}
+#text-display.chinese-reader .chinese-sentence-audio:hover,
+#text-display.chinese-reader .chinese-sentence-audio[aria-pressed="true"] { background:#eee7dc; color:#765536; }
+.chinese-sentence-audio:focus-visible { outline:2px solid #a77e55; outline-offset:1px; }
+#reader-wrapper:has(.chinese-reader) #reader-search-bar { order:0; }
+#reader-wrapper:has(.chinese-reader) #chapter-navigation { order:1; }
+#reader-wrapper:has(.chinese-reader) #chinese-reader-options {
+    order:2; flex-shrink:0; margin:0; padding:6px 14px; gap:5px 10px;
+    border-bottom:1px solid #eee8df; background:#fdfbf7; color:#72675b; font-size:12px;
+}
+#reader-wrapper:has(.chinese-reader) #text-display { order:3; }
+#reader-wrapper:has(.chinese-reader) #reading-status-bar { order:4; }
+#chinese-reader-options label { margin:0; font-weight:400; white-space:nowrap; }
+#chinese-reader-options button, #chinese-reader-options select {
+    min-height:36px; margin:0; padding:5px 8px; border:1px solid #e4dbcf;
+    border-radius:8px; background:#fff; color:#72604f; box-shadow:none;
+}
+#chinese-reader-options input[type="checkbox"] { width:16px; height:16px; margin:0; accent-color:#7b958c; }
+#chinese-audio-status:empty { display:none; }
+@media (max-width:767px) {
+    #text-display.chinese-reader { padding:10px 16px 28px; }
+    #reader-wrapper:has(.chinese-reader) #chinese-reader-options { gap:4px 7px; padding:5px 12px; }
+    #reader-wrapper:has(.chinese-reader) #reading-status-bar { padding-bottom:60px; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #app-title, body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) .workspace-sample-button { display:none; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #add-btn, body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #fab-toggle, body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #bulk-add-btn {
+        position:fixed; bottom:max(8px, env(safe-area-inset-bottom)) !important;
+        width:42px; height:42px; border:1px solid #e4dbcf; border-radius:11px;
+        background:#fff; color:#806447; box-shadow:0 2px 6px rgba(68,50,30,0.07); font-size:20px;
+    }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #add-btn { right:114px; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #fab-toggle { right:64px; }
+    body:has(#reader-wrapper[style*="display: flex"] .chinese-reader) #bulk-add-btn { right:14px !important; width:42px !important; height:42px !important; border-radius:11px !important; font-size:12px; }
+    #reader-wrapper:has(.chinese-reader) .reading-status-main { align-items:center; }
+    #reader-wrapper:has(.chinese-reader) #bookmark-btn { background:transparent; color:#806447; border:1px solid #e4dbcf; border-radius:7px; }
+}
+
+.learning-target-summary { color:#7b715f; font-size:0.85em; }
+
+/* Notes share the original-text decorator; no saved note content is rewritten. */
+.block-english.chinese-reader { line-height:2.4; overflow-wrap:break-word; }
+.block-english.chinese-reader .chinese-character { min-width:1.35em; margin-top:0.8em; }
+.block-english.chinese-reader .chinese-character::before { font-size:0.46em; }
+.chinese-note-controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0; font-size:12px; color:#72604f; }
+.chinese-note-controls label { display:inline-flex; gap:5px; align-items:center; margin:0; }
+.chinese-note-controls input { width:16px; height:16px; margin:0; accent-color:#7b958c; }
+.chinese-note-controls button { min-height:36px; padding:5px 8px; border:1px solid #e4dbcf; border-radius:8px; background:#fff; color:#72604f; }
+[data-chinese-selection-audio]:disabled { opacity:0.45; }
+[data-chinese-selection-audio][aria-pressed="true"] { background:#eee7dc; }

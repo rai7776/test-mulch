@@ -47,8 +47,21 @@ function oldPom(x){if(!x||x.id!==A||x.type!=='article'||x.parentId!==F||x.name!=
 function canUpgrade(a){if(!Array.isArray(a))return false;const f=a.find(x=>x?.id===F),g=a.find(x=>x?.id===G),p=a.find(x=>x?.id===A);if(!f||f.type!=='folder'||f.parentId!==null||f.name!=='📚 チュートリアル'||!keys(f,['id','type','name','parentId']))return false;const children=a.filter(x=>x&&x.parentId===F);return children.length===2&&oldGuide(g)&&oldPom(p);}
 function replace(a){const ids=new Set([F,G,A]),i=a.findIndex(x=>ids.has(x?.id)),r=a.filter(x=>!ids.has(x?.id)),at=i<0?r.length:Math.min(i,r.length);return[...r.slice(0,at),...clone(),...r.slice(at)];}
 function refresh(){try{typeof showLibrary==='function'&&showLibrary();}catch(_){}try{typeof renderList==='function'&&renderList(typeof currentTab==='string'?currentTab:'words');}catch(_){}try{window.SmartReaderStudy?.refresh?.();}catch(_){}try{window.SmartReaderNoteStructureUI?.refresh?.();}catch(_){}}
-async function stored(){const t=Date.now();while(Date.now()-t<5000){try{const a=await db.getItem('library_items');if(Array.isArray(a)&&a.length)return a;}catch(_){}await new Promise(r=>setTimeout(r,60));}try{const a=await db.getItem('library_items');return Array.isArray(a)?a:[];}catch(_){return[];}}
-async function migrate(){if(typeof db==='undefined')return;const a=await stored();let n=null;if(!a.length)n=clone();else if(canUpgrade(a))n=replace(a);if(!n)return;try{await db.setItem('library_items',n);if(typeof libraryItems!=='undefined')libraryItems=n;try{localStorage.setItem('smart-reader-sample-version',String(V));}catch(_){}refresh();}catch(e){console.error('Sample data v2 migration failed',e);}}
+async function migrate(){
+if(typeof db==='undefined'||!window.SmartReaderWorkspaceState?.activeWorkspace)return;
+const workspace=window.SmartReaderWorkspaceState.activeWorkspace;
+if(workspace.setupPending||workspace.kind!=='language'||!/^en(?:-|$)/i.test(workspace.contentLanguage||''))return;
+const marker='workspace:'+workspace.id+':english-sample-v2-initialized';
+if(await db.getItem(marker)===true)return;
+const a=await db.getItem('library_items');
+if(a!==null&&!Array.isArray(a))return;
+let n=null;if(!a?.length)n=clone();else if(canUpgrade(a))n=replace(a);
+try{
+if(n){await db.setItem('library_items',n);if(typeof libraryItems!=='undefined')libraryItems=n;refresh();}
+await db.setItem(marker,true);
+}catch(e){console.error('Sample data v2 migration failed',e);}
+}
 window.SmartReaderSampleDataV2={version:V,data:clone(),canUpgradeLegacySample:canUpgrade,migrate};
-const start=()=>window.setTimeout(migrate,0);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+// Initialization owns the active library; never race setup or Chinese repair.
+window.addEventListener('smartreader:workspace-ready',()=>{migrate().catch(console.error);});
 })();

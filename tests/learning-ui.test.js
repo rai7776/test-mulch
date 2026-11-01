@@ -1,0 +1,23 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const ui = require('../learning-ui.js');
+test('recent article is scoped to Workspace and never returns deleted or invalid records', () => {
+    const data = new Map();
+    const storage = { getItem:k => data.get(k), setItem:(k,v) => data.set(k,v) };
+    const english = { activeWorkspaceId:'en' }, chinese = { activeWorkspaceId:'zh' };
+    const article = { id:1, type:'article', name:'One', readingPosition:{ chapterId:'two', scrollTop:300 } };
+    const before = JSON.stringify(article);
+    ui.remember(storage, english, article);
+    assert.equal(ui.recent(storage, english, [article]), article);
+    assert.equal(ui.recent(storage, chinese, [article]), null);
+    assert.equal(ui.recent(storage, english, []), null);
+    assert.equal(ui.recent(storage, null, [article]), null);
+    assert.equal(JSON.stringify(article), before);
+    storage.setItem(ui.recentKey(english), '{broken');
+    assert.equal(ui.recent(storage, english, [article]), null);
+    storage.setItem(ui.recentKey(english), '{}');
+    assert.equal(ui.recent(storage, english, [{type:'article'}]), null);
+    const blocked = { getItem() { throw Error('blocked'); }, setItem() { throw Error('blocked'); } };
+    assert.doesNotThrow(() => ui.remember(blocked, english, article));
+    assert.equal(ui.recent(blocked, english, [article]), null);
+});

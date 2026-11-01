@@ -44,29 +44,13 @@
     }
 
     async function runWorkspaceAwareAppInit(previousOnload, event, workspaceState) {
-        const active = workspaceState?.activeWorkspace;
-        const isNewWorkspace = !!active && !active.migratedFromLegacy;
-        if (!isNewWorkspace) {
-            const result = previousOnload.call(window, event);
-            if (result && typeof result.then === 'function') await result;
-            return;
-        }
-
-        // app.js normally injects the English tutorial whenever library_items is empty.
-        // New non-legacy workspaces should start truly empty instead.
-        libraryItems = await db.getItem('library_items') || [];
-        const savedSet = await db.getItem('reader_settings');
-        if (savedSet) {
-            readerSettings = savedSet;
-            applySettings();
-        }
-        showLibrary();
-        renderList('words');
-        setupEventListeners();
+        // init now owns Workspace-aware seeding and repair for every Workspace.
+        const result = previousOnload.call(window, event);
+        if (result && typeof result.then === 'function') await result;
     }
 
     const workspaceReady = loadScriptPromise(
-        'workspace-core.js?v=4',
+        'workspace-core.js?v=5',
         'smart-reader-workspace-core-loader'
     );
     const foundationReady = loadScriptPromise(
@@ -128,7 +112,7 @@
     loadStyle('article-copy-ui.css?v=3', 'smart-reader-article-copy-ui-style');
     loadStyle('workspace-backup-ui.css?v=1', 'smart-reader-workspace-backup-ui-style');
     loadStyle('workspace-management-ui.css?v=1', 'smart-reader-workspace-management-ui-style');
-    loadScript('workspace-ui.js?v=3', 'smart-reader-workspace-ui-loader');
+    loadScript('workspace-ui.js?v=4', 'smart-reader-workspace-ui-loader');
     loadScript('settings-hub.js?v=3', 'smart-reader-settings-hub-loader');
     loadScriptPromise('article-copy-core.js?v=2', 'smart-reader-article-copy-core-loader')
         .then(() => loadScript('article-copy-ui.js?v=3', 'smart-reader-article-copy-ui-loader'))
@@ -147,10 +131,10 @@
         .catch(error => console.error('Failed to load workspace management feature', error));
 
     loadScriptPromise('speech-language-core.js?v=1', 'smart-reader-speech-language-core-loader')
-        .then(() => loadScript('speech-language-adapter.js?v=1', 'smart-reader-speech-language-adapter-loader'))
+        .then(() => loadScript('speech-language-adapter.js?v=2', 'smart-reader-speech-language-adapter-loader'))
         .catch(error => console.error('Failed to load multilingual speech support', error));
 
-    loadScriptPromise('bulk-prompt-context-core.js?v=1', 'smart-reader-bulk-prompt-context-core-loader')
+    loadScriptPromise('bulk-prompt-context-core.js?v=2', 'smart-reader-bulk-prompt-context-core-loader')
         .then(() => loadScript('bulk-prompt-context-adapter.js?v=1', 'smart-reader-bulk-prompt-context-adapter-loader'))
         .catch(error => console.error('Failed to load contextual bulk import prompt support', error));
 
@@ -164,7 +148,7 @@
     loadScript('note-structure-ui-core.js?v=1.5', 'note-structure-ui-core-loader');
     // relation data is retained for a future arrow renderer.
     loadScript('note-structure-editor.js?v=4', 'note-structure-editor-loader');
-    loadScript('sample-data-v2.js?v=2', 'smart-reader-sample-data-v2-loader');
+    // Loaded before app.js so Chinese repair can recognize both sample versions.
     loadScript('global-vocab-card-display.js?v=1', 'global-vocab-card-display-loader');
     loadScript('folder-study-range.js?v=1', 'folder-study-range-loader');
     loadScript('flashcard-auto-audio.js?v=1', 'flashcard-auto-audio-loader');

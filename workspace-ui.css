@@ -205,3 +205,17 @@
         border-color: #7d4e26;
     }
 }
+
+/* Optional sample action for existing Chinese Workspaces. */
+.workspace-sample-button {
+    width: auto;
+    min-width: 44px;
+    padding: 0 7px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+.workspace-sample-button[hidden] { display: none !important; }
+.workspace-sample-button:disabled { cursor: wait; opacity: 0.6; }
+@media (max-width: 640px) {
+    .workspace-sample-button { width: auto; min-width: 42px; font-size: 0.75rem; }
+}

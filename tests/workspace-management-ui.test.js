@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(root, 'workspace-management-ui.js'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'workspace-management-ui.js'), 'utf8').replace(/\r\n/g, '\n');
 const loader = fs.readFileSync(path.join(root, 'note-structure-ui.js'), 'utf8');
 
 test('workspace management observer does not rerender an existing section', () => {
