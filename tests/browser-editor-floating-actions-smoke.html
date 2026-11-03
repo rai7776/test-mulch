@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Editor floating actions regression</title>
+<link rel="stylesheet" href="../style.css?v=1.4">
+<link rel="stylesheet" href="../chinese-learning.css?v=6">
+<link rel="stylesheet" href="../learning-ui.css?v=5">
+</head>
+<body class="learning-ui">
+<div id="input-area" class="input-card" style="display:block">
+    <input type="text" value="無題">
+    <textarea>按照刻板印象来说。</textarea>
+    <div class="input-actions">
+      <button id="cancel" type="button">キャンセル</button>
+      <button id="save" type="button">保存して読む</button>
+    </div>
+</div>
+<button id="add-btn" class="fab-btn" style="display:block">＋</button>
+<button id="fab-toggle" class="fab-btn" style="display:block">📋</button>
+<button id="bulk-add-btn" class="fab-btn" style="display:block">一括</button>
+<script>
+try {
+    const ids = ['add-btn','fab-toggle','bulk-add-btn'];
+    const hidden = () => ids.every(id => getComputedStyle(document.getElementById(id)).display === 'none');
+    const visible = () => ids.every(id => getComputedStyle(document.getElementById(id)).display !== 'none');
+    function check(ok, message) { if (!ok) throw Error(message); }
+    check(hidden(), 'Editor buttons overlap Cancel/Save');
+    document.body.classList.add('reader-mode-active');
+    check(visible(), 'Reader buttons unexpectedly hidden');
+    document.body.classList.remove('reader-mode-active');
+    check(hidden(), 'Buttons reappeared after returning to editor');
+    document.body.dataset.result='editor-fab-smoke-ok';
+} catch(error) {
+    document.body.dataset.result='editor-fab-smoke-failed: '+error.message;
+}
+</script>
+</body>
+</html>
