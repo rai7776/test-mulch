@@ -1209,8 +1209,6 @@ function showLibrary() {
     flushReadingPositionSave();
     hideAllSections();
     document.getElementById('side-panel')?.classList.remove('is-open');
-    document.getElementById('add-btn').style.display = '';
-    document.getElementById('fab-toggle').style.display = '';
     editingId = null; // 本棚に戻る際は編集IDをリセット
     pendingImportedDocument = null;
     importReviewState = null;
@@ -1298,8 +1296,6 @@ async function convertCurrentArticleToChapterMode() {
 function showInputArea() {
     flushReadingPositionSave();
     hideAllSections();
-    document.getElementById('add-btn').style.display = '';
-    document.getElementById('fab-toggle').style.display = '';
     editingId = null;
     pendingImportedDocument = null;
     importReviewState = null;
@@ -1800,6 +1796,7 @@ function openArticle(id) {
     if (!currentArticle) return;
     currentChapterId = getInitialChapterId(currentArticle);
     hideAllSections();
+    document.body.classList.add('reader-mode-active');
     document.getElementById('add-btn').style.display = '';
     document.getElementById('fab-toggle').style.display = '';
     document.getElementById('reader-wrapper').style.display = 'flex';
@@ -2864,7 +2861,7 @@ async function addChineseSampleToActiveWorkspace() {
     return true;
 }
 window.addChineseSampleToActiveWorkspace = addChineseSampleToActiveWorkspace;
-function hideAllSections() { window.SmartReaderChinese?.stopSentenceAudio(); window.SmartReaderReaderHeader?.hide(document); ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
+function hideAllSections() { document.body.classList.remove('reader-mode-active'); window.SmartReaderChinese?.stopSentenceAudio(); window.SmartReaderReaderHeader?.hide(document); ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 function lockReaderScrollForModal() {
     const display = document.getElementById('text-display');
     if (!display || !currentArticle || readerScrollLockState) return;
