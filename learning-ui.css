@@ -204,3 +204,11 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
     .learning-ui #vocabulary-section, .learning-ui #problems-section { padding-top:8px; }
     .learning-ui .study-center-shell { padding-top:8px; }
 }
+
+/* Floating actions belong to Reader only, never article/book editors, Library or Study.
+   This also overrides dynamic bulk-import FAB styles on mobile Safari. */
+body.learning-ui:not(.reader-mode-active) #add-btn,
+body.learning-ui:not(.reader-mode-active) #fab-toggle,
+body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
+    display: none !important;
+}
