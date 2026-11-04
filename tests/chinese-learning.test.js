@@ -123,7 +123,8 @@ test('sentence audio uses Chinese locale and stops the active sentence', () => {
         assert.equal(button['aria-pressed'], 'false');
         assert.equal(cancelled, 2);
         global.window.SmartReaderWorkspaceState = englishState;
-        assert.equal(chinese.playSentence('hello', button), false);
+        assert.equal(chinese.playSentence('hello', button), true);
+        assert.equal(spoken[1].lang, 'en-US');
     } finally {
         chinese.stopSentenceAudio();
         if (previous === undefined) delete global.window; else global.window = previous;
