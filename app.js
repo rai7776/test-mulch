@@ -1961,7 +1961,7 @@ function syncReaderSentenceAudioVisibility() {
     const visible = !!readerSettings.sentenceAudioButtonsVisible;
     const display = document.getElementById('text-display');
     const toggle = document.getElementById('reader-sentence-audio-visible');
-    if (display) display.classList.toggle('sentence-audio-visible', visible);
+    display?.classList?.toggle?.('sentence-audio-visible', visible);
     if (toggle) toggle.checked = visible;
 }
 
