@@ -53,7 +53,7 @@ const SAMPLE_DATA = [
 
 
 const db = localforage.createInstance({ name: "ProjectA_DB_v3" });
-const DEFAULT_READER_SETTINGS = Object.freeze({ fontSize: 18, lineHeight: 1.8 });
+const DEFAULT_READER_SETTINGS = Object.freeze({ fontSize: 18, lineHeight: 1.8, sentenceAudioButtonsVisible: false });
 
 let libraryItems = [], currentFolderId = null, currentArticle = null;
 let currentChapterId = null;
@@ -1950,10 +1950,25 @@ function renderArticleText() {
     const showPinyin = readerSettings.annotationVisibility?.pinyin !== false;
     window.SmartReaderChinese?.decorateReader(display, currentArticle, showPinyin);
     window.SmartReaderChinese?.syncReaderControls(currentArticle, showPinyin);
+    syncReaderSentenceAudioVisibility();
     window.SmartReaderChinese?.setSpeechRate(readerSettings.speechRate || 0.85);
     const rate=document.getElementById('chinese-speech-rate');
     if (rate) rate.value=String(readerSettings.speechRate || 0.85);
     updateProgress(null, true);
+}
+
+function syncReaderSentenceAudioVisibility() {
+    const visible = !!readerSettings.sentenceAudioButtonsVisible;
+    const display = document.getElementById('text-display');
+    const toggle = document.getElementById('reader-sentence-audio-visible');
+    if (display) display.classList.toggle('sentence-audio-visible', visible);
+    if (toggle) toggle.checked = visible;
+}
+
+function setReaderSentenceAudioVisibility(visible) {
+    readerSettings.sentenceAudioButtonsVisible = !!visible;
+    syncReaderSentenceAudioVisibility();
+    void db.setItem('reader_settings', readerSettings);
 }
 
 function setChinesePinyinVisibility(visible) {
