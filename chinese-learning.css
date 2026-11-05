@@ -77,9 +77,14 @@
 #text-display.chinese-reader .word-highlight { background-color:#d9eee9; }
 #text-display.chinese-reader .note-highlight { background:rgba(190,153,93,0.045); border-bottom:1px dotted #c6ad87; }
 #text-display.chinese-reader .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
+/* Sentence controls occupy no inline space until the Reader toggle is enabled. */
 #text-display .chinese-sentence-audio {
+    display:none;
     width:1.45em; min-width:32px; height:40px; margin:0 0.08em;
     padding:0; border:0; border-radius:8px; background:transparent; color:#95806a;
+}
+#text-display.sentence-audio-visible .chinese-sentence-audio {
+    display:inline-flex;
 }
 #text-display .chinese-sentence-audio:hover,
 #text-display .chinese-sentence-audio[aria-pressed="true"] { background:#eee7dc; color:#765536; }
@@ -93,6 +98,7 @@
 #reader-wrapper #text-display { order:3; }
 #reader-wrapper #reading-status-bar { order:4; }
 #chinese-reader-options label { margin:0; font-weight:400; white-space:nowrap; }
+#chinese-reader-options .reader-sentence-audio-option { flex:0 0 auto; }
 #chinese-reader-options button, #chinese-reader-options select {
     min-height:36px; margin:0; padding:5px 8px; border:1px solid #e4dbcf;
     border-radius:8px; background:#fff; color:#72604f; box-shadow:none;

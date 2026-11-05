@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css?v=1.4">
     <link rel="stylesheet" href="study-center.css?v=10">
     <link rel="stylesheet" href="workspace-ui.css?v=2">
-    <link rel="stylesheet" href="chinese-learning.css?v=7">
+    <link rel="stylesheet" href="chinese-learning.css?v=8">
     <link rel="stylesheet" href="reader-header.css?v=1">
     <link rel="stylesheet" href="learning-ui.css?v=5">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -303,6 +303,7 @@
             <div id="text-display" onclick="handleReaderClick(event)" onkeydown="handleReaderKeydown(event)"></div>
             <div id="chinese-reader-options" hidden>
                 <div class="reader-display-options"><label><input id="chinese-reader-pinyin-visible" type="checkbox" checked onchange="setChinesePinyinVisibility(this.checked)"> 拼音を表示</label></div>
+                <label class="reader-sentence-audio-option" title="各文の再生ボタンを表示"><input id="reader-sentence-audio-visible" type="checkbox" onchange="setReaderSentenceAudioVisibility(this.checked)" aria-label="各文の再生ボタンを表示"> 🔊表示</label>
                 <div class="reader-audio-controls" role="group" aria-label="音声再生">
                 <button type="button" onclick="SmartReaderChinese.playAllSentences(document.getElementById('text-display'))">▶ 連続再生</button>
                 <button id="chinese-selection-audio" type="button" aria-label="選択範囲を再生" aria-pressed="false" disabled title="本文の単語や句を長押しで選択して再生">選択範囲</button>
@@ -561,7 +562,7 @@
     <script src="reader-header.js?v=1"></script>
     <script src="learning-ui.js?v=1"></script>
     <script src="reader-vocabulary-highlights.js?v=1"></script>
-    <script src="app.js?v=4.14"></script>
+    <script src="app.js?v=4.15"></script>
     <script src="workspace-ui.js?v=4"></script>
     <script src="speech-language-adapter.js?v=2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
