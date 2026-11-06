@@ -43,6 +43,22 @@ jobs:
             2> /tmp/smart-reader-epub.log
           grep -F 'PASS: XHTML blocks, paragraph breaks, and EPUB indentation' /tmp/smart-reader-epub-dom.html
           ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)' /tmp/smart-reader-epub.log
+      - name: Verify literal Reader line and indent formatting
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
+          timeout 20s "$CHROME_BIN" \
+            --headless \
+            --virtual-time-budget=800 \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --user-data-dir=/tmp/smart-reader-literal-layout-profile \
+            --dump-dom \
+            http://127.0.0.1:4173/tests/browser-reader-literal-layout.html \
+            > /tmp/smart-reader-literal-layout-dom.html \
+            2> /tmp/smart-reader-literal-layout.log
+          grep -F 'reader-literal-layout-smoke-ok' /tmp/smart-reader-literal-layout-dom.html
+          ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)' /tmp/smart-reader-literal-layout.log
       - name: Render app in real Chrome
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
@@ -158,4 +174,6 @@ jobs:
             /tmp/smart-reader-multilingual.log
             /tmp/smart-reader-epub-dom.html
             /tmp/smart-reader-epub.log
+            /tmp/smart-reader-literal-layout-dom.html
+            /tmp/smart-reader-literal-layout.log
             /tmp/smart-reader-http.log
