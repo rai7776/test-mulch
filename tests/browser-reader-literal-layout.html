@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>Reader literal text layout regression</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <div id="text-display" class="literal-line-reader" style="overflow:visible;height:auto;flex:none;">
+    <p data-paragraph-index="0">a</p>
+    <div class="reader-blank-lines" aria-hidden="true" style="height:1lh"></div>
+    <p data-paragraph-index="1">b</p>
+    <p data-paragraph-index="2">c</p>
+    <p data-paragraph-index="3">  d</p>
+    <p data-paragraph-index="4">　e</p>
+  </div>
+  <pre id="result" role="status">Running…</pre>
+  <script>
+  (function () {
+    const output = document.getElementById('result');
+    function assert(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+    try {
+      const display = document.querySelector('#text-display');
+      const paragraphs = Array.from(display.querySelectorAll('p'));
+      const blank = display.querySelector('.reader-blank-lines');
+      const [a, b, c, d, e] = paragraphs;
+      const lh = parseFloat(getComputedStyle(display).lineHeight);
+      const top = element => element.getBoundingClientRect().top;
+      const closeTo = (actual, expected) => Math.abs(actual - expected) <= 1.5;
+      assert(paragraphs.length === 5, 'Blank line must not become another indexed paragraph');
+      assert(getComputedStyle(d).whiteSpace === 'break-spaces', 'Spaces must be preserved');
+      assert(closeTo(top(b) - top(a), 2 * lh), 'One empty line needs one additional line height');
+      assert(closeTo(top(c) - top(b), lh), 'Single newline should not add a paragraph margin');
+      assert(closeTo(top(d) - top(c), lh), 'Indented next line should not add a margin');
+      assert(blank.getBoundingClientRect().height >= lh - 1, 'Blank line spacer height');
+      function charX(element, start) {
+        const range = document.createRange();
+        range.setStart(element.firstChild, start);
+        range.setEnd(element.firstChild, start + 1);
+        return range.getBoundingClientRect().left;
+      }
+      assert(charX(d, 2) > charX(c, 0), 'Leading half-width spaces must shift the d glyph');
+      assert(charX(e, 1) > charX(c, 0), 'Leading full-width space must shift the e glyph');
+      output.textContent = 'reader-literal-layout-smoke-ok';
+    } catch (error) {
+      output.textContent = 'FAIL: ' + error.message;
+      throw error;
+    }
+  })();
+  </script>
+</body>
+</html>
