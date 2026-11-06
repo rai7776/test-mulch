@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Multilingual Reader controls smoke</title>
 <link rel="stylesheet" href="../style.css?v=1.4">
-<link rel="stylesheet" href="../chinese-learning.css?v=7">
+<link rel="stylesheet" href="../chinese-learning.css?v=10">
 <link rel="stylesheet" href="../learning-ui.css?v=4">
 </head>
 <body class="learning-ui">
@@ -29,6 +29,7 @@
 <script src="../language-profile.js"></script>
 <script src="../learning-targets.js"></script>
 <script src="../chinese-learning.js"></script>
+<script src="../reader-sentence-overlay.js"></script>
 <script>
 try {
     window.SmartReaderWorkspaceState={activeWorkspace:{kind:'language',contentLanguage:'en'}};
@@ -54,8 +55,31 @@ try {
         'Sentence controls must be placed after their paragraph');
     check(getComputedStyle(audioControls).display==='none','Optional audio controls should be hidden initially');
     display.classList.add('sentence-audio-visible');
-    check(getComputedStyle(audioControls).display!=='none','Optional sentence controls are not visible when enabled');
+    SmartReaderSentenceOverlay.refresh(display);
+    check(display.classList.contains('reader-sentence-overlay-ready'),
+        'Sentence overlay could not measure text offsets');
+    check(getComputedStyle(audioControls).display==='none',
+        'Paragraph controls must be hidden when the overlay is positioned');
+    const markers=Array.from(display.querySelectorAll('.reader-sentence-overlay-trigger'));
+    check(markers.length>=1 && markers.length<=2,'Sentence overlay did not group its touch targets');
+    check(markers.every(marker=> {
+        const bounds=marker.getBoundingClientRect();
+        const parent=display.getBoundingClientRect();
+        return bounds.width>=28 && bounds.right<=parent.right+1 && bounds.left>parent.left;
+    }), 'Sentence overlay is outside the Reader gutter');
+    check(display.textContent==='First sentence. Second sentence!',
+        'Overlay polluted original Reader text');
+    const groupedMarker=markers.find(marker=>marker.dataset.count==='2');
+    if(groupedMarker) {
+        groupedMarker.click();
+        check(display.querySelectorAll('.reader-sentence-overlay-option').length===2,
+            'Same-line sentences should offer a chooser instead of overlapping');
+        groupedMarker.click();
+    }
     display.classList.remove('sentence-audio-visible');
+    SmartReaderSentenceOverlay.refresh(display);
+    check(!display.classList.contains('reader-sentence-overlay-ready'),
+        'Disabling sentence audio must restore the regular Reader width');
     check(display.textContent==='First sentence. Second sentence!','Audio spans modified source text');
     check(!display.querySelector('.chinese-character'),'English text received Chinese pinyin spans');
     check(display.querySelector('.word-highlight')?.textContent==='sentence','Speech decoration damaged vocabulary highlight');
@@ -78,6 +102,26 @@ try {
     check(nativeSelection.toString()===originalSelection,'Native selection changed after audio event');
     observer.disconnect();
     nativeSelection.removeAllRanges();
+    // Editing an article rerenders new paragraphs and their measured sentence endings.
+    display.innerHTML='<p data-paragraph-index="0">Edited text. Another new sentence.</p>';
+    display.classList.add('sentence-audio-visible');
+    SmartReaderChinese.decorateReader(display,{words:[]},true);
+    SmartReaderSentenceOverlay.refresh(display);
+    check(display.textContent==='Edited text. Another new sentence.',
+        'Reattached overlay modified the edited source text');
+    check(display.querySelectorAll('.chinese-sentence-audio').length===2,
+        'Edited content did not receive refreshed sentence records');
+    check(display.classList.contains('reader-sentence-overlay-ready'),
+        'Edited content was not reanchored');
+    const editedMarkers=Array.from(display.querySelectorAll('.reader-sentence-overlay-trigger'));
+    check(editedMarkers.length>=1,'Edited sentence controls were not repositioned');
+    display.style.fontSize='25px';
+    SmartReaderSentenceOverlay.refresh(display);
+    check(display.querySelectorAll('.reader-sentence-overlay-trigger').length>=1,
+        'Font changes broke sentence placement');
+    display.style.fontSize='';
+    display.classList.remove('sentence-audio-visible');
+    SmartReaderSentenceOverlay.refresh(display);
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display==='none'),'Editor has floating Reader actions');
     document.body.classList.add('reader-mode-active');
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display!=='none'),'Reader action missing');

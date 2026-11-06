@@ -167,3 +167,69 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn { display:none !importan
 @media (max-width:767px) {
     body.reader-mode-active #reading-status-bar { padding-bottom:60px; }
 }
+
+/* Sentence-end controls float in a dedicated right gutter. Never add elements to p. */
+#text-display { position:relative; }
+#text-display.sentence-audio-visible.reader-sentence-overlay-ready {
+    padding-right:56px;
+}
+#text-display.sentence-audio-visible.reader-sentence-overlay-ready > .reader-sentence-controls {
+    display:none;
+}
+#text-display .reader-sentence-overlay {
+    position:absolute;
+    top:0; left:0; width:100%; height:0;
+    pointer-events:none;
+    z-index:3;
+}
+#text-display:not(.sentence-audio-visible) .reader-sentence-overlay { display:none; }
+#text-display .reader-sentence-overlay-trigger {
+    position:absolute;
+    display:flex; align-items:center; justify-content:center;
+    width:32px; height:28px; box-sizing:border-box;
+    margin:0; padding:0;
+    border:1px solid #e1d7c9; border-radius:9px;
+    background:rgba(255,253,248,0.96); color:#745a3e;
+    box-shadow:0 1px 3px rgba(50,35,20,0.12);
+    cursor:pointer;
+    pointer-events:auto;
+    font-size:12px;
+    touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
+}
+#text-display .reader-sentence-overlay-trigger::before { content:'▶'; }
+#text-display .reader-sentence-overlay-trigger[data-count]:not([data-count="1"])::before {
+    content:'▶' attr(data-count);
+}
+#text-display .reader-sentence-overlay-trigger[aria-pressed="true"] {
+    background:#f5ead7; color:#60431f;
+}
+#text-display .reader-sentence-overlay-trigger[aria-pressed="true"]::before { content:'■'; }
+#text-display .reader-sentence-overlay-trigger:focus-visible,
+#text-display .reader-sentence-overlay-option:focus-visible {
+    outline:2px solid #a77e55; outline-offset:2px;
+}
+#text-display .reader-sentence-overlay-menu {
+    position:absolute;
+    width:min(260px, calc(100% - 64px));
+    max-height:186px; overflow:auto;
+    padding:5px;
+    box-sizing:border-box;
+    border:1px solid #e4dbcf; border-radius:10px;
+    background:#fffefa; box-shadow:0 4px 14px rgba(40,30,20,0.17);
+    pointer-events:auto;
+}
+#text-display .reader-sentence-overlay-option {
+    display:block; width:100%; height:36px;
+    padding:0 9px; margin:0;
+    border:0; border-radius:6px;
+    background:transparent; color:#675240;
+    text-align:left; cursor:pointer;
+    touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
+}
+#text-display .reader-sentence-overlay-option::before {
+    display:block; content:attr(data-preview);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#text-display .reader-sentence-overlay-option:hover { background:#f5eee4; }

@@ -49,6 +49,7 @@
     }
     function clearSpeech(speech) {
         speech?.button?.setAttribute('aria-pressed','false');
+        speech?.overlayButton?.setAttribute('aria-pressed','false');
         speech?.parts?.forEach(part => part.classList.remove('is-speaking'));
     }
     function stopSentenceAudio() {
@@ -69,8 +70,10 @@
         }
         const utterance = new window.SpeechSynthesisUtterance(String(text).trim());
         utterance.lang = profiles.active().locale; utterance.rate = speechRate;
-        const speech = { synthesis, button, utterance, parts:buttonRecords.get(button)?.parts || [] };
+        const record = buttonRecords.get(button);
+        const speech = { synthesis, button, utterance, parts:record?.parts || [], overlayButton:record?.overlayButton };
         activeSpeech = speech; button?.setAttribute('aria-pressed','true');
+        speech.overlayButton?.setAttribute('aria-pressed','true');
         speech.parts.forEach(part => part.classList.add('is-speaking'));
         utterance.onend = () => {
             if (activeSpeech !== speech) return;
@@ -439,6 +442,12 @@
             paragraph.dataset.chineseDecorated = 'true';
         });
         sentenceRecords.set(display,records);
+        // The Reader overlay never wraps or edits its paragraph text nodes.
+        // If geometric positioning is unavailable, the paragraph controls remain.
+        if (!display.dataset?.chineseNoteSource) {
+            window.SmartReaderSentenceOverlay?.attach(display, records,
+                record => playSentence(record.text, record.button));
+        }
     }
     function attachStudyControls(card,word,article,onChange) {
         if(!card || !targets.managed(word) || typeof document==='undefined')return;
