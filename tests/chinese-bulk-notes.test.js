@@ -110,14 +110,29 @@ test('note decorator preserves original text and structure, toggles readings and
     toggle.checked = false; toggle.handlers.change();
     assert.equal(source.classList.contains('chinese-pinyin-visible'), false);
     const button = controls.children[1];
+    assert.equal(button.disabled, false, 'selection playback is available before any selection');
+    // Every property write during selectionchange risks dismissing iOS selection handles.
+    let disabledWrites = 0;
+    let disabledState = button.disabled;
+    Object.defineProperty(button, 'disabled', {
+        configurable: true,
+        get() { return disabledState; },
+        set(value) { disabledWrites++; disabledState = value; }
+    });
     window.getSelection = () => ({ rangeCount:1, toString:() => '图书馆', getRangeAt:() => ({ startContainer:source, endContainer:source }) });
     events.selectionchange();
     assert.equal(button.disabled, false);
-    button.handlers.pointerdown({ preventDefault() {} });
+    let prevented = false;
+    button.handlers.pointerdown({ preventDefault() { prevented = true; } });
+    assert.equal(prevented, true, 'tapping playback preserves the selected text');
     window.getSelection = () => null;
     events.selectionchange();
     assert.equal(button.disabled, false);
+    assert.equal(disabledWrites, 0, 'selectionchange must never mutate the playback button');
     button.handlers.click({ stopPropagation() {} });
     assert.equal(spoken[0].text, '图书馆');
     assert.equal(spoken[0].lang, 'zh-CN');
+    prevented = false;
+    button.handlers.pointerdown({ preventDefault() { prevented = true; } });
+    assert.equal(prevented, false, 'empty selection must not suppress native pointer behavior');
 }));

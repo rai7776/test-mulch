@@ -238,7 +238,6 @@
     }
     const selectionSources = new WeakMap();
     const selectionValues = new WeakMap();
-    const selectionPresses = new WeakSet();
     const selectionDocuments = new WeakSet();
     function selectedSourceText(source, selection) {
         if (!source || !selection?.rangeCount || selection.isCollapsed) return '';
@@ -254,37 +253,42 @@
                 const selection = doc.defaultView?.getSelection();
                 doc.querySelectorAll('[data-chinese-selection-audio]').forEach(control => {
                     const text = hasReaderSpeech() ? selectedSourceText(selectionSources.get(control), selection) : '';
+                    // iOS Safari owns the native selection handles and editing menu.
+                    // Mutating button.disabled during selectionchange can dismiss them.
+                    // Cache only the text here; change the button only on initialization.
                     selectionValues.set(control, text);
-                    control.disabled = (!text && !selectionPresses.has(control)) || !doc.defaultView?.speechSynthesis;
                 });
             });
         }
         if (!selectionSources.has(button)) {
             button.dataset.chineseSelectionAudio = 'true';
             let pending = '';
-            // Mobile focus can collapse the selection before click fires.
+            // The selection may collapse when the user taps the playback button.
+            // Read it before focus changes, without intercepting text gestures.
             button.addEventListener('pointerdown', event => {
-                pending = selectionValues.get(button) || '';
-                if (pending) { selectionPresses.add(button); event.preventDefault(); }
+                pending = selectedSourceText(selectionSources.get(button), doc.defaultView?.getSelection())
+                    || selectionValues.get(button) || '';
+                if (pending) event.preventDefault();
             });
             button.addEventListener('click', event => {
                 event.stopPropagation();
-                const value = pending || selectionValues.get(button);
+                const value = pending
+                    || selectedSourceText(selectionSources.get(button), doc.defaultView?.getSelection())
+                    || selectionValues.get(button);
                 pending = '';
-                selectionPresses.delete(button);
                 if (value) playSentence(value, button);
+                else audioStatus('先に本文の単語や句を選択してください。');
             });
             const cancelPress = () => {
-                pending = ''; selectionPresses.delete(button);
-                button.disabled = !selectionValues.get(button);
+                pending = '';
             };
             button.addEventListener('pointercancel', cancelPress);
             button.addEventListener('pointerleave', cancelPress);
         }
         selectionSources.set(button, source);
         selectionValues.set(button, '');
-        selectionPresses.delete(button);
-        button.disabled = true;
+        // Keep the control's disabled state stable while a text selection is active.
+        button.disabled = !hasReaderSpeech() || !doc.defaultView?.speechSynthesis;
     }
     function decorateNote(card, article) {
         if (!card || !hasReaderSpeech() || card.querySelector('.chinese-note-controls')) return;

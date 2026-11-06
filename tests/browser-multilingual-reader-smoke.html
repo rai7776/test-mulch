@@ -45,6 +45,25 @@ try {
     check(display.textContent==='First sentence. Second sentence!','Audio spans modified source text');
     check(!display.querySelector('.chinese-character'),'English text received Chinese pinyin spans');
     check(display.querySelector('.word-highlight')?.textContent==='sentence','Speech decoration damaged vocabulary highlight');
+    // Native text selection must survive the audio-control selection listener.
+    const selectionControl=document.getElementById('chinese-selection-audio');
+    check(!selectionControl.disabled,'Selection playback control is unexpectedly disabled');
+    const selectableText=display.querySelector('.reader-speech-segment')?.firstChild;
+    check(selectableText?.nodeType===Node.TEXT_NODE,'Speech decoration removed selectable text');
+    const range=document.createRange();
+    range.selectNodeContents(selectableText);
+    const nativeSelection=window.getSelection();
+    nativeSelection.removeAllRanges();
+    nativeSelection.addRange(range);
+    const originalSelection=nativeSelection.toString();
+    check(originalSelection.length>0,'Could not select native text');
+    const observer=new MutationObserver(()=>{});
+    observer.observe(selectionControl,{attributes:true,attributeFilter:['disabled','aria-disabled']});
+    document.dispatchEvent(new Event('selectionchange'));
+    check(observer.takeRecords().length===0,'Audio control changed attributes during text selection');
+    check(nativeSelection.toString()===originalSelection,'Native selection changed after audio event');
+    observer.disconnect();
+    nativeSelection.removeAllRanges();
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display==='none'),'Editor has floating Reader actions');
     document.body.classList.add('reader-mode-active');
     check(fabIds.every(id=>getComputedStyle(document.getElementById(id)).display!=='none'),'Reader action missing');
