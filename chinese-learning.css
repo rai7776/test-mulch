@@ -77,7 +77,26 @@
 #text-display.chinese-reader .word-highlight { background-color:#d9eee9; }
 #text-display.chinese-reader .note-highlight { background:rgba(190,153,93,0.045); border-bottom:1px dotted #c6ad87; }
 #text-display.chinese-reader .chinese-manual-reading .chinese-character { margin-top:0; min-width:1em; }
-/* Sentence controls occupy no inline space until the Reader toggle is enabled. */
+/* Audio controls sit below each paragraph; no button splits selectable text. */
+.reader-sentence-controls {
+    display:flex; flex-wrap:nowrap; align-items:center; gap:6px;
+    max-width:100%; overflow-x:auto; overscroll-behavior-x:contain;
+    margin:4px 0 12px; padding:2px 0;
+}
+.reader-sentence-controls .chinese-sentence-audio::before {
+    content:attr(data-sentence-number) ' ▶';
+}
+.reader-sentence-controls .chinese-sentence-audio[aria-pressed="true"]::before {
+    content:attr(data-sentence-number) ' ■';
+}
+#text-display .reader-sentence-controls { display:none; }
+#text-display.sentence-audio-visible .reader-sentence-controls { display:flex; }
+#text-display .reader-sentence-controls .chinese-sentence-audio {
+    width:auto; min-width:42px; height:34px; flex:0 0 auto;
+    padding:0 9px; border:1px solid #e4dbcf; border-radius:8px;
+    background:#fffdfa;
+}
+/* Legacy compatibility for any sentence buttons rendered elsewhere. */
 #text-display .chinese-sentence-audio {
     display:none;
     width:1.45em; min-width:32px; height:40px; margin:0 0.08em;

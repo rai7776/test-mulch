@@ -98,7 +98,7 @@
         const next = () => {
             if (token !== sequenceToken || index >= records.length) return;
             const record = records[index++];
-            record.parts[0]?.scrollIntoView?.({ block:'nearest', behavior:'smooth' });
+            (record.parts[0] || record.paragraph)?.scrollIntoView?.({ block:'nearest', behavior:'smooth' });
             speakSentence(record.text,record.button,next);
         };
         audioStatus('');
@@ -312,8 +312,38 @@
         installSelectionAudio(source, selected);
     }
 
-    // Plain-language Reader speech: leave original text untouched while attaching
-    // sentence-level playback at native text offsets. No pinyin spans are created.
+    // Keep the original Reader text nodes untouched for iOS Safari selection.
+    // Sentence playback controls live after each paragraph, never between words.
+    function installParagraphAudioButtons(paragraph, doc, sentences) {
+        if (!sentences.length) return;
+        const controls = doc.createElement('div');
+        controls.className = 'reader-sentence-controls';
+        controls.setAttribute('role', 'group');
+        controls.setAttribute('aria-label', '文ごとの再生');
+        sentences.forEach((record, index) => {
+            record.paragraph = paragraph;
+            const button = doc.createElement('button');
+            button.type = 'button';
+            button.className = 'chinese-sentence-audio';
+            button.dataset.sentenceNumber = String(index + 1);
+            button.setAttribute('aria-label', '文' + (index + 1) + 'を再生: ' + record.text.trim());
+            button.setAttribute('aria-pressed', 'false');
+            button.title = '文' + (index + 1) + 'を再生／停止';
+            button.disabled = !window.speechSynthesis || !window.SpeechSynthesisUtterance;
+            record.button = button;
+            buttonRecords.set(button, record);
+            button.addEventListener('click', event => {
+                event.stopPropagation();
+                playSentence(record.text, button);
+            });
+            controls.appendChild(button);
+        });
+        // Notes use a non-paragraph source element. Put controls after its text.
+        // Article controls are siblings, leaving the selectable <p> DOM intact.
+        if (paragraph.dataset?.chineseNoteSource) paragraph.appendChild(controls);
+        else paragraph.insertAdjacentElement('afterend', controls);
+    }
+
     function decoratePlainSpeechParagraph(paragraph, doc) {
         const walker = doc.createTreeWalker(paragraph, 4);
         const nodes = [];
@@ -323,55 +353,10 @@
             }
         }
         const text = nodes.map(node => node.nodeValue).join('');
-        const sentences = splitSentences(text).map(sentence => ({ ...sentence, parts: [] }));
-        const endings = new Map(sentences.map(sentence => [sentence.end, sentence]));
-        let offset = 0;
-        nodes.forEach(node => {
-            const value = node.nodeValue;
-            const fragment = doc.createDocumentFragment();
-            const nodeEnd = offset + value.length;
-            const boundaries = sentences.filter(sentence => sentence.end > offset && sentence.end <= nodeEnd);
-            let cursor = 0;
-            const appendSegment = (end, record) => {
-                if (end <= cursor) return;
-                const part = doc.createElement('span');
-                part.className = 'reader-speech-segment';
-                part.textContent = value.slice(cursor, end);
-                fragment.appendChild(part);
-                if (record) record.parts.push(part);
-                cursor = end;
-            };
-            boundaries.forEach(record => {
-                appendSegment(record.end - offset, record);
-                const button = doc.createElement('button');
-                button.type = 'button';
-                button.className = 'chinese-sentence-audio';
-                button.setAttribute('aria-label', 'この文を再生: ' + record.text.trim());
-                button.setAttribute('aria-pressed', 'false');
-                button.title = 'この文を再生／停止';
-                button.disabled = !window.speechSynthesis || !window.SpeechSynthesisUtterance;
-                record.button = button;
-                buttonRecords.set(button, record);
-                button.addEventListener('click', event => {
-                    event.stopPropagation();
-                    playSentence(record.text, button);
-                });
-                fragment.appendChild(button);
-            });
-            const remaining = value.slice(cursor);
-            if (remaining) {
-                const part = doc.createElement('span');
-                part.className = 'reader-speech-segment';
-                part.textContent = remaining;
-                // Only the current sentence should be highlighted during playback.
-                const current = sentences.find(sentence =>
-                    sentence.start < nodeEnd && sentence.end > offset + cursor);
-                if (current) current.parts.push(part);
-                fragment.appendChild(part);
-            }
-            node.replaceWith(fragment);
-            offset = nodeEnd;
-        });
+        const sentences = splitSentences(text).map(sentence => ({ ...sentence, parts: [], paragraph }));
+        // Do not split, wrap, or replace even a single text node.
+        // Keeping text continuous restores Safari's normal selection model.
+        installParagraphAudioButtons(paragraph, doc, sentences);
         paragraph.dataset.chineseDecorated = 'true';
         sentenceRecords.set(paragraph, sentences);
         return sentences;
@@ -425,7 +410,6 @@
             });
             const sentences = splitSentences(text).map(sentence => ({...sentence,parts:[]}));
             sentenceRecords.set(paragraph,sentences); records.push(...sentences);
-            const endings = new Map(sentences.map(sentence => [sentence.end,sentence]));
             let sentenceIndex = 0;
             let offset = 0;
             nodes.forEach(node => {
@@ -448,26 +432,10 @@
                         fragment.appendChild(span);
                     } else fragment.appendChild(doc.createTextNode(char));
                     offset += char.length;
-                    if (endings.has(offset)) {
-                        const record = endings.get(offset);
-                        const sentence = record.text;
-                        const button = doc.createElement('button');
-                        button.type = 'button';
-                        button.className = 'chinese-sentence-audio';
-                        button.setAttribute('aria-label', 'この文を再生: ' + sentence.trim());
-                        button.setAttribute('aria-pressed', 'false');
-                        button.title = 'この文を再生／停止';
-                        record.button = button; buttonRecords.set(button,record);
-                        button.disabled = !window.speechSynthesis || !window.SpeechSynthesisUtterance;
-                        button.addEventListener('click', event => {
-                            event.stopPropagation();
-                            playSentence(sentence, button);
-                        });
-                        fragment.appendChild(button);
-                    }
                 });
                 node.replaceWith(fragment);
             });
+            installParagraphAudioButtons(paragraph, doc, sentences);
             paragraph.dataset.chineseDecorated = 'true';
         });
         sentenceRecords.set(display,records);

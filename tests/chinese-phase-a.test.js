@@ -116,9 +116,16 @@ test('sentence fallback supports Chinese, Latin punctuation, quotes and newline 
 function readerFixture(text) {
     const classes = () => { const values = new Set(); return { add: x => values.add(x), remove: x => values.delete(x),
         contains: x => values.has(x), toggle(x, enabled) { enabled ? values.add(x) : values.delete(x); } }; };
-    const paragraph = { dataset: {} };
+    const paragraph = {
+        dataset: {},
+        insertAdjacentElement(position, element) {
+            assert.equal(position, 'afterend');
+            this.sentenceControls = element;
+        }
+    };
     const doc = {
         createElement() { return { dataset: {}, classList: classes(), attributes: {}, textContent: '',
+            children: [], appendChild(child) { this.children.push(child); },
             setAttribute(key, value) { this.attributes[key] = value; }, addEventListener() {} }; },
         createTextNode(value) { return { textContent: value }; },
         createDocumentFragment() { return { children: [], appendChild(child) { this.children.push(child); } }; },
@@ -140,6 +147,9 @@ test('RD-01/AU-01 decorator keeps original text, queues sentences and cancels sa
     chinese.decorateReader(display, { words: [] }, true);
     assert.equal(display.paragraph.children.map(child => child.textContent).join(''), text);
     assert.equal(display.paragraph.children.filter(child => child.dataset?.pinyin).length, 7);
+    assert.equal(display.paragraph.children.filter(child => child.className==='chinese-sentence-audio').length, 0,
+        'Chinese sentence controls must not be interleaved with text');
+    assert.equal(display.paragraph.sentenceControls.children.length, 2);
     const childCount = display.paragraph.children.length;
     chinese.decorateReader(display, { words: [] }, false);
     assert.equal(display.paragraph.children.length, childCount);

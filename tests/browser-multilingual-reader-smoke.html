@@ -37,18 +37,32 @@ try {
     const pinyinControls=toolbar.querySelector('.reader-display-options');
     const fabIds=['add-btn','fab-toggle','bulk-add-btn'];
     function check(value,message){if(!value)throw Error(message);}
+    const readerParagraph=display.querySelector('p[data-paragraph-index]');
+    const originalNodes=Array.from(readerParagraph.childNodes);
     SmartReaderChinese.decorateReader(display,{words:[]},true);
+    check(originalNodes.length===readerParagraph.childNodes.length,'Reader speech inserted nodes into paragraph');
+    check(originalNodes.every((node,index)=>readerParagraph.childNodes[index]===node),
+        'Reader speech replaced native text nodes');
     SmartReaderChinese.syncReaderControls({words:[]},true);
     check(!toolbar.hidden,'English Reader audio toolbar is hidden');
     check(pinyinControls.hidden,'English Reader shows Chinese pinyin controls');
     check(display.querySelectorAll('button.chinese-sentence-audio').length===2,'English sentences missing audio buttons');
+    check(readerParagraph.querySelectorAll('button.chinese-sentence-audio').length===0,
+        'Sentence buttons must not interrupt selectable paragraph text');
+    const audioControls=display.querySelector('.reader-sentence-controls');
+    check(!!audioControls && audioControls.previousElementSibling===readerParagraph,
+        'Sentence controls must be placed after their paragraph');
+    check(getComputedStyle(audioControls).display==='none','Optional audio controls should be hidden initially');
+    display.classList.add('sentence-audio-visible');
+    check(getComputedStyle(audioControls).display!=='none','Optional sentence controls are not visible when enabled');
+    display.classList.remove('sentence-audio-visible');
     check(display.textContent==='First sentence. Second sentence!','Audio spans modified source text');
     check(!display.querySelector('.chinese-character'),'English text received Chinese pinyin spans');
     check(display.querySelector('.word-highlight')?.textContent==='sentence','Speech decoration damaged vocabulary highlight');
     // Native text selection must survive the audio-control selection listener.
     const selectionControl=document.getElementById('chinese-selection-audio');
     check(!selectionControl.disabled,'Selection playback control is unexpectedly disabled');
-    const selectableText=display.querySelector('.reader-speech-segment')?.firstChild;
+    const selectableText=readerParagraph.firstChild;
     check(selectableText?.nodeType===Node.TEXT_NODE,'Speech decoration removed selectable text');
     const range=document.createRange();
     range.selectNodeContents(selectableText);
