@@ -47,16 +47,21 @@ function makeDisplay(text) {
         add:name=>values.add(name),remove:name=>values.delete(name),contains:name=>values.has(name),
         toggle(name,on){if(on)values.add(name);else values.delete(name);}
     };};
-    const paragraph={dataset:{}, children:[]};
-    const node={
-        nodeValue:text,parentElement:{closest:()=>null},
-        replaceWith(fragment){paragraph.children=fragment.children;}
+    const node={ nodeValue:text, textContent:text, parentElement:{closest:()=>null} };
+    const paragraph={
+        dataset:{}, children:[node],
+        insertAdjacentElement(position, value){
+            assert.equal(position,'afterend');
+            this.sentenceControls=value;
+        }
     };
     const doc={
         createElement(tag){return {
             tagName:tag,className:'',dataset:{},textContent:'',disabled:false,
-            classList:classes(), attributes:{}, setAttribute(name,v){this.attributes[name]=v;},
-            addEventListener(name,fn){this[name]=fn;}
+            classList:classes(), attributes:{}, children:[],
+            setAttribute(name,v){this.attributes[name]=v;},
+            addEventListener(name,fn){this[name]=fn;},
+            appendChild(child){this.children.push(child);}
         };},
         createTextNode(value){return {nodeValue:value,textContent:value};},
         createDocumentFragment(){return {children:[],appendChild(child){this.children.push(child);}};},
@@ -71,20 +76,24 @@ function makeDisplay(text) {
     return {display,paragraph};
 }
 
-test('English Reader receives sentence buttons and continuous playback without pinyin spans', () => {
+test('English Reader preserves original text nodes and places sentence controls outside paragraphs', () => {
     withWindow(makeState('en'), win => {
         const spoken=[];
         win.speechSynthesis={cancel(){},speak(u){spoken.push(u);}};
         win.SpeechSynthesisUtterance=class{constructor(t){this.text=t;}};
         const {display,paragraph}=makeDisplay('Hello world. How are you?');
         chinese.decorateReader(display,{words:[]},true);
-        const buttons=paragraph.children.filter(n=>n.tagName==='button');
+        const buttons=paragraph.sentenceControls?.children || [];
         assert.equal(buttons.length,2);
-        assert.equal(paragraph.children.map(n=>n.textContent).join(''),'Hello world. How are you?');
+        assert.equal(paragraph.children.length,1, 'paragraph must retain its single original text node');
+        assert.equal(paragraph.children[0].nodeValue,'Hello world. How are you?');
+        assert.equal(buttons[0].dataset.sentenceNumber, '1');
+        assert.equal(buttons[1].dataset.sentenceNumber, '2');
         assert.ok(!paragraph.children.some(n=>n.className==='chinese-character'));
         assert.equal(display.classList.contains('chinese-reader'),false);
         chinese.decorateReader(display,{words:[]},true);
-        assert.equal(paragraph.children.filter(n=>n.tagName==='button').length,2);
+        assert.equal(paragraph.sentenceControls.children.length,2);
+        assert.equal(paragraph.children.length,1);
         chinese.playAllSentences(display);
         assert.equal(spoken.length,1);
         assert.equal(spoken[0].text,'Hello world.');
