@@ -88,6 +88,21 @@ input, textarea, select { font-size: 16px !important; }
     margin-top: 0;
 }
 
+/* Raw text, manual articles and TXT: one newline is one line, while
+   blank source lines have explicit height. This preserves the same visual
+   indentation (spaces, full-width spaces and tabs) that the author entered. */
+#text-display.literal-line-reader p[data-paragraph-index] {
+    margin: 0;
+    white-space: break-spaces;
+    tab-size: 4;
+    overflow-wrap: anywhere;
+}
+#text-display.literal-line-reader .reader-blank-lines {
+    display: block;
+    line-height: inherit;
+    pointer-events: none;
+}
+
 /* 本文検索バー */
 #reader-search-bar {
     flex-shrink: 0;
