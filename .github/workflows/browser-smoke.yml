@@ -29,7 +29,7 @@ jobs:
           exit 1
       - name: Verify EPUB XHTML paragraphs and first-line indents
         run: |
-          CHROME_BIN="$(cat /tmp/smart-reader-chrome-bin)"
+          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
           timeout 20s "$CHROME_BIN" \
             --headless \
             --virtual-time-budget=1000 \
