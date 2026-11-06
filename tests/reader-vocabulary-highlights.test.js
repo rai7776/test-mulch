@@ -52,6 +52,11 @@ function createReaderContext(chinese = true) {
         articleText: ''
     });
     vm.runInContext(source.slice(start, end), context);
+    // Use the real paragraph and whitespace helpers when exercising rendering.
+    const paragraphStart = source.indexOf('function getReaderParagraphs(content) {');
+    const paragraphEnd = source.indexOf('function getReaderParagraphElement(node) {', paragraphStart);
+    assert.ok(paragraphStart > 0 && paragraphEnd > paragraphStart);
+    vm.runInContext(source.slice(paragraphStart, paragraphEnd), context);
     const renderStart = source.indexOf('function renderArticleText()');
     const renderEnd = source.indexOf('\nfunction setChinesePinyinVisibility(', renderStart);
     assert.ok(renderStart > 0 && renderEnd > renderStart);
@@ -71,6 +76,35 @@ test('Chinese one-character words highlight in text, including paragraph boundar
     assert.match(context.display.innerHTML, /<p data-paragraph-index="0"><span class="word-highlight"[^>]*>烟<\/span>/);
     assert.match(context.display.innerHTML, /下班<span class="word-highlight"[^>]*>后<\/span><\/p>/);
     assert.match(context.display.innerHTML, /<p data-paragraph-index="1"><span class="word-highlight"[^>]*>后<\/span><\/p>/);
+});
+
+test('manual Reader preserves empty lines and leading spaces without changing paragraph indices', () => {
+    const context = createReaderContext(false);
+    context.articleText = 'a\n\nb\nc\n d\n　e\n\tf';
+    context.renderArticleText();
+    const html = context.display.innerHTML;
+    assert.match(html, /<p data-paragraph-index="0">a<\/p><div class="reader-blank-lines" aria-hidden="true" style="height:1lh"><\/div><p data-paragraph-index="1">b<\/p>/);
+    assert.match(html, /<p data-paragraph-index="1">b<\/p><p data-paragraph-index="2">c<\/p>/);
+    assert.match(html, /<p data-paragraph-index="3"> d<\/p>/);
+    assert.match(html, /<p data-paragraph-index="4">　e<\/p>/);
+    assert.match(html, /<p data-paragraph-index="5">\tf<\/p>/);
+    assert.equal((html.match(/data-paragraph-index=/g) || []).length, 6);
+});
+
+test('blank line helper preserves CRLF and multiple empty lines', () => {
+    const context = createReaderContext(false);
+    const spacing = context.getReaderBlankLineCounts('\nfirst\r\n\r\n\r\n  second\n');
+    assert.deepEqual(Array.from(spacing.before), [1, 2]);
+    assert.equal(spacing.trailing, 1);
+});
+
+test('EPUB keeps book paragraph formatting without raw text spacing elements', () => {
+    const context = createReaderContext(false);
+    context.currentArticle.sourceType = 'epub';
+    context.articleText = 'First.\n\nSecond.';
+    context.renderArticleText();
+    assert.doesNotMatch(context.display.innerHTML, /reader-blank-lines/);
+    assert.match(context.display.innerHTML, /<p data-paragraph-index="1">Second\.<\/p>/);
 });
 
 test('English single-character terms are unchanged, but multiple letters are highlighted', () => {
