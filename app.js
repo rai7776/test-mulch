@@ -1905,12 +1905,19 @@ function renderArticleText() {
     window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems, goToFolder);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
-    // EPUB paragraphs retain their boundaries as text; display them using
-    // book-style first-line indentation rather than the default web layout.
-    display.classList?.toggle?.('epub-reader', String(currentArticle.sourceType || '').toLowerCase() === 'epub');
+    const sourceType = String(currentArticle.sourceType || '').toLowerCase();
+    // XHTML books keep book-style paragraph formatting; manually entered and
+    // TXT text must preserve literal line breaks and leading whitespace.
+    const isEpub = sourceType === 'epub';
+    const isLiteralText = !['epub', 'html', 'pdf'].includes(sourceType);
+    display.classList?.toggle?.('epub-reader', isEpub);
+    display.classList?.toggle?.('literal-line-reader', isLiteralText);
     const content = getCurrentChapterContent();
     const currentChapterIdForHighlight = getCurrentChapterId();
     const paragraphs = getReaderParagraphs(content);
+    // Metadata only: indices and actual paragraph strings stay unchanged so
+    // existing selection anchors, vocabulary, problems and search keep working.
+    const blankLines = isLiteralText ? getReaderBlankLineCounts(content) : null;
     const questionMarkers = getQuestionMarkerEntries(paragraphs, currentChapterIdForHighlight);
     const questionTokens = [];
     let html = paragraphs.map((paragraph, index) => {
@@ -1921,9 +1928,12 @@ function renderArticleText() {
             questionTokens.push({ token, question: entry.question, selected: entry.selected, questionIndex: entry.questionIndex });
             source = source.slice(0, entry.start) + token + source.slice(entry.start + entry.selected.length);
         });
-        return `<p data-paragraph-index="${index}">${escapeHtml(source)}</p>`;
+        const blankBefore = blankLines?.before[index] || 0;
+        return renderReaderBlankLines(blankBefore)
+            + `<p data-paragraph-index="${index}">${escapeHtml(source)}</p>`;
     }).join('');
-    
+    if (blankLines?.trailing) html += renderReaderBlankLines(blankLines.trailing);
+
     // ハイライト置換 (ノート > 単語 の順で処理)
     const sn = [...currentArticle.notes].sort((a,b) => String(b.originalText || '').length - String(a.originalText || '').length);
     sn.forEach(n => {
@@ -2646,6 +2656,28 @@ function escapeRegExp(value) {
 
 function getReaderParagraphs(content) {
     return String(content ?? '').replace(/\r\n?/g, '\n').split('\n').filter(paragraph => paragraph.trim());
+}
+
+// Preserve blank lines without adding paragraph indices. Paragraph indices and
+// character offsets are used by saved highlights, questions and reading links.
+function getReaderBlankLineCounts(content) {
+    const before = [];
+    let emptyLines = 0;
+    String(content ?? '').replace(/\r\n?/g, '\n').split('\n').forEach(line => {
+        if (!line.trim()) {
+            emptyLines += 1;
+        } else {
+            before.push(emptyLines);
+            emptyLines = 0;
+        }
+    });
+    return { before, trailing: emptyLines };
+}
+
+function renderReaderBlankLines(count) {
+    return count > 0
+        ? `<div class="reader-blank-lines" aria-hidden="true" style="height:${count}lh"></div>`
+        : '';
 }
 
 function getReaderParagraphElement(node) {
