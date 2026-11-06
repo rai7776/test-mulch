@@ -1966,6 +1966,7 @@ function syncReaderSentenceAudioVisibility() {
     const toggle = document.getElementById('reader-sentence-audio-visible');
     display?.classList?.toggle?.('sentence-audio-visible', visible);
     if (toggle) toggle.checked = visible;
+    globalThis.SmartReaderSentenceOverlay?.refresh?.(display);
 }
 
 function setReaderSentenceAudioVisibility(visible) {
@@ -1982,6 +1983,7 @@ function setChinesePinyinVisibility(visible) {
     readerSettings.annotationVisibility.pinyin = !!visible;
     void db.setItem('reader_settings', readerSettings);
     window.SmartReaderChinese?.decorateReader(document.getElementById('text-display'), currentArticle, visible);
+    globalThis.SmartReaderSentenceOverlay?.refresh?.(document.getElementById('text-display'));
     restoreReadingPosition(position);
 }
 async function setChineseSpeechRate(value) {
@@ -3066,7 +3068,11 @@ async function toggleMemorized(id, e, sourceIndex = null) {
     restoreReadingPosition(readingPosition);
 }
 function speakWord(t) { if ('speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = window.SmartReaderSpeechLanguage?.speechLocaleFromState(window.SmartReaderWorkspaceState) || 'en-US'; speechSynthesis.speak(u); } }
-function applySettings() { document.documentElement.style.setProperty('--reader-font-size', readerSettings.fontSize+'px'); document.documentElement.style.setProperty('--reader-line-height', readerSettings.lineHeight); }
+function applySettings() {
+    document.documentElement.style.setProperty('--reader-font-size', readerSettings.fontSize+'px');
+    document.documentElement.style.setProperty('--reader-line-height', readerSettings.lineHeight);
+    globalThis.SmartReaderSentenceOverlay?.refresh?.(document.getElementById('text-display'));
+}
 function renderSettingsUI(c) { c.innerHTML = `<div class="settings-group"><p>文字: ${readerSettings.fontSize}px</p><input type="range" min="14" max="30" value="${readerSettings.fontSize}" oninput="updateSetting('font', this.value)"><p>行間: ${readerSettings.lineHeight}</p><input type="range" min="1.2" max="2.5" step="0.1" value="${readerSettings.lineHeight}" oninput="updateSetting('line', this.value)"></div>`; }
 function updateSetting(t, v) { if (t==='font') readerSettings.fontSize=v; else readerSettings.lineHeight=v; applySettings(); db.setItem('reader_settings', readerSettings); renderList('settings'); }
 function createNewFolder() { const n = prompt("フォルダ名"); if(n){ libraryItems.push({id:Date.now(), type:'folder', name:n, parentId:currentFolderId}); saveToDB(); showLibrary(); } }
