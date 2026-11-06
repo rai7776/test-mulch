@@ -88,8 +88,25 @@
         state.doc.addEventListener('pointerdown', dismiss, true);
     }
 
+    function readerSelectionActive(state) {
+        const selection = state.doc.getSelection?.();
+        if (!selection || selection.isCollapsed || !selection.rangeCount) return false;
+        try {
+            return state.display.contains(selection.getRangeAt(0).commonAncestorContainer);
+        } catch (_) {
+            return false;
+        }
+    }
+
     function render(state) {
         const { display, doc, overlay } = state;
+        // Safari's selection handles are sensitive even to unrelated DOM writes.
+        // Defer layout changes until native text selection has ended.
+        if (readerSelectionActive(state)) {
+            state.pendingWhileSelecting = true;
+            return display.classList.contains('reader-sentence-overlay-ready');
+        }
+        state.pendingWhileSelecting = false;
         clearMenu(state);
         if (!display.classList.contains('sentence-audio-visible') ||
             !state.records.length || !doc.createRange || display.clientWidth < MIN_WIDTH) {
@@ -166,6 +183,7 @@
         if (state.frame) state.view?.cancelAnimationFrame?.(state.frame);
         state.view?.removeEventListener?.('resize', state.schedule);
         state.view?.visualViewport?.removeEventListener?.('resize', state.schedule);
+        state.doc.removeEventListener('selectionchange', state.onSelectionChange);
         state.observer?.disconnect();
         state.display.removeEventListener('scroll', state.closeOnScroll);
         state.overlay.remove();
@@ -200,7 +218,11 @@
                 if (states.get(display) === state) render(state);
             });
         };
+        state.onSelectionChange = () => {
+            if (state.pendingWhileSelecting && !readerSelectionActive(state)) state.schedule();
+        };
         states.set(display, state);
+        doc.addEventListener('selectionchange', state.onSelectionChange);
         view?.addEventListener?.('resize', state.schedule);
         view?.visualViewport?.addEventListener?.('resize', state.schedule);
         display.addEventListener('scroll', state.closeOnScroll, { passive: true });
