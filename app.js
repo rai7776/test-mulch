@@ -1905,6 +1905,9 @@ function renderArticleText() {
     window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems, goToFolder);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
+    // EPUB paragraphs retain their boundaries as text; display them using
+    // book-style first-line indentation rather than the default web layout.
+    display.classList?.toggle?.('epub-reader', String(currentArticle.sourceType || '').toLowerCase() === 'epub');
     const content = getCurrentChapterContent();
     const currentChapterIdForHighlight = getCurrentChapterId();
     const paragraphs = getReaderParagraphs(content);

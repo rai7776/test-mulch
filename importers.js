@@ -392,7 +392,7 @@
     }
 
     function chooseHtmlContentRoot(document) {
-        const body = document.body || document.documentElement;
+        const body = document.body || document.querySelector('body') || document.documentElement;
         if (!body) return document.documentElement;
         const bodyLength = normalizePlainText(body.textContent).length;
         const findCandidate = selector => Array.from(document.querySelectorAll(selector))
@@ -476,8 +476,29 @@
         return blocks;
     }
 
-    function extractHtmlDocumentParts(html) {
-        const document = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    // EPUB XHTML is XML, not HTML. In particular, HTML parsing treats <pre/> as
+    // an opening <pre> and may swallow every following paragraph into one block.
+    function parseXhtmlDocument(source) {
+        const xmlDocument = new DOMParser().parseFromString(source, 'application/xhtml+xml');
+        if (!xmlDocument.querySelector('parsererror')) return xmlDocument;
+
+        // Some EPUBs contain imperfect XHTML. Fall back to HTML only after
+        // expanding XML-style self-closing, non-void elements.
+        const htmlSafeSource = source.replace(
+            /<([A-Za-z][\w:.-]*)(\s[^<>]*?)?\s*\/>/g,
+            (match, tagName, attributes = '') =>
+                /^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(tagName)
+                    ? match
+                    : '<' + tagName + attributes + '></' + tagName + '>'
+        );
+        return new DOMParser().parseFromString(htmlSafeSource, 'text/html');
+    }
+
+    function extractHtmlDocumentParts(html, options = {}) {
+        const source = String(html || '');
+        const document = options.xhtml
+            ? parseXhtmlDocument(source)
+            : new DOMParser().parseFromString(source, 'text/html');
         removeUnsafeHtmlNodes(document);
         const root = chooseHtmlContentRoot(document);
         const blocks = extractHtmlBlocks(root);
@@ -488,7 +509,7 @@
             root,
             blocks,
             headingTitle,
-            documentTitle: normalizeInlineText(document.title),
+            documentTitle: normalizeInlineText(document.title || document.querySelector('head > title')?.textContent),
             plainText
         };
     }
@@ -1164,7 +1185,9 @@
             }
             const source = await readZipText(archive, item.href);
             if (!source) continue;
-            const parts = extractHtmlDocumentParts(source);
+            const parts = extractHtmlDocumentParts(source, {
+                xhtml: item.mediaType === 'application/xhtml+xml' || /\.xhtml$/i.test(item.href)
+            });
             if (!parts.plainText) continue;
             if (!contentTitleFallback) {
                 contentTitleFallback = parts.headingTitle || parts.documentTitle;
@@ -1274,6 +1297,7 @@
         SmartReaderImportError,
         generateStableChapterId,
         getHtmlNodeText,
+        extractHtmlDocumentParts,
         normalizeImportedDocument,
         normalizeHtmlBlockText,
         normalizePlainText,

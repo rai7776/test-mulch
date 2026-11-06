@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>EPUB XHTML paragraph regression</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <h1>EPUB XHTML paragraph regression</h1>
+  <pre id="result" role="status">Running…</pre>
+  <script src="../importers.js"></script>
+  <script>
+    (function () {
+      const output = document.getElementById('result');
+      const assert = (condition, message) => {
+        if (!condition) throw new Error(message);
+      };
+      try {
+        // A Project Gutenberg EPUB uses an empty, XML-style <pre/> immediately
+        // before the book. HTML parsing swallows the remainder into this pre.
+        const xhtml = `<?xml version="1.0" encoding="utf-8"?>
+          <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Example</title></head>
+          <body><pre/><h1>Example</h1>
+          <p>First paragraph with <i>inline emphasis</i>.</p>
+          <p>Second paragraph.</p></body></html>`;
+        const parts = window.SmartReaderImporters.extractHtmlDocumentParts(xhtml, { xhtml: true });
+        assert(parts.blocks.some(block => block.type === 'heading' && block.text === 'Example'),
+          'Heading should remain a distinct block');
+        assert(parts.blocks.some(block => block.text === 'First paragraph with inline emphasis.'),
+          'First paragraph should remain intact');
+        assert(parts.blocks.some(block => block.text === 'Second paragraph.'),
+          'Second paragraph should remain distinct');
+        assert(parts.plainText.includes('First paragraph with inline emphasis.\n\nSecond paragraph.'),
+          'Paragraph breaks should be preserved in chapter content');
+        const display = document.createElement('div');
+        display.id = 'text-display';
+        display.className = 'epub-reader';
+        display.innerHTML = '<p data-paragraph-index="0">First paragraph.</p>';
+        document.body.appendChild(display);
+        const indent = getComputedStyle(display.firstElementChild).textIndent;
+        assert(indent !== '0px', 'EPUB paragraph should have a first-line indent');
+        output.textContent = 'PASS: XHTML blocks, paragraph breaks, and EPUB indentation';
+      } catch (error) {
+        output.textContent = 'FAIL: ' + error.message;
+        throw error;
+      }
+    })();
+  </script>
+</body>
+</html>
