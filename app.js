@@ -2677,8 +2677,12 @@ function getReaderBlankLineCounts(content) {
 }
 
 function renderReaderBlankLines(count) {
+    // Each source blank line adds only a quarter of the current line height.
+    // The adjacent text lines already have their own line height, so 1lh here
+    // made an ordinary blank line look like roughly two line steps.
+    // CSS's lh unit follows the Reader line-height setting automatically.
     return count > 0
-        ? `<div class="reader-blank-lines" aria-hidden="true" style="height:${count}lh"></div>`
+        ? `<div class="reader-blank-lines" aria-hidden="true" style="height:${count * 0.25}lh"></div>`
         : '';
 }
 

@@ -8,7 +8,7 @@
 <body>
   <div id="text-display" class="literal-line-reader" style="overflow:visible;height:auto;flex:none;">
     <p data-paragraph-index="0">a</p>
-    <div class="reader-blank-lines" aria-hidden="true" style="height:1lh"></div>
+    <div class="reader-blank-lines" aria-hidden="true" style="height:0.25lh"></div>
     <p data-paragraph-index="1">b</p>
     <p data-paragraph-index="2">c</p>
     <p data-paragraph-index="3">  d</p>
@@ -31,10 +31,18 @@
       const closeTo = (actual, expected) => Math.abs(actual - expected) <= 1.5;
       assert(paragraphs.length === 5, 'Blank line must not become another indexed paragraph');
       assert(getComputedStyle(d).whiteSpace === 'break-spaces', 'Spaces must be preserved');
-      assert(closeTo(top(b) - top(a), 2 * lh), 'One empty line needs one additional line height');
+      assert(closeTo(top(b) - top(a), 1.25 * lh), 'One empty line should add only a quarter line height');
       assert(closeTo(top(c) - top(b), lh), 'Single newline should not add a paragraph margin');
       assert(closeTo(top(d) - top(c), lh), 'Indented next line should not add a margin');
-      assert(blank.getBoundingClientRect().height >= lh - 1, 'Blank line spacer height');
+      assert(closeTo(blank.getBoundingClientRect().height, 0.25 * lh), 'Blank line spacer height');
+      // Reader settings change the line-height; the spacer must scale with it.
+      display.style.setProperty('--reader-line-height', '2.3');
+      const enlargedLh = parseFloat(getComputedStyle(display).lineHeight);
+      assert(enlargedLh > lh, 'Reader line-height setting must take effect');
+      assert(closeTo(top(b) - top(a), 1.25 * enlargedLh), 'Blank line gap should scale with Reader line-height');
+      assert(closeTo(top(c) - top(b), enlargedLh), 'Normal line spacing should scale consistently');
+      assert(closeTo(blank.getBoundingClientRect().height, 0.25 * enlargedLh),
+        'Blank line spacer must track Reader line-height');
       function charX(element, start) {
         const range = document.createRange();
         range.setStart(element.firstChild, start);
