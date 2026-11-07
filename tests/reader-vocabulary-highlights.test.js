@@ -83,7 +83,7 @@ test('manual Reader preserves empty lines and leading spaces without changing pa
     context.articleText = 'a\n\nb\nc\n d\n　e\n\tf';
     context.renderArticleText();
     const html = context.display.innerHTML;
-    assert.match(html, /<p data-paragraph-index="0">a<\/p><div class="reader-blank-lines" aria-hidden="true" style="height:0\\.25lh"><\/div><p data-paragraph-index="1">b<\/p>/);
+    assert.match(html, /<p data-paragraph-index="0">a<\/p><div class="reader-blank-lines" aria-hidden="true" style="height:0\.25lh"><\/div><p data-paragraph-index="1">b<\/p>/);
     assert.match(html, /<p data-paragraph-index="1">b<\/p><p data-paragraph-index="2">c<\/p>/);
     assert.match(html, /<p data-paragraph-index="3"> d<\/p>/);
     assert.match(html, /<p data-paragraph-index="4">　e<\/p>/);
@@ -95,7 +95,7 @@ test('multiple blank lines scale their compact gap by source line count', () => 
     const context = createReaderContext(false);
     context.articleText = 'a\n\n\nb';
     context.renderArticleText();
-    assert.match(context.display.innerHTML, /height:0\\.5lh/);
+    assert.match(context.display.innerHTML, /height:0\.5lh/);
     assert.equal((context.display.innerHTML.match(/data-paragraph-index=/g) || []).length, 2);
 });
 
