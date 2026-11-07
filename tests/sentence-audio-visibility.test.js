@@ -21,7 +21,7 @@ test('compact toggle is outside Chinese-only pinyin options and uses cache-buste
     assert.match(html, /🔊表示/);
     assert.match(html, /chinese-learning\.css\?v=10/);
     assert.match(html, /reader-sentence-overlay\.js\?v=1/);
-    assert.match(html, /app\.js\?v=4\.18/);
+    assert.match(html, /app\.js\?v=4\.19/);
     assert.match(css, /\.reader-sentence-audio-option\s*\{\s*flex:0 0 auto;/);
 });
 
