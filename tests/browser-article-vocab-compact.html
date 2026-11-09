@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Article vocabulary compact mobile layout smoke</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  /* Simulate the later-injected multiple-senses styles in the production app. */
+  .article-vocabulary-sense-rich { padding:13px 12px 10px; }
+  .article-vocabulary-sense-rich .word-row { display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr); gap:10px; }
+  .article-vocabulary-sense-rich .word-text { font-size:1rem; line-height:1.3; }
+  .article-vocabulary-primary-sense { font-size:.98rem; line-height:1.4; font-weight:850; }
+  .article-vocabulary-sense-rich .action-group { margin-top:8px; }
+</style>
+</head>
+<body>
+<aside id="side-panel" class="panel is-open is-expanded">
+  <div class="panel-header">
+    <nav class="tabs" style="flex:1">
+      <button class="tab-btn active">単語</button>
+      <button class="tab-btn">ノート</button>
+      <button class="tab-btn">問題</button>
+    </nav>
+    <button class="close-btn" aria-label="閉じる">×</button>
+  </div>
+  <section class="chapter-scope-controls" id="chapter-scope-controls">
+    <div class="chapter-scope-topline">
+      <span class="chapter-scope-label">表示範囲</span>
+      <div class="chapter-scope-segment">
+        <button class="active">この章</button>
+        <button>記事全体</button>
+      </div>
+    </div>
+  </section>
+  <div id="list-search-controls" class="panel-controls">
+    <div style="display:flex;gap:5px;margin-bottom:8px">
+      <input id="list-search" type="search" placeholder="リスト内検索…" style="flex:1;min-width:0">
+      <button class="btn-export">⬇️</button>
+    </div>
+  </div>
+  <div id="vocabulary-controls">
+    <div id="article-vocabulary-statistics">26 words · 26 unique · 0 memorized</div>
+    <div class="control-row">
+      <div class="anki-settings-group">
+        <label class="anki-toggle"><input type="checkbox">暗記モード</label>
+        <select id="anki-target-select" class="mini-select"><option>両方隠す</option></select>
+      </div>
+    </div>
+    <div class="control-row">
+      <label class="anki-toggle"><input type="checkbox">覚えた単語（✅）を隠す</label>
+    </div>
+    <div id="article-study-fallback" class="sidebar-study-controls article-study-fallback">
+      <button class="study-inline-primary" data-article-study-open>🎴 この章をカード出題</button>
+    </div>
+  </div>
+  <div id="panel-content" class="scroll-area">
+    <div class="note-card compact-card article-vocabulary-sense-rich">
+      <div class="word-row">
+        <div class="word-left"><input type="checkbox"><span>🔊</span><span class="word-text">nothing short of a A</span></div>
+        <div class="meaning-right article-vocabulary-meaning-stack"><div class="article-vocabulary-primary-sense">Aに他ならない</div></div>
+      </div>
+      <div class="action-group"><button>編</button><button>消</button></div>
+    </div>
+    <div class="note-card compact-card article-vocabulary-sense-rich">
+      <div class="word-row">
+        <div class="word-left"><input type="checkbox"><span>🔊</span><span class="word-text">cloister</span></div>
+        <div class="meaning-right article-vocabulary-meaning-stack"><div class="article-vocabulary-primary-sense">回廊</div></div>
+      </div>
+      <div class="action-group"><button>編</button><button>消</button></div>
+    </div>
+    <div class="note-card compact-card article-vocabulary-sense-rich">
+      <div class="word-row">
+        <div class="word-left"><input type="checkbox"><span>🔊</span><span class="word-text">immaculate</span></div>
+        <div class="meaning-right article-vocabulary-meaning-stack"><div class="article-vocabulary-primary-sense">汚れていない、純白の</div></div>
+      </div>
+      <div class="action-group"><button>編</button><button>消</button></div>
+    </div>
+  </div>
+</aside>
+<pre id="result" style="position:fixed;top:0;left:0;z-index:3000;background:white"></pre>
+<script src="../flashcard-ui-tuning.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const output = document.getElementById('result');
+    try {
+      const assert = (okay, why) => { if (!okay) throw new Error(why); };
+      const rect = element => element.getBoundingClientRect();
+      const panel = document.querySelector('#side-panel');
+      const studyRow = document.querySelector('.article-study-fallback');
+      const studyButton = document.querySelector('[data-article-study-open]');
+      const cards = Array.from(document.querySelectorAll('#panel-content .note-card'));
+      const actions = cards[0].querySelector('.action-group');
+      const firstWord = cards[0].querySelector('.word-row');
+      const displayed = getComputedStyle(studyRow);
+      assert(window.innerWidth <= 700, 'Expected mobile viewport, got ' + window.innerWidth);
+      assert(displayed.gridTemplateColumns.split(' ').length === 1, 'Fallback should use one column');
+      assert(Math.abs(rect(studyRow).width - rect(studyButton).width) <= 2, 'Study button does not fill row');
+      assert(rect(studyButton).right <= rect(panel).right - 5, 'Study button clipped at right');
+      assert(rect(studyButton).left >= rect(panel).left + 3, 'Study button clipped at left');
+      assert(rect(cards[0]).width <= rect(panel).width - 12, 'Word card overflows panel width');
+      assert(rect(cards[0]).height < 100, 'Long word card is too tall: ' + rect(cards[0]).height);
+      assert(rect(cards[1]).height < 78, 'Short word card is too tall: ' + rect(cards[1]).height);
+      assert(Math.abs(rect(firstWord).top - rect(actions).top) < 30, 'Edit actions appear in a separate row');
+      assert(cards[0].querySelector('.action-group button').getBoundingClientRect().height >= 40,
+        'Edit action lacks minimum touch height');
+      assert(rect(cards[0]).top - rect(panel).top < 275, 'Controls occupy too much vertical space');
+      output.textContent = 'article-vocab-compact-smoke-ok';
+    } catch (error) {
+      output.textContent = 'FAIL: ' + error.message;
+      throw error;
+    }
+  }, { once:true });
+</script>
+</body>
+</html>
