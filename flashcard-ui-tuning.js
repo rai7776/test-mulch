@@ -145,6 +145,187 @@
                     padding: 0 3px;
                 }
 
+                /* Reader word sheet: keep the controls short and let the vocabulary
+                   list use the available space. Scope this to the article sheet only. */
+                #side-panel:not(.folder-panel-mode) #chapter-scope-controls {
+                    padding: 3px 8px 2px;
+                }
+                #side-panel:not(.folder-panel-mode) .chapter-scope-segment button {
+                    min-height: 30px;
+                }
+                #side-panel:not(.folder-panel-mode) #list-search-controls {
+                    padding: 4px 8px 3px;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) auto;
+                    align-items: center;
+                    column-gap: 5px;
+                    row-gap: 2px;
+                    min-width: 0;
+                    padding: 0 8px 5px;
+                }
+                #side-panel #vocabulary-controls[hidden] { display: none !important; }
+                #side-panel:not(.folder-panel-mode) #article-vocabulary-statistics {
+                    grid-column: 1 / -1;
+                    margin: 1px 0;
+                    padding: 0;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls > .control-row {
+                    min-width: 0;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls > .control-row:nth-child(2) {
+                    grid-column: 1;
+                    grid-row: 2;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls > .control-row:nth-child(3) {
+                    grid-column: 2;
+                    grid-row: 2;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls .anki-settings-group {
+                    flex-wrap: nowrap;
+                    gap: 4px;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls .anki-toggle {
+                    white-space: nowrap;
+                    font-size: .7rem;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls .anki-toggle input[type="checkbox"] {
+                    width: 17px;
+                    height: 17px;
+                    min-width: 17px;
+                    margin: 0 3px 0 0;
+                }
+                #side-panel:not(.folder-panel-mode) #anki-target-select {
+                    min-width: 0;
+                    max-width: 101px;
+                    min-height: 30px;
+                    padding: 3px 16px 3px 5px;
+                    font-size: .7rem;
+                }
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls .sidebar-study-controls {
+                    grid-column: 1 / -1;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    margin: 3px 0 0;
+                }
+                /* The fallback launcher has ONE button, unlike the two-column
+                   native launcher. Do not reserve a phantom second column. */
+                #side-panel:not(.folder-panel-mode) #vocabulary-controls .article-study-fallback {
+                    grid-template-columns: minmax(0, 1fr) !important;
+                }
+                #side-panel:not(.folder-panel-mode) .article-study-fallback [data-article-study-open] {
+                    grid-column: 1 / -1;
+                    width: 100%;
+                    max-width: 100%;
+                    min-width: 0;
+                    box-sizing: border-box;
+                    white-space: normal;
+                }
+                /* Compact two-column text and place Edit/Delete beside the text.
+                   The meaning remains fully readable and action targets stay >= 40px. */
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) auto;
+                    align-items: center;
+                    column-gap: 6px;
+                    row-gap: 2px;
+                    min-width: 0;
+                    padding: 8px 9px;
+                    margin-bottom: 5px;
+                    border-radius: 10px;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .word-row {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+                    align-items: center;
+                    gap: 7px;
+                    min-width: 0;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .word-left {
+                    min-width: 0;
+                    overflow: visible;
+                    align-items: center;
+                    gap: 3px;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .word-left input[type="checkbox"] {
+                    flex: 0 0 18px;
+                    width: 18px;
+                    height: 18px;
+                    margin: 0;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .word-left > span:not(.word-text) {
+                    flex: 0 0 28px;
+                    min-width: 28px;
+                    min-height: 40px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .word-text {
+                    min-width: 0;
+                    font-size: .91rem;
+                    line-height: 1.28;
+                    overflow-wrap: anywhere;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .meaning-right,
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .article-vocabulary-meaning-stack {
+                    min-width: 0;
+                    text-align: left;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .article-vocabulary-primary-sense {
+                    font-size: .86rem;
+                    line-height: 1.32;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card .article-vocabulary-secondary-senses {
+                    gap: 1px;
+                    margin-top: 2px;
+                    font-size: .73rem;
+                    line-height: 1.3;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .action-group {
+                    grid-column: 2;
+                    grid-row: 1;
+                    display: flex;
+                    justify-content: flex-end;
+                    align-self: center;
+                    gap: 3px;
+                    margin: 0;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .action-group button {
+                    min-width: 38px;
+                    min-height: 40px;
+                    padding: 3px 6px;
+                    font-size: .76rem;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .memo-row,
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .article-vocabulary-memo,
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .chinese-study-controls {
+                    grid-column: 1 / -1;
+                    margin-top: 2px;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .memo-row {
+                    padding-left: 0;
+                }
+                #side-panel:not(.folder-panel-mode) #panel-content .note-card.compact-card > .article-vocabulary-memo {
+                    margin-left: 0;
+                    padding-top: 3px;
+                }
+                @media (max-width: 355px) {
+                    #side-panel:not(.folder-panel-mode) #vocabulary-controls {
+                        grid-template-columns: minmax(0, 1fr);
+                    }
+                    #side-panel:not(.folder-panel-mode) #vocabulary-controls > .control-row:nth-child(3) {
+                        grid-column: 1;
+                        grid-row: 3;
+                    }
+                }
+
                 /* Global Vocabulary: denser controls, smaller buttons, study tools stay visible. */
                 #vocabulary-section .vocabulary-header {
                     padding-left: 10px;

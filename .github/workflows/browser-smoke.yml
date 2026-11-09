@@ -59,6 +59,23 @@ jobs:
             2> /tmp/smart-reader-literal-layout.log
           grep -F 'reader-literal-layout-smoke-ok' /tmp/smart-reader-literal-layout-dom.html
           ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)' /tmp/smart-reader-literal-layout.log
+      - name: Verify mobile article vocabulary density and study button width
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
+          timeout 20s "$CHROME_BIN" \
+            --headless \
+            --window-size=390,844 \
+            --virtual-time-budget=1200 \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --user-data-dir=/tmp/smart-reader-vocab-compact-profile \
+            --dump-dom \
+            http://127.0.0.1:4173/tests/browser-article-vocab-compact.html \
+            > /tmp/smart-reader-vocab-compact-dom.html \
+            2> /tmp/smart-reader-vocab-compact.log
+          grep -F 'article-vocab-compact-smoke-ok' /tmp/smart-reader-vocab-compact-dom.html
+          ! grep -E 'Uncaught (TypeError|ReferenceError|SyntaxError)' /tmp/smart-reader-vocab-compact.log
       - name: Render app in real Chrome
         run: |
           CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
@@ -176,4 +193,6 @@ jobs:
             /tmp/smart-reader-epub.log
             /tmp/smart-reader-literal-layout-dom.html
             /tmp/smart-reader-literal-layout.log
+            /tmp/smart-reader-vocab-compact-dom.html
+            /tmp/smart-reader-vocab-compact.log
             /tmp/smart-reader-http.log
