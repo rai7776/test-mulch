@@ -43,11 +43,9 @@ jobs:
           for n in body.descendants:
               if not isinstance(n, Tag):
                   continue
-              if n.name in ('h2','h3') and 'words in this story' in n.get_text(' ', strip=True).lower():
-                  break
-              if n.name != 'p':
+              if n.name in ('h2','h3'):
                   continue
-              if n.find_parent(class_=re.compile('caption|image|photo|related', re.I)):
+              if n.name != 'p':
                   continue
               paragraph = re.sub(r'\s+', ' ', n.get_text('', strip=False)).strip()
               if paragraph and paragraph not in paras[-2:]:
