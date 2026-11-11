@@ -33,13 +33,7 @@
             <div class="library-header">
                 <nav id="breadcrumbs" class="breadcrumbs" aria-label="フォルダの場所"></nav>
                 <div class="library-actions">
-                    <nav class="library-primary-tabs" aria-label="メインセクション">
-                        <span class="library-primary-tab is-active" aria-current="page">Library</span>
-                        <button type="button" class="library-primary-tab" onclick="showDiscover()"><strong>Discover</strong></button>
-                        <button type="button" class="library-primary-tab" onclick="showGlobalVocabulary()"><strong>Vocabulary</strong></button>
-                        <button type="button" id="study-center-library-button" class="library-primary-tab study-center-entry-button" onclick="window.showStudyCenter?.()"><strong>Study</strong></button>
-                        <button type="button" class="library-primary-tab" onclick="showGlobalProblems()"><strong>Problems</strong></button>
-                    </nav>
+                    <nav class="library-primary-tabs" data-main-nav data-active-tab="library" aria-label="メインセクション"></nav>
                     <div class="library-search-control">
                         <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
                         <button type="button" id="global-search-clear-btn" onclick="clearGlobalSearch()" aria-label="検索をクリア">×</button>
@@ -71,7 +65,7 @@
 
         <div id="vocabulary-section" style="display:none;">
             <div class="vocabulary-header">
-                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showDiscover()">Discover</button><span aria-current="page">Vocabulary</span><button type="button" onclick="window.showStudyCenter?.()">Study</button><button type="button" onclick="showGlobalProblems()">Problems</button></nav>
+                <nav class="learning-section-tabs" data-main-nav data-active-tab="vocabulary" aria-label="メインセクション"></nav>
                 <div class="vocabulary-title-row">
                     <div>
                         <span class="study-center-eyebrow">VOCABULARY</span>
@@ -113,7 +107,7 @@
 
         <div id="problems-section" style="display:none;">
             <div class="problems-header">
-                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showGlobalVocabulary()">Vocabulary</button><button type="button" onclick="window.showStudyCenter?.()">Study</button><button type="button" onclick="showDiscover()">Discover</button><span aria-current="page">Problems</span></nav>
+                <nav class="learning-section-tabs" data-main-nav data-active-tab="problems" aria-label="メインセクション"></nav>
                 <div class="problems-title-row">
                     <div>
                         <span class="study-center-eyebrow">PROBLEMS</span>
@@ -577,13 +571,14 @@
     <script src="flashcard-study.js?v=1.19"></script>
     <script src="study-reward-ui.js?v=5"></script>
     <script src="flashcard-ui-tuning.js?v=1.2"></script>
-    <script src="study-center.js?v=16"></script>
+    <script src="main-navigation.js?v=1"></script>
+    <script src="study-center.js?v=17"></script>
     <script src="study-word-detail.js?v=1"></script>
     <script src="article-flashcard-launcher.js?v=2"></script>
     <script src="global-vocab-mobile-ui.js?v=1.0"></script>
     <script src="folder-panel-context.js?v=1.0"></script>
     <script src="note-structure-ui.js?v=2.5"></script>
     <script src="word-senses.js?v=8"></script>
-    <script src="discover.js?v=1"></script>
+    <script src="discover.js?v=2"></script>
 </body>
 </html>
