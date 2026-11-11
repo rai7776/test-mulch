@@ -432,7 +432,7 @@
 
     function getAllStudyEntries() {
         const entries = [];
-        (Array.isArray(window.libraryItems) ? window.libraryItems : (typeof libraryItems !== 'undefined' ? libraryItems : []))
+        (window.SmartReaderReaderArticles?.all?.() || (Array.isArray(window.libraryItems) ? window.libraryItems : (typeof libraryItems !== 'undefined' ? libraryItems : [])))
             .filter(item => item && item.type === 'article')
             .forEach(article => {
                 (Array.isArray(article.words) ? article.words : []).forEach((word, index) => {
@@ -455,7 +455,7 @@
         if (typeof getFilteredGlobalVocabulary !== 'function') return [];
         try {
             return dedupeEntries(getFilteredGlobalVocabulary().map(globalEntry => {
-                const article = (Array.isArray(libraryItems) ? libraryItems : []).find(item => item && item.type === 'article' && String(item.id) === String(globalEntry.articleId));
+                const article = window.SmartReaderReaderArticles?.find?.(globalEntry.articleId) || (Array.isArray(libraryItems) ? libraryItems : []).find(item => item && item.type === 'article' && String(item.id) === String(globalEntry.articleId));
                 if (!article || !globalEntry.word) return null;
                 return makeEntry(article, globalEntry.word, globalEntry.sourceIndex);
             }).filter(Boolean));
