@@ -33,7 +33,7 @@
       "source": "Sample · Original",
       "title": "Exploring Our Changing Planet",
       "description": "地球環境をテーマにした英文読解",
-      "content": "Our planet is constantly changing. Scientists use satellites to observe the oceans, forests, and atmosphere. These observations help researchers understand how the environment changes over time.\\n\\nBy comparing new information with older records, scientists can identify patterns and ask better questions about the future."
+      "content": "Our planet is constantly changing. Scientists use satellites to observe the oceans, forests, and atmosphere. These observations help researchers understand how the environment changes over time.\n\nBy comparing new information with older records, scientists can identify patterns and ask better questions about the future."
     },
     {
       "id": "sample-business-001",
@@ -48,7 +48,7 @@
       "source": "Sample · Original",
       "title": "A Change to the Meeting Schedule",
       "description": "ビジネスメールを読む練習",
-      "content": "Dear Team,\\n\\nPlease note that Thursday's project meeting has been moved from 10:00 a.m. to 2:00 p.m. The location remains the same.\\n\\nIf you cannot attend at the new time, please contact me by Wednesday afternoon. Thank you for your flexibility.\\n\\nBest regards,\\nAlex"
+      "content": "Dear Team,\n\nPlease note that Thursday's project meeting has been moved from 10:00 a.m. to 2:00 p.m. The location remains the same.\n\nIf you cannot attend at the new time, please contact me by Wednesday afternoon. Thank you for your flexibility.\n\nBest regards,\nAlex"
     },
     {
       "id": "sample-story-001",
@@ -63,7 +63,23 @@
       "source": "Sample · Original",
       "title": "The Secret of the Old Library",
       "description": "短い物語で英文を読む",
-      "content": "Mia found a small key inside an old book. A note beside it said, 'Look behind the blue door.'\\n\\nThe next morning, she returned to the library and began searching for the door. She did not know what she would find, but she was excited to discover the answer."
+      "content": "Mia found a small key inside an old book. A note beside it said, 'Look behind the blue door.'\n\nThe next morning, she returned to the library and began searching for the door. She did not know what she would find, but she was excited to discover the answer."
+    },
+    {
+      "id": "sample-toeic-001",
+      "type": "Learning Materials",
+      "collection": "TOEIC",
+      "genres": [
+        "Business"
+      ],
+      "tags": [],
+      "difficulty": "中級",
+      "minutes": 3,
+      "publishedAt": "2026-11-11",
+      "source": "Sample · Original",
+      "title": "An Office Announcement",
+      "description": "TOEIC形式のビジネス文書",
+      "content": "Notice to All Staff\n\nThe office cafeteria will be closed on Friday for maintenance. Employees may use the dining area on the first floor. Normal service will resume on Monday."
     }
   ]
 }
