@@ -1139,7 +1139,6 @@
     function init() {
         wrapHideAllSections();
         injectSection();
-        injectNavigation();
         injectActivityCalendar();
         bindEvents();
         updateNavBadge();
