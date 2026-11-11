@@ -15,19 +15,9 @@ const matches=a=>{
 };
 const results=()=>state.articles.filter(matches).sort((a,b)=>state.sort==='oldest'?Date.parse(a.publishedAt)-Date.parse(b.publishedAt):state.sort==='shortest'?(a.minutes||0)-(b.minutes||0):Date.parse(b.publishedAt)-Date.parse(a.publishedAt));
 const summary=(items,empty='すべて')=>items.length?items.join(', '):empty;
-function nav(){
- document.querySelectorAll('.library-primary-tabs,.learning-section-tabs').forEach(n=>{
-  if(n.querySelector('.discover-nav-entry'))return;
-  const b=document.createElement('button');b.type='button';b.className=(n.classList.contains('library-primary-tabs')?'library-primary-tab ':'')+'discover-nav-entry';
-  b.textContent='Discover';b.onclick=showDiscover;
-  const anchor=Array.from(n.children).find(e=>e.textContent.trim()==='Library');
-  if(anchor)anchor.after(b);else n.prepend(b);
- });
-}
 function showDiscover(){
  if(typeof hideAllSections==='function')hideAllSections();
  section().style.display='block';state.article=null;render();
- document.querySelectorAll('.discover-nav-entry').forEach(e=>e.setAttribute('aria-current','page'));
 }
 window.showDiscover=showDiscover;
 function render(){
@@ -99,7 +89,7 @@ function openArticle(id){
  };
 }
 async function init(){
- nav();const root=section();if(!root)return;
+ const root=section();if(!root)return;
  try{const response=await fetch('discover-data/index.json',{cache:'no-cache'});if(!response.ok)throw Error('HTTP '+response.status);const index=await response.json();state.articles=Array.isArray(index.articles)?index.articles:[];state.types=index.types||[...new Set(state.articles.map(a=>a.type))];state.genres=index.genres||[...new Set(state.articles.flatMap(a=>a.genres||[]))];}
  catch(e){console.warn('Discover catalog unavailable',e);root.dataset.error='true';}
  render();
