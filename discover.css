@@ -54,3 +54,5 @@
 .library-primary-tabs::-webkit-scrollbar,.learning-section-tabs::-webkit-scrollbar{display:none}
 .library-primary-tabs>* ,.learning-section-tabs>*{flex-shrink:0}
 @media(max-width:600px){.discover-filter-label{display:none}.discover-filter-trigger{width:39px;padding:5px}.discover-thumbnail{flex-basis:66px;height:66px}.discover-card{gap:9px}.discover-inner{padding:10px 12px 90px}.discover-sheet{max-height:86dvh}}
+
+.discover-card .discover-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
