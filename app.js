@@ -1858,7 +1858,7 @@ window.openDiscoverReader = openDiscoverReader;
 async function saveCurrentDiscoverToLibrary() {
     const source = currentArticle;
     if (!source?.isDiscoverArticle) return;
-    flushReadingPositionSave();
+    await flushReadingPositionSave();
     const existing = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(source.discoverId));
     if (existing) { openArticle(existing.id, 'discover'); return; }
     const article = JSON.parse(JSON.stringify(source));
@@ -3025,7 +3025,8 @@ function scheduleReadingPositionSave() {
 function flushReadingPositionSave() {
     clearTimeout(readingPositionSaveTimer);
     readingPositionSaveTimer = null;
-    if (currentArticle) void saveCurrentReadingPosition();
+    if (currentArticle) return saveCurrentReadingPosition();
+    return Promise.resolve();
 }
 
 async function saveToDB() {
