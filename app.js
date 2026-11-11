@@ -2917,7 +2917,7 @@ async function addChineseSampleToActiveWorkspace() {
     return true;
 }
 window.addChineseSampleToActiveWorkspace = addChineseSampleToActiveWorkspace;
-function hideAllSections() { document.body.classList.remove('reader-mode-active'); window.SmartReaderChinese?.stopSentenceAudio(); window.SmartReaderReaderHeader?.hide(document); ['library-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
+function hideAllSections() { document.body.classList.remove('reader-mode-active'); window.SmartReaderChinese?.stopSentenceAudio(); window.SmartReaderReaderHeader?.hide(document); ['library-section', 'discover-section', 'vocabulary-section', 'problems-section', 'input-area', 'import-review-area', 'reader-wrapper', 'back-to-library', 'article-meta'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
 function lockReaderScrollForModal() {
     const display = document.getElementById('text-display');
     if (!display || !currentArticle || readerScrollLockState) return;
