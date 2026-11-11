@@ -65,7 +65,7 @@ function discoverReaderStorageKey() {
     return DISCOVER_READER_STORAGE_PREFIX + (window.SmartReaderWorkspaceState?.activeWorkspaceId || 'default');
 }
 function allReaderArticles() {
-    return [...libraryItems.filter(item => item?.type === 'article'), ...discoverReaderItems];
+    return [...libraryItems.filter(item => item?.type === 'article'), ...discoverReaderItems.filter(item => item?.type === 'article')];
 }
 function findReaderArticle(id) {
     return allReaderArticles().find(article => String(article.id) === String(id));
@@ -171,6 +171,15 @@ async function init() {
     libraryItems = await db.getItem('library_items') || [];
     discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
     if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
+    // Previously viewed Discover articles can later be saved to Library.
+    // Remove their separate cache copy to avoid duplicate global vocabulary.
+    const duplicateDiscoverRecords = discoverReaderItems.filter(item =>
+        libraryItems.some(saved => saved?.type === 'article' && String(saved.discoverId) === String(item.discoverId)));
+    if (duplicateDiscoverRecords.length) {
+        discoverReaderItems = discoverReaderItems.filter(item => !duplicateDiscoverRecords.includes(item));
+        try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
+        catch (error) { console.warn('Unable to clean duplicate Discover cache', error); }
+    }
     if (workspaceState?.activeWorkspace && window.SmartReaderWorkspaceSamples?.repairActiveChineseWorkspace) {
         try {
             const repaired = await window.SmartReaderWorkspaceSamples.repairActiveChineseWorkspace(
@@ -1851,16 +1860,18 @@ async function saveCurrentDiscoverToLibrary() {
     article.parentId = null;
     delete article.isDiscoverArticle;
     libraryItems.push(article);
-    discoverReaderItems = discoverReaderItems.filter(item => item.id !== source.id);
     try {
-        await saveToDB();
-        openArticle(article.id, 'discover');
+        await db.setItem('library_items', libraryItems);
     } catch (error) {
         libraryItems = libraryItems.filter(item => item !== article);
-        discoverReaderItems.push(source);
         console.error('Discover Library save failed', error);
         alert('Libraryに保存できませんでした。');
+        return;
     }
+    discoverReaderItems = discoverReaderItems.filter(item => item.id !== source.id);
+    try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
+    catch (error) { console.warn('Discover cache cleanup will retry on next startup', error); }
+    openArticle(article.id, 'discover');
 }
 
 async function shareCurrentDiscoverReader() {
@@ -1899,7 +1910,7 @@ function openArticle(id, origin = null) {
     if (saveButton) saveButton.style.display = nextArticle.isDiscoverArticle ? '' : 'none';
     const shareButton = document.getElementById('reader-share-discover');
     if (shareButton) shareButton.style.display = readerOrigin === 'discover' ? '' : 'none';
-    window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
+    if (!currentArticle.isDiscoverArticle) window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
     ensureArticleCollections(currentArticle);
     if (!currentArticle) return;
     currentChapterId = getInitialChapterId(currentArticle);
@@ -1911,6 +1922,7 @@ function openArticle(id, origin = null) {
     document.getElementById('back-to-library').style.display = 'inline-block';
     document.getElementById('article-meta').style.display = 'flex';
     document.getElementById('display-url').href = currentArticle.url || '#';
+    document.getElementById('display-url').title = currentArticle.sourceName || '元記事';
     document.getElementById('display-url').style.display = currentArticle.url ? 'inline-flex' : 'none';
 
     renderChapterNavigation();
