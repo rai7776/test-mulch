@@ -2029,12 +2029,13 @@ function renderQuestionMarkerText(selected, question, chapterId, questionIndex =
 function renderArticleText() {
     window.SmartReaderChinese?.stopSentenceAudio();
     if(!currentArticle) return;
+    const readingFromDiscover = typeof readerOrigin !== 'undefined' && readerOrigin === 'discover';
     window.SmartReaderReaderHeader?.render(document,
-        readerOrigin === 'discover' ? { ...currentArticle, readerSource: 'discover' } : currentArticle,
-        libraryItems, readerOrigin === 'discover' ? () => window.showDiscover?.() : goToFolder);
-    const readerHeader = document.querySelector('.app-header');
-    readerHeader?.classList.toggle('is-discover-reader', readerOrigin === 'discover');
-    readerHeader?.classList.toggle('has-source-url', readerOrigin === 'discover' && !!currentArticle.url);
+        readingFromDiscover ? { ...currentArticle, readerSource: 'discover' } : currentArticle,
+        libraryItems, readingFromDiscover ? () => window.showDiscover?.() : goToFolder);
+    const readerHeader = document.querySelector?.('.app-header');
+    readerHeader?.classList?.toggle?.('is-discover-reader', readingFromDiscover);
+    readerHeader?.classList?.toggle?.('has-source-url', readingFromDiscover && !!currentArticle.url);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
     const sourceType = String(currentArticle.sourceType || '').toLowerCase();
