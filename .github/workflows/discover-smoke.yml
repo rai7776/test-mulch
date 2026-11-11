@@ -45,7 +45,7 @@ jobs:
                   continue
               if n.name in ('h2','h3') and 'words in this story' in n.get_text(' ', strip=True).lower():
                   break
-              if n.name != 'p' or n.find_parent(('p','figure','figcaption')):
+              if n.name != 'p':
                   continue
               if n.find_parent(class_=re.compile('caption|image|photo|related', re.I)):
                   continue
