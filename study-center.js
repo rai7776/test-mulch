@@ -968,7 +968,7 @@
         section.style.display = 'none';
         section.innerHTML = `
             <div class="study-center-shell">
-                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="window.showDiscover?.()">Discover</button><button type="button" onclick="showGlobalVocabulary()">Vocabulary</button><span aria-current="page">Study</span><button type="button" onclick="showGlobalProblems()">Problems</button></nav>
+                <nav class="learning-section-tabs" data-main-nav data-active-tab="study" aria-label="メインセクション"></nav>
                 <header class="study-center-header">
                     <div><span class="study-center-eyebrow">STUDY</span><h1>学習</h1><p>いつ、何を復習するかをここで管理します。</p></div>
                 </header>
@@ -982,6 +982,7 @@
                 <div class="study-center-content" data-study-content></div>
             </div>
         `;
+        window.SmartReaderMainNavigation?.mount(section);
         const firstSection = main.firstElementChild;
         if (firstSection) main.insertBefore(section, firstSection);
         else main.appendChild(section);
