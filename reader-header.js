@@ -25,7 +25,7 @@
     }
 
     function hide(doc) {
-        doc.querySelector('.app-header')?.classList.remove('reader-header');
+        doc.querySelector('.app-header')?.classList.remove('reader-header', 'is-discover-reader', 'has-source-url');
         const nav = doc.getElementById('reader-breadcrumbs');
         if (nav) nav.hidden = true;
     }
