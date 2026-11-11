@@ -3984,8 +3984,7 @@ function collectGlobalVocabulary() {
     let sequence = 0;
     const entries = [];
 
-    libraryItems
-        .filter(item => item && item.type === 'article')
+    allReaderArticles()
         .forEach(article => {
             const words = Array.isArray(article.words) ? article.words : [];
             words.forEach((word, sourceIndex) => {
@@ -4042,7 +4041,7 @@ function resolveGlobalWordSourceIndex(words, wordId, sourceIndex) {
 
 function getGlobalEntrySource(entry) {
     if (!entry) return null;
-    const article = libraryItems.find(item => item.type === 'article' && globalIdsEqual(item.id, entry.articleId));
+    const article = allReaderArticles().find(item => globalIdsEqual(item.id, entry.articleId));
     if (!article) return null;
     ensureArticleCollections(article);
 
@@ -4722,7 +4721,7 @@ function openGlobalVocabularyWordEditor(key) {
 async function saveGlobalVocabularyWordFromModal() {
     const reference = globalVocabularyEditRef;
     if (!reference) return;
-    const article = libraryItems.find(item => item.type === 'article' && globalIdsEqual(item.id, reference.articleId));
+    const article = allReaderArticles().find(item => globalIdsEqual(item.id, reference.articleId));
     if (!article) {
         closeModal();
         return;
@@ -4930,8 +4929,7 @@ function getGlobalProblemChapterInfo(article, question) {
 function collectGlobalProblems() {
     let sequence = 0;
     const entries = [];
-    libraryItems
-        .filter(item => item && item.type === 'article')
+    allReaderArticles()
         .forEach(article => {
             const questions = Array.isArray(article.questions) ? article.questions : [];
             questions.forEach((question, sourceIndex) => {
@@ -4984,7 +4982,7 @@ function resolveGlobalProblemSourceIndex(questions, questionId, sourceIndex) {
 
 function getGlobalProblemEntrySource(entry) {
     if (!entry) return null;
-    const article = libraryItems.find(item => item?.type === 'article' && globalIdsEqual(item.id, entry.articleId));
+    const article = allReaderArticles().find(item => globalIdsEqual(item.id, entry.articleId));
     if (!article) return null;
     ensureArticleCollections(article);
     const index = resolveGlobalProblemSourceIndex(article.questions, entry.questionId, entry.sourceIndex);
@@ -5130,7 +5128,7 @@ function renderGlobalProblemsControls() {
 
     sourceSelect.innerHTML = '';
     appendGlobalProblemOption(sourceSelect, 'all', 'すべての記事・書籍');
-    const articles = libraryItems.filter(item => item?.type === 'article');
+    const articles = allReaderArticles();
     articles.forEach(article => appendGlobalProblemOption(sourceSelect, article.id, getGlobalArticleTitle(article)));
     if (!articles.some(article => String(article.id) === String(state.sourceId))) state.sourceId = 'all';
     sourceSelect.value = String(state.sourceId);
