@@ -3571,6 +3571,8 @@ async function confirmSmartReaderRestore() {
         await replaceSmartReaderPersistentData(restoreBackup.data);
 
         libraryItems = restoreBackup.data.library_items;
+        discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
+        if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
         readerSettings = { ...DEFAULT_READER_SETTINGS, ...restoreBackup.data.reader_settings };
         currentArticle = null;
         currentChapterId = null;
@@ -3588,6 +3590,8 @@ async function confirmSmartReaderRestore() {
             try {
                 await replaceSmartReaderPersistentData(safetyBackup.data, { removeAbsentKeys: true });
                 libraryItems = safetyBackup.data.library_items;
+                discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
+                if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
                 readerSettings = { ...DEFAULT_READER_SETTINGS, ...safetyBackup.data.reader_settings };
                 rolledBack = true;
             } catch (rollbackError) {
