@@ -6,8 +6,9 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const section=()=>document.getElementById('discover-section');
 const matches=a=>{
  const types=state.selectedTypes.length?state.selectedTypes:(state.category!=='All'&&state.types.includes(state.category)?[state.category]:[]);
+ const collectionMatch=state.category!=='TOEIC'||a.collection==='TOEIC';
  const genres=state.selectedGenres.length?state.selectedGenres:(state.category!=='All'&&state.genres.includes(state.category)?[state.category]:[]);
- return (!types.length||types.includes(a.type))&&(!genres.length||genres.some(g=>(a.genres||[]).includes(g)))&&(state.difficulty==='all'||a.difficulty===state.difficulty)&&(!state.query||[a.title,a.description,a.type,...(a.genres||[]),...(a.tags||[])].join(' ').toLowerCase().includes(state.query.toLowerCase()));
+ return collectionMatch&&(!types.length||types.includes(a.type))&&(!genres.length||genres.some(g=>(a.genres||[]).includes(g)))&&(state.difficulty==='all'||a.difficulty===state.difficulty)&&(!state.query||[a.title,a.description,a.type,...(a.genres||[]),...(a.tags||[])].join(' ').toLowerCase().includes(state.query.toLowerCase()));
 };
 const results=()=>state.articles.filter(matches).sort((a,b)=>state.sort==='oldest'?Date.parse(a.publishedAt)-Date.parse(b.publishedAt):state.sort==='shortest'?(a.minutes||0)-(b.minutes||0):Date.parse(b.publishedAt)-Date.parse(a.publishedAt));
 const summary=(items,empty='すべて')=>items.length?items.join(', '):empty;
@@ -32,7 +33,7 @@ function render(){
  const items=results();
  root.innerHTML=`<div class="discover-inner">
  <h2>Discover</h2><div class="discover-subtitle">Daily Reading</div>
- <div class="discover-categories" role="group" aria-label="カテゴリ">${['All',...state.types,...state.genres].map(c=>`<button type="button" data-category="${esc(c)}" class="${state.category===c?'is-selected':''}">${esc(c==='All'?'すべて':c)}</button>`).join('')}</div>
+ <div class="discover-categories" role="group" aria-label="カテゴリ">${['All','News','TOEIC','Stories',...state.types.filter(t=>!['News','Stories'].includes(t)),...state.genres].map(c=>`<button type="button" data-category="${esc(c)}" class="${state.category===c?'is-selected':''}">${esc(c==='All'?'すべて':c)}</button>`).join('')}</div>
  <div class="discover-search-row"><input id="discover-search" type="search" placeholder="記事を検索..." aria-label="記事を検索"><button type="button" class="discover-filter-trigger" id="discover-filter-trigger" aria-label="フィルターを開く" aria-expanded="${state.filterOpen}"><span aria-hidden="true">☷</span><span class="discover-filter-label">フィルター</span>${active?`<small>${active}</small>`:''}</button></div>
  <div class="discover-results-label"><span>記事一覧</span><small>${items.length}件</small></div>
  <div class="discover-cards">${items.length?items.map(a=>`<button type="button" class="discover-card" data-article="${esc(a.id)}"><span class="discover-thumbnail" aria-hidden="true">${a.type==='News'?'▤':a.type==='Stories'?'▥':'✉'}</span><span class="discover-card-main"><span class="discover-meta"><span class="discover-pill">${esc(a.genres?.[0]||a.type)}</span> ${esc(a.difficulty||'')} · 約${Number(a.minutes)||3}分</span><strong>${esc(a.title)}</strong><span class="discover-description">${esc(a.description||'')}</span><span class="discover-source">${esc(a.source||'')}</span></span></button>`).join(''):'<p class="discover-empty">条件に一致する記事がありません。フィルターを変更してください。</p>'}</div>
