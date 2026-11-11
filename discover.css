@@ -90,3 +90,28 @@
  justify-content:center;
  white-space:nowrap;
 }
+
+/* Preserve the old four-tab breathing room with five scrollable tabs.
+   The previous flex override dropped the grid's equal-width spacing. */
+.learning-ui #library-section .library-primary-tabs > .library-primary-tab,
+.learning-ui .learning-section-tabs > button,
+.learning-ui .learning-section-tabs > span{
+ flex:0 0 auto!important;
+ min-width:88px!important;
+ width:auto!important;
+ padding:8px 16px!important;
+ box-sizing:border-box;
+ text-align:center;
+}
+.learning-ui #library-section .library-primary-tabs,
+.learning-ui .learning-section-tabs{
+ justify-content:flex-start!important;
+}
+@media(max-width:420px){
+ .learning-ui #library-section .library-primary-tabs > .library-primary-tab,
+ .learning-ui .learning-section-tabs > button,
+ .learning-ui .learning-section-tabs > span{
+  min-width:84px!important;
+  padding:7px 14px!important;
+ }
+}
