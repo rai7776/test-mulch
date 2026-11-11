@@ -34,7 +34,7 @@ function render(){
  const root=section();if(!root)return;
  const active=state.selectedTypes.length+state.selectedGenres.length+(state.difficulty!=='all'?1:0)+(state.sort!=='newest'?1:0);
  const items=results();
- root.innerHTML=`<div class="discover-inner">
+ root.innerHTML=`<div class="discover-inner"><nav class="learning-section-tabs discover-main-tabs" aria-label="メインセクション"><button type="button" data-go="library">Library</button><span aria-current="page">Discover</span><button type="button" data-go="vocabulary">Vocabulary</button><button type="button" data-go="study">Study</button><button type="button" data-go="problems">Problems</button></nav>
  <h2>Discover</h2><div class="discover-subtitle">Daily Reading</div>
  <div class="discover-categories" role="group" aria-label="カテゴリ">${['All','News','TOEIC','Stories',...state.types.filter(t=>!['News','Stories'].includes(t)),...state.genres].map(c=>`<button type="button" data-category="${esc(c)}" class="${state.category===c?'is-selected':''}">${esc(c==='All'?'すべて':c)}</button>`).join('')}</div>
  <div class="discover-search-row"><input id="discover-search" type="search" placeholder="記事を検索..." aria-label="記事を検索"><button type="button" class="discover-filter-trigger" id="discover-filter-trigger" aria-label="フィルターを開く" aria-expanded="${state.filterOpen}"><span aria-hidden="true">☷</span><span class="discover-filter-label">フィルター</span>${active?`<small>${active}</small>`:''}</button></div>
@@ -44,6 +44,7 @@ function render(){
  ${state.filterOpen?filterMarkup(items.length):''}`;
  const input=root.querySelector('#discover-search');input.value=state.query;
  input.addEventListener('input',e=>{const start=e.target.selectionStart;state.query=e.target.value;render();const next=section().querySelector('#discover-search');next.focus();next.setSelectionRange(start,start);});
+ root.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const destinations={library:()=>goToFolder(null),vocabulary:()=>showGlobalVocabulary(),study:()=>window.showStudyCenter?.(),problems:()=>showGlobalProblems()};destinations[b.dataset.go]?.();});
  root.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{state.category=b.dataset.category;state.selectedTypes=[];state.selectedGenres=[];render();});
  root.querySelectorAll('[data-article]').forEach(b=>b.onclick=()=>openArticle(b.dataset.article));
  root.querySelector('#discover-filter-trigger').onclick=()=>{state.filterOpen=true;render();};
@@ -85,7 +86,8 @@ function openArticle(id){
  const a=state.articles.find(x=>String(x.id)===String(id));if(!a)return;
  state.article=a;
  const root=section();
- root.innerHTML=`<div class="discover-inner discover-preview"><button class="discover-back" id="discover-back">‹ Discover</button><div class="discover-meta"><span class="discover-pill">${esc(a.genres?.[0]||a.type)}</span> ${esc(a.difficulty)} · 約${Number(a.minutes)||3}分</div><h2>${esc(a.title)}</h2>${articleDescription(a)?`<p class="discover-description" lang="${esc(articleLanguage(a))}">${esc(articleDescription(a))}</p>`:""}<div class="discover-article-body" lang="${esc(articleLanguage(a))}">${String(a.content||'').split(/\n\s*\n/).map(p=>`<p>${esc(p)}</p>`).join('')}</div><div class="discover-preview-actions"><button id="discover-save">Libraryに保存してReaderで開く</button><button id="discover-share">共有</button></div></div>`;
+ root.innerHTML=`<div class="discover-inner discover-preview"><nav class="learning-section-tabs discover-main-tabs" aria-label="メインセクション"><button type="button" data-go="library">Library</button><span aria-current="page">Discover</span><button type="button" data-go="vocabulary">Vocabulary</button><button type="button" data-go="study">Study</button><button type="button" data-go="problems">Problems</button></nav><button class="discover-back" id="discover-back">‹ Discover</button><div class="discover-meta"><span class="discover-pill">${esc(a.genres?.[0]||a.type)}</span> ${esc(a.difficulty)} · 約${Number(a.minutes)||3}分</div><h2>${esc(a.title)}</h2>${articleDescription(a)?`<p class="discover-description" lang="${esc(articleLanguage(a))}">${esc(articleDescription(a))}</p>`:""}<div class="discover-article-body" lang="${esc(articleLanguage(a))}">${String(a.content||'').split(/\n\s*\n/).map(p=>`<p>${esc(p)}</p>`).join('')}</div><div class="discover-preview-actions"><button id="discover-save">Libraryに保存してReaderで開く</button><button id="discover-share">共有</button></div></div>`;
+ root.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const destinations={library:()=>goToFolder(null),vocabulary:()=>showGlobalVocabulary(),study:()=>window.showStudyCenter?.(),problems:()=>showGlobalProblems()};destinations[b.dataset.go]?.();});
  root.querySelector('#discover-back').onclick=render;
  root.querySelector('#discover-share').onclick=async()=>{const url=new URL(location.href);url.hash='discover/'+encodeURIComponent(a.id);try{if(navigator.share)await navigator.share({title:a.title,url:String(url)});else{await navigator.clipboard.writeText(String(url));alert('記事のURLをコピーしました');}}catch(e){if(e.name!=='AbortError')alert('共有できませんでした');}};
  root.querySelector('#discover-save').onclick=async()=>{
