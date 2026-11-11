@@ -97,6 +97,8 @@
     }
 
     function library() {
+        const shared = window.SmartReaderReaderArticles?.all?.();
+        if (Array.isArray(shared)) return shared;
         if (Array.isArray(window.libraryItems)) return window.libraryItems;
         try {
             if (typeof libraryItems !== 'undefined' && Array.isArray(libraryItems)) return libraryItems;
