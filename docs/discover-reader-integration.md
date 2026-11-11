@@ -14,7 +14,7 @@
 - 保存先（各端末のLocalForage）: `discover_reader_items_v1:<activeWorkspaceId>`
 - Readerでは `discover:<catalogId>` を内部IDとして使う。異なるWorkspaceの学習データは分離される。
 - 各ローカル記事には、登録した単語・メモ・問題・しおり・読書位置が保存される。閲覧履歴はLibraryの「前回の続き」を上書きしない。
-- 別保存領域の学習データはGlobal Vocabulary / Problemsからも参照・編集できる。
+- 別保存領域の学習データはGlobal Vocabulary / ProblemsだけでなくStudy CenterやFlashcardからも利用できる。
 - Library保存時は記事と学習データを移し、別領域の同一記事キャッシュを削除する。起動時にも古い重複キャッシュを整理する。
 - バックアップは既存のLocalForageキー収集によりDiscover学習データを含む。
 
