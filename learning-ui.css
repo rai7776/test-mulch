@@ -212,3 +212,38 @@ body.learning-ui:not(.reader-mode-active) #fab-toggle,
 body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
     display: none !important;
 }
+
+/* Five-section navigation: shared, single-row, horizontally scrollable. */
+.learning-ui #library-section .library-primary-tabs,
+.learning-ui .learning-section-tabs {
+ display:flex;
+ flex-direction:row;
+ flex-wrap:nowrap;
+ justify-content:flex-start;
+ align-items:stretch;
+ gap:0;
+ width:100%;
+ max-width:100%;
+ min-width:0;
+ overflow-x:auto;
+ overflow-y:hidden;
+ -webkit-overflow-scrolling:touch;
+ scrollbar-width:none;
+}
+.learning-ui #library-section .library-primary-tabs::-webkit-scrollbar,
+.learning-ui .learning-section-tabs::-webkit-scrollbar{display:none}
+.learning-ui #library-section .library-primary-tabs > *,
+.learning-ui .learning-section-tabs > button,
+.learning-ui .learning-section-tabs > span{
+ flex:0 0 auto;
+ width:auto;
+ min-width:88px;
+ box-sizing:border-box;
+ padding:8px 16px;
+ white-space:nowrap;
+}
+@media(max-width:420px){
+ .learning-ui #library-section .library-primary-tabs > *,
+ .learning-ui .learning-section-tabs > button,
+ .learning-ui .learning-section-tabs > span{min-width:84px;padding:7px 14px}
+}
