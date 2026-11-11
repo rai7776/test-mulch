@@ -37,7 +37,6 @@ jobs:
           title = soup.select_one('h1')
           assert title, 'Missing title'
           candidates = [(selector, node) for selector in ('.wsw', '.article-body', '.article-content', '[itemprop=articleBody]') for node in soup.select(selector) if node.find('p')]
-          print('DEBUG body candidates:', [(sel, len(node.select('p')), node.get('class')) for sel, node in candidates[:12]])
           body = max((node for _, node in candidates), key=lambda n: len(n.select('p')), default=None)
           assert body, 'Article body missing'
           paras = []
@@ -53,7 +52,6 @@ jobs:
               paragraph = re.sub(r'\s+', ' ', n.get_text('', strip=False)).strip()
               if paragraph and paragraph not in paras[-2:]:
                   paras.append(paragraph)
-          print('DEBUG candidate p preview:', [(p.get_text(' ', strip=True)[:55], [q.get('class') for q in list(p.parents)[:3] if isinstance(q, Tag)]) for p in body.select('p')[:6]])
           content = '\n\n'.join(paras)
           words = len(re.findall(r"\b[A-Za-z]+(?:[’'-][A-Za-z]+)*\b", content))
           assert len(paras) >= 5 and 300 <= words <= 1800, f'Extraction suspicious: {len(paras)} paragraphs, {words} words'
