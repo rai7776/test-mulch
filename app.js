@@ -70,6 +70,7 @@ function allReaderArticles() {
 function findReaderArticle(id) {
     return allReaderArticles().find(article => String(article.id) === String(id));
 }
+window.SmartReaderReaderArticles = Object.freeze({ all: allReaderArticles, find: findReaderArticle });
 
 let currentChapterId = null;
 let readerWordCounts = { articleId: null, chapterId: null, chapter: 0, book: 0, chapterChars: 0, bookChars: 0 };
