@@ -22,7 +22,9 @@
             <h1 id="app-title">Smart Reader</h1>
         </div>
         <div id="article-meta" style="display:none;">
-            <button onclick="editCurrentArticle()" class="small-edit-btn">編集</button>
+            <button id="reader-edit-article" onclick="editCurrentArticle()" class="small-edit-btn">編集</button>
+            <button type="button" id="reader-save-discover" onclick="saveCurrentDiscoverToLibrary()" class="small-edit-btn" style="display:none;">Libraryに保存</button>
+            <button type="button" id="reader-share-discover" onclick="shareCurrentDiscoverReader()" class="small-edit-btn" style="display:none;">共有</button>
             <button onclick="showCurrentArticleVocabulary()" class="small-edit-btn">この資料の単語</button>
             <a id="display-url" href="#" target="_blank" rel="noopener noreferrer">元記事 ↗</a>
         </div>
@@ -558,10 +560,10 @@
     <script src="reader-sentence-overlay.js?v=1"></script>
     <script src="workspace-samples.js?v=4"></script>
     <script src="sample-data-v2.js?v=3"></script>
-    <script src="reader-header.js?v=1"></script>
+    <script src="reader-header.js?v=2"></script>
     <script src="learning-ui.js?v=1"></script>
     <script src="reader-vocabulary-highlights.js?v=1"></script>
-    <script src="app.js?v=4.19"></script>
+    <script src="app.js?v=4.20"></script>
     <script src="workspace-ui.js?v=4"></script>
     <script src="speech-language-adapter.js?v=2"></script>
     <script src="global-vocab-multiselect.js?v=1.0"></script>
@@ -579,6 +581,6 @@
     <script src="folder-panel-context.js?v=1.0"></script>
     <script src="note-structure-ui.js?v=2.5"></script>
     <script src="word-senses.js?v=8"></script>
-    <script src="discover.js?v=2"></script>
+    <script src="discover.js?v=3"></script>
 </body>
 </html>
