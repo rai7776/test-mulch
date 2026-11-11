@@ -15,6 +15,7 @@ function harness(options = {}) {
         let libraryItems=env.libraryItems, discoverReaderItems=env.discoverReaderItems, currentArticle=null;
         const window=env.window, db=env.db, console=env.logger, alert=env.alert,
             saveToDB=env.saveToDB, openArticle=env.openArticle,
+            flushReadingPositionSave=env.flushReadingPositionSave,
             discoverReaderStorageKey=env.discoverReaderStorageKey, showLibrary=env.showLibrary,
             navigator=env.navigator, location=env.location;
         ${handlers}
@@ -32,7 +33,7 @@ function harness(options = {}) {
             persisted[key] = JSON.parse(JSON.stringify(data));
         }},
         logger:{error(){},warn(){}}, alert:()=>{},
-        saveToDB:async ()=>{},
+        saveToDB:async ()=>{}, flushReadingPositionSave:()=>{},
         openArticle:(id, origin)=>opened.push({id, origin}),
         discoverReaderStorageKey:()=> 'discover_reader_items_v1:test-workspace',
         showLibrary:()=>{}, navigator:{}, location:{href:'https://example.test/reader'}
@@ -98,4 +99,10 @@ test('Failed Library persistence keeps Discover article and annotations intact',
     assert.equal(app.getState().libraryItems.length, 0);
     assert.equal(app.getState().discoverReaderItems.length, 1);
     assert.equal(app.getState().discoverReaderItems[0].words[0].word, 'keep');
+});
+
+test('Untrusted Discover source URLs do not become Reader links', async () => {
+    const app = harness();
+    await app.openDiscoverReader({...article, id:'bad-url', sourceUrl:'javascript:alert(1)'});
+    assert.equal(app.getState().discoverReaderItems[0].url, '');
 });
