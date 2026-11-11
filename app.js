@@ -174,7 +174,7 @@ async function init() {
     // Previously viewed Discover articles can later be saved to Library.
     // Remove their separate cache copy to avoid duplicate global vocabulary.
     const duplicateDiscoverRecords = discoverReaderItems.filter(item =>
-        libraryItems.some(saved => saved?.type === 'article' && String(saved.discoverId) === String(item.discoverId)));
+        libraryItems.some(saved => saved?.type === 'article' && item?.discoverId != null && saved.discoverId != null && String(saved.discoverId) === String(item.discoverId)));
     if (duplicateDiscoverRecords.length) {
         discoverReaderItems = discoverReaderItems.filter(item => !duplicateDiscoverRecords.includes(item));
         try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
@@ -1827,7 +1827,7 @@ async function openDiscoverReader(catalogArticle) {
             id: readerId, type: 'article', isDiscoverArticle: true,
             discoverId: String(catalogArticle.id), parentId: null,
             name: String(catalogArticle.title || '無題'),
-            content: catalogArticle.content, url: catalogArticle.sourceUrl || '',
+            content: catalogArticle.content, url: catalogArticle.sourceUrl || catalogArticle.url || '',
             sourceName: catalogArticle.sourceName || '', language: catalogArticle.language || 'en',
             words: [], notes: [], bookmarks: [], questions: []
         };
@@ -1835,7 +1835,7 @@ async function openDiscoverReader(catalogArticle) {
     } else {
         article.name = String(catalogArticle.title || article.name);
         article.content = catalogArticle.content;
-        article.url = catalogArticle.sourceUrl || article.url || '';
+        article.url = catalogArticle.sourceUrl || catalogArticle.url || article.url || '';
         article.sourceName = catalogArticle.sourceName || article.sourceName || '';
         article.language = catalogArticle.language || article.language || 'en';
     }
