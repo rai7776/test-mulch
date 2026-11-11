@@ -56,6 +56,21 @@ const db = localforage.createInstance({ name: "ProjectA_DB_v3" });
 const DEFAULT_READER_SETTINGS = Object.freeze({ fontSize: 18, lineHeight: 1.8, sentenceAudioButtonsVisible: false });
 
 let libraryItems = [], currentFolderId = null, currentArticle = null;
+let discoverReaderItems = [];
+let readerOrigin = 'library';
+let resolveSmartReaderReady;
+window.SmartReaderAppReady = new Promise(resolve => { resolveSmartReaderReady = resolve; });
+const DISCOVER_READER_STORAGE_PREFIX = 'discover_reader_items_v1:';
+function discoverReaderStorageKey() {
+    return DISCOVER_READER_STORAGE_PREFIX + (window.SmartReaderWorkspaceState?.activeWorkspaceId || 'default');
+}
+function allReaderArticles() {
+    return [...libraryItems.filter(item => item?.type === 'article'), ...discoverReaderItems];
+}
+function findReaderArticle(id) {
+    return allReaderArticles().find(article => String(article.id) === String(id));
+}
+
 let currentChapterId = null;
 let readerWordCounts = { articleId: null, chapterId: null, chapter: 0, book: 0, chapterChars: 0, bookChars: 0 };
 let pendingImportedDocument = null;
@@ -154,6 +169,8 @@ async function init() {
     // Always use the active Workspace library. Repair only Chinese sample data;
     // never seed the default English tutorial into a Chinese Workspace.
     libraryItems = await db.getItem('library_items') || [];
+    discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
+    if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
     if (workspaceState?.activeWorkspace && window.SmartReaderWorkspaceSamples?.repairActiveChineseWorkspace) {
         try {
             const repaired = await window.SmartReaderWorkspaceSamples.repairActiveChineseWorkspace(
@@ -185,6 +202,7 @@ async function init() {
     showLibrary(); 
     renderList('words');
     setupEventListeners(); // リスナー設定を呼び出す
+    resolveSmartReaderReady();
     if (workspaceState) window.dispatchEvent(new CustomEvent('smartreader:workspace-ready', { detail: workspaceState }));
 }
 
@@ -1783,14 +1801,104 @@ function goToNextChapter() {
     if (index >= 0 && index < chapters.length - 1) void switchToChapter(chapters[index + 1].id);
 }
 
-function openArticle(id) {
-    const nextArticle = libraryItems.find(i => i.id === id);
+function readerBack() {
+    if (readerOrigin === 'discover') window.showDiscover?.();
+    else showLibrary();
+}
+
+async function openDiscoverReader(catalogArticle) {
+    if (!catalogArticle?.id || typeof catalogArticle.content !== 'string') return;
+    await window.SmartReaderAppReady;
+    const existingSaved = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(catalogArticle.id));
+    if (existingSaved) { openArticle(existingSaved.id, 'discover'); return; }
+    const readerId = 'discover:' + String(catalogArticle.id);
+    let article = discoverReaderItems.find(item => item.id === readerId);
+    if (!article) {
+        article = {
+            id: readerId, type: 'article', isDiscoverArticle: true,
+            discoverId: String(catalogArticle.id), parentId: null,
+            name: String(catalogArticle.title || '無題'),
+            content: catalogArticle.content, url: catalogArticle.sourceUrl || '',
+            sourceName: catalogArticle.sourceName || '', language: catalogArticle.language || 'en',
+            words: [], notes: [], bookmarks: [], questions: []
+        };
+        discoverReaderItems.push(article);
+    } else {
+        article.name = String(catalogArticle.title || article.name);
+        article.content = catalogArticle.content;
+        article.url = catalogArticle.sourceUrl || article.url || '';
+        article.sourceName = catalogArticle.sourceName || article.sourceName || '';
+        article.language = catalogArticle.language || article.language || 'en';
+    }
+    try {
+        await db.setItem(discoverReaderStorageKey(), discoverReaderItems);
+    } catch (error) {
+        console.error('Discover reader cache save failed', error);
+        alert('この記事の学習データを保存できない可能性があります。端末の保存設定をご確認ください。');
+    }
+    openArticle(readerId, 'discover');
+}
+window.openDiscoverReader = openDiscoverReader;
+
+async function saveCurrentDiscoverToLibrary() {
+    const source = currentArticle;
+    if (!source?.isDiscoverArticle) return;
+    const existing = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(source.discoverId));
+    if (existing) { openArticle(existing.id, 'discover'); return; }
+    const article = JSON.parse(JSON.stringify(source));
+    article.id = Date.now();
+    while (libraryItems.some(item => String(item.id) === String(article.id))) article.id += 1;
+    article.parentId = null;
+    delete article.isDiscoverArticle;
+    libraryItems.push(article);
+    discoverReaderItems = discoverReaderItems.filter(item => item.id !== source.id);
+    try {
+        await saveToDB();
+        openArticle(article.id, 'discover');
+    } catch (error) {
+        libraryItems = libraryItems.filter(item => item !== article);
+        discoverReaderItems.push(source);
+        console.error('Discover Library save failed', error);
+        alert('Libraryに保存できませんでした。');
+    }
+}
+
+async function shareCurrentDiscoverReader() {
+    const id = currentArticle?.discoverId;
+    if (!id) return;
+    const url = new URL(location.href);
+    url.hash = 'discover/' + encodeURIComponent(id);
+    try {
+        if (navigator.share) await navigator.share({title: currentArticle.name, url: String(url)});
+        else {
+            await navigator.clipboard.writeText(String(url));
+            alert('記事のURLをコピーしました');
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') alert('共有できませんでした。');
+    }
+}
+
+function openArticle(id, origin = null) {
+    const nextArticle = findReaderArticle(id);
     if (!nextArticle) return;
 
     // 記事を切り替える前に、現在の記事の自動読書位置を確定する。
     if (currentArticle && currentArticle.id !== nextArticle.id) flushReadingPositionSave();
 
     currentArticle = nextArticle;
+    readerOrigin = origin || (nextArticle.isDiscoverArticle ? 'discover' : 'library');
+    const back = document.getElementById('back-to-library');
+    if (back) {
+        back.textContent = readerOrigin === 'discover' ? '‹ Discover' : '📖 本棚';
+        back.onclick = readerBack;
+    }
+    const editButton = document.getElementById('reader-edit-article');
+    if (editButton) editButton.style.display = nextArticle.isDiscoverArticle ? 'none' : '';
+    const saveButton = document.getElementById('reader-save-discover');
+    if (saveButton) saveButton.style.display = nextArticle.isDiscoverArticle ? '' : 'none';
+    const shareButton = document.getElementById('reader-share-discover');
+    if (shareButton) shareButton.style.display = readerOrigin === 'discover' ? '' : 'none';
     window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
     ensureArticleCollections(currentArticle);
     if (!currentArticle) return;
@@ -1902,7 +2010,8 @@ function renderQuestionMarkerText(selected, question, chapterId, questionIndex =
 function renderArticleText() {
     window.SmartReaderChinese?.stopSentenceAudio();
     if(!currentArticle) return;
-    window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems, goToFolder);
+    window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems,
+        readerOrigin === 'discover' ? () => window.showDiscover?.() : goToFolder);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
     const sourceType = String(currentArticle.sourceType || '').toLowerCase();
@@ -2896,7 +3005,10 @@ function flushReadingPositionSave() {
     if (currentArticle) void saveCurrentReadingPosition();
 }
 
-async function saveToDB() { await db.setItem('library_items', libraryItems); }
+async function saveToDB() {
+    await db.setItem('library_items', libraryItems);
+    await db.setItem(discoverReaderStorageKey(), discoverReaderItems);
+}
 
 // Existing Chinese Workspaces can opt in to the sample without replacing any articles.
 async function addChineseSampleToActiveWorkspace() {
