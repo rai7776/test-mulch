@@ -92,6 +92,28 @@
         "en": "An office notice about temporary changes to cafeteria service."
       },
       "sourceName": "Smart Reader"
+    },
+    {
+      "id": "voa-wright-brothers-7998765",
+      "type": "Articles",
+      "genres": [
+        "History",
+        "Technology"
+      ],
+      "tags": [],
+      "difficulty": "中級",
+      "minutes": 2,
+      "publishedAt": "2025-03-17",
+      "title": "The Wright Brothers and the First Powered Flight",
+      "content": "Wilbur and Orville Wright changed the history of transportation by developing a powered airplane. The brothers grew up in the United States and became interested in machines at an early age. They learned from bicycles, kites, and gliders as they worked on their ideas for flight.\n\nThey chose an area near Kitty Hawk, North Carolina, to test their designs because the winds there were useful for their experiments. After many tests, they built a small airplane with a gasoline engine.\n\nOn December 17, 1903, Orville Wright made a short powered flight. It lasted about twelve seconds and covered roughly thirty-six meters. The brothers continued experimenting, and their work eventually attracted international attention.\n\nTheir early airplane is now preserved at the Smithsonian National Air and Space Museum. The Wright brothers' experiments helped begin the modern era of powered aviation.",
+      "language": "en",
+      "descriptions": {
+        "en": "A short Smart Reader adaptation about the Wright brothers' first powered flight."
+      },
+      "sourceName": "Smart Reader adaptation · VOA Learning English",
+      "sourceUrl": "https://learningenglish.voanews.com/a/wilbur-and-orville-wright-the-first-airplane/7998765.html",
+      "licenseUrl": "https://learningenglish.voanews.com/p/6861.html",
+      "contentType": "adaptation"
     }
   ]
 }
