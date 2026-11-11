@@ -1816,6 +1816,11 @@ function readerBack() {
     else showLibrary();
 }
 
+function discoverSourceUrl(article) {
+    const url = String(article?.sourceUrl || article?.url || '').trim();
+    return /^https?:\/\/[^\s/]+/i.test(url) ? url : '';
+}
+
 async function openDiscoverReader(catalogArticle) {
     if (!catalogArticle?.id || typeof catalogArticle.content !== 'string') return;
     await window.SmartReaderAppReady;
@@ -1828,7 +1833,7 @@ async function openDiscoverReader(catalogArticle) {
             id: readerId, type: 'article', isDiscoverArticle: true,
             discoverId: String(catalogArticle.id), parentId: null,
             name: String(catalogArticle.title || '無題'),
-            content: catalogArticle.content, url: catalogArticle.sourceUrl || catalogArticle.url || '',
+            content: catalogArticle.content, url: discoverSourceUrl(catalogArticle),
             sourceName: catalogArticle.sourceName || '', language: catalogArticle.language || 'en',
             words: [], notes: [], bookmarks: [], questions: []
         };
@@ -1836,7 +1841,7 @@ async function openDiscoverReader(catalogArticle) {
     } else {
         article.name = String(catalogArticle.title || article.name);
         article.content = catalogArticle.content;
-        article.url = catalogArticle.sourceUrl || catalogArticle.url || article.url || '';
+        article.url = discoverSourceUrl(catalogArticle) || article.url || '';
         article.sourceName = catalogArticle.sourceName || article.sourceName || '';
         article.language = catalogArticle.language || article.language || 'en';
     }
@@ -1853,6 +1858,7 @@ window.openDiscoverReader = openDiscoverReader;
 async function saveCurrentDiscoverToLibrary() {
     const source = currentArticle;
     if (!source?.isDiscoverArticle) return;
+    flushReadingPositionSave();
     const existing = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(source.discoverId));
     if (existing) { openArticle(existing.id, 'discover'); return; }
     const article = JSON.parse(JSON.stringify(source));
