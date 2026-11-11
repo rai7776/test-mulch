@@ -1,5 +1,20 @@
 # メインタブ追加・変更ガイド（2026-11-11）
 
+> **更新（2026-11-11）:** メインタブは `main-navigation.js` の `TABS` 配列と `SmartReaderMainNavigation.mount(root)` に共通化しました。以下の「現行の構成」「追加手順」の一部は旧構造の経緯を説明する履歴として残しています。今後は新しい手順を優先してください。
+
+## 共通化後のタブ追加手順
+
+1. `main-navigation.js` の `TABS` に新しい `id` と `label` を1件追加し、`actions` に遷移関数を定義する。
+2. 新画面のナビゲーションには `<nav class="learning-section-tabs" data-main-nav data-active-tab="新しいid" aria-label="メインセクション"></nav>` を1つ置く。
+3. HTMLに静的配置する場合はページ初期化で自動描画される。JSで後から生成する場合は `window.SmartReaderMainNavigation.mount(section)` を実行する。
+4. `hideAllSections()` に画面IDを追加する。既存画面のナビゲーションを個別に編集しない。
+5. `aria-current="page"` は共通レンダラーが1件だけ付与する。タブDOMを後から追加する処理は書かない。
+6. スマホの横スクロール、選択下線、連続画面切り替え、Studyの再表示、Discoverの一覧・プレビューで回帰確認する。
+
+---
+
+
+
 Smart Reader のメインタブは **Library / Discover / Vocabulary / Study / Problems** の5つです。
 この文書は Discover 追加時に実機で発生した回帰不具合と、次のタブ追加時の作業手順を記録します。
 
