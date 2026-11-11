@@ -56,3 +56,7 @@
 @media(max-width:600px){.discover-filter-label{display:none}.discover-filter-trigger{width:39px;padding:5px}.discover-thumbnail{flex-basis:66px;height:66px}.discover-card{gap:9px}.discover-inner{padding:10px 12px 90px}.discover-sheet{max-height:86dvh}}
 
 .discover-card .discover-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+
+/* Match the existing learning-section-tabs styling; keep the strip scrollable. */
+.discover-main-tabs{margin-bottom:14px;max-width:100%;overflow-x:auto;white-space:nowrap}
+.discover-main-tabs>*{flex-shrink:0}
