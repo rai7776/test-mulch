@@ -16,6 +16,7 @@ const matches=a=>{
 const results=()=>state.articles.filter(matches).sort((a,b)=>state.sort==='oldest'?Date.parse(a.publishedAt)-Date.parse(b.publishedAt):state.sort==='shortest'?(a.minutes||0)-(b.minutes||0):Date.parse(b.publishedAt)-Date.parse(a.publishedAt));
 const summary=(items,empty='すべて')=>items.length?items.join(', '):empty;
 function showDiscover(){
+ if(typeof flushReadingPositionSave==='function')flushReadingPositionSave();
  if(typeof hideAllSections==='function')hideAllSections();
  section().style.display='block';state.article=null;render();
 }
@@ -72,21 +73,15 @@ function bindFilter(){
  root.querySelector('#discover-apply').onclick=closeFilter;
 }
 function closeFilter(){state.filterOpen=false;render();}
-function openArticle(id){
- const a=state.articles.find(x=>String(x.id)===String(id));if(!a)return;
- state.article=a;
- const root=section();
- root.innerHTML=`<div class="discover-inner discover-preview"><nav class="learning-section-tabs discover-main-tabs" data-main-nav data-active-tab="discover" aria-label="メインセクション"></nav><button class="discover-back" id="discover-back">‹ Discover</button><div class="discover-meta"><span class="discover-pill">${esc(a.genres?.[0]||a.type)}</span> ${esc(a.difficulty)} · 約${Number(a.minutes)||3}分</div><h2>${esc(a.title)}</h2>${articleDescription(a)?`<p class="discover-description" lang="${esc(articleLanguage(a))}">${esc(articleDescription(a))}</p>`:""}<div class="discover-article-body" lang="${esc(articleLanguage(a))}">${String(a.content||'').split(/\n\s*\n/).map(p=>`<p>${esc(p)}</p>`).join('')}</div><div class="discover-preview-actions"><button id="discover-save">Libraryに保存してReaderで開く</button><button id="discover-share">共有</button></div></div>`;
- window.SmartReaderMainNavigation?.mount(root);
- root.querySelector('#discover-back').onclick=render;
- root.querySelector('#discover-share').onclick=async()=>{const url=new URL(location.href);url.hash='discover/'+encodeURIComponent(a.id);try{if(navigator.share)await navigator.share({title:a.title,url:String(url)});else{await navigator.clipboard.writeText(String(url));alert('記事のURLをコピーしました');}}catch(e){if(e.name!=='AbortError')alert('共有できませんでした');}};
- root.querySelector('#discover-save').onclick=async()=>{
-  const existing=libraryItems.find(i=>i.type==='article'&&i.discoverId===a.id);
-  if(existing){window.openArticle(existing.id);return;}
-  const article={id:Date.now(),type:'article',name:a.title,parentId:null,content:a.content,url:a.sourceUrl||'',discoverId:a.id,words:[],notes:[],bookmarks:[],questions:[]};
-  libraryItems.push(article);
-  try{await saveToDB();window.openArticle(article.id);}catch(e){libraryItems=libraryItems.filter(i=>i!==article);alert('保存できませんでした。');}
- };
+function openArticle(id) {
+ const article=state.articles.find(item=>String(item.id)===String(id));
+ if(!article)return;
+ state.article=article;
+ const opening=window.openDiscoverReader?.(article);
+ if(opening?.catch)opening.catch(error=>{
+  console.error('Discover Reader could not open',error);
+  alert('この記事をReaderで開けませんでした。');
+ });
 }
 async function init(){
  const root=section();if(!root)return;
