@@ -60,3 +60,33 @@
 /* Match the existing learning-section-tabs styling; keep the strip scrollable. */
 .discover-main-tabs{margin-bottom:14px;max-width:100%;overflow-x:auto;white-space:nowrap}
 .discover-main-tabs>*{flex-shrink:0}
+
+/* Main navigation: override legacy four-column grid so a fifth tab never wraps. */
+.library-primary-tabs,
+.learning-section-tabs,
+.discover-main-tabs{
+ display:flex!important;
+ flex-direction:row!important;
+ flex-wrap:nowrap!important;
+ align-items:stretch;
+ justify-content:flex-start;
+ gap:0;
+ width:100%;
+ max-width:100%;
+ min-width:0;
+ overflow-x:auto!important;
+ overflow-y:hidden;
+ -webkit-overflow-scrolling:touch;
+ scrollbar-width:none;
+}
+.library-primary-tabs > *,
+.learning-section-tabs > *,
+.discover-main-tabs > *{
+ display:flex;
+ flex:0 0 auto!important;
+ width:auto!important;
+ min-width:max-content;
+ align-items:center;
+ justify-content:center;
+ white-space:nowrap;
+}
