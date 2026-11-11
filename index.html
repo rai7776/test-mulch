@@ -35,6 +35,7 @@
                 <div class="library-actions">
                     <nav class="library-primary-tabs" aria-label="メインセクション">
                         <span class="library-primary-tab is-active" aria-current="page">Library</span>
+                        <button type="button" class="library-primary-tab" onclick="showDiscover()"><strong>Discover</strong></button>
                         <button type="button" class="library-primary-tab" onclick="showGlobalVocabulary()"><strong>Vocabulary</strong></button>
                         <button type="button" id="study-center-library-button" class="library-primary-tab study-center-entry-button" onclick="window.showStudyCenter?.()"><strong>Study</strong></button>
                         <button type="button" class="library-primary-tab" onclick="showGlobalProblems()"><strong>Problems</strong></button>
@@ -70,7 +71,7 @@
 
         <div id="vocabulary-section" style="display:none;">
             <div class="vocabulary-header">
-                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><span aria-current="page">Vocabulary</span><button type="button" onclick="window.showStudyCenter?.()">Study</button><button type="button" onclick="showGlobalProblems()">Problems</button></nav>
+                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showDiscover()">Discover</button><span aria-current="page">Vocabulary</span><button type="button" onclick="window.showStudyCenter?.()">Study</button><button type="button" onclick="showGlobalProblems()">Problems</button></nav>
                 <div class="vocabulary-title-row">
                     <div>
                         <span class="study-center-eyebrow">VOCABULARY</span>
@@ -112,7 +113,7 @@
 
         <div id="problems-section" style="display:none;">
             <div class="problems-header">
-                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showGlobalVocabulary()">Vocabulary</button><button type="button" onclick="window.showStudyCenter?.()">Study</button><span aria-current="page">Problems</span></nav>
+                <nav class="learning-section-tabs" aria-label="メインセクション"><button type="button" onclick="goToFolder(null)">Library</button><button type="button" onclick="showGlobalVocabulary()">Vocabulary</button><button type="button" onclick="window.showStudyCenter?.()">Study</button><button type="button" onclick="showDiscover()">Discover</button><span aria-current="page">Problems</span></nav>
                 <div class="problems-title-row">
                     <div>
                         <span class="study-center-eyebrow">PROBLEMS</span>
