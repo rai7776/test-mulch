@@ -20,7 +20,7 @@
             ancestors.unshift({ id:folder.id, label:String(folder.name || '無題のフォルダ') });
             parent = folder.parentId;
         }
-        return [{ id:null, label:'本棚' }, ...ancestors,
+        return [{ id:null, label:article?.isDiscoverArticle || article?.readerSource === 'discover' ? 'Discover' : '本棚' }, ...ancestors,
             { id:article?.id, label:String(article?.name || '無題'), current:true }];
     }
 
