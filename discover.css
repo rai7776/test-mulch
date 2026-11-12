@@ -3,6 +3,10 @@
 .discover-inner{max-width:800px;margin:0 auto;padding:12px 15px 90px;min-width:0}
 .discover-inner h2{font-size:1.25rem;margin:0 0 3px;color:var(--text)}
 .discover-subtitle{font-size:.8rem;color:#777;margin-bottom:12px}
+.discover-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.discover-title-row>div{min-width:0}
+.discover-public-entry{display:inline-flex;align-items:center;flex:0 0 auto;margin:2px 0 10px;padding:5px 9px;border:1px solid #e4dbd0;border-radius:8px;background:#fffdfa;color:#6e5844;text-decoration:none;font-size:.78rem;white-space:nowrap}
+.discover-public-entry:hover{background:#f3ede5}
 .discover-categories{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding-bottom:8px}
 .discover-categories::-webkit-scrollbar{display:none}
 .discover-categories button{flex:0 0 auto;white-space:nowrap;padding:6px 10px;border:1px solid #ddd;border-radius:7px;background:white;color:var(--text);font:inherit;font-size:.83rem}
