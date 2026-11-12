@@ -88,10 +88,10 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
     height:34px;
     min-height:34px;
     padding:0;
-    border:0;
-    border-radius:50%;
-    background:#efeff2;
-    color:#292b35;
+    border:1px solid #e4dbd0;
+    border-radius:8px;
+    background:#fffdfa;
+    color:#6e5844;
     order:-1;
     align-items:center;
     justify-content:center;
@@ -101,7 +101,7 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
     pointer-events:none;
 }
 .learning-ui .reader-header #article-meta #display-url:hover {
-    background:#e1e1e8;
+    background:#f3ede5;
 }
 .learning-ui #reader-breadcrumbs ol, .learning-ui #breadcrumbs ol { display:flex; align-items:center; list-style:none; gap:0; padding:0; margin:0; overflow-x:auto; scrollbar-width:thin; }
 .learning-ui #reader-breadcrumbs li, .learning-ui #breadcrumbs li { display:flex; align-items:center; flex:0 0 auto; min-width:0; }
