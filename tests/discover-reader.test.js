@@ -151,6 +151,15 @@ test('Reopening a TOEIC sample preserves answers, edits, and intentionally remov
     assert.equal(saved.questions.length, 1);
     assert.equal(saved.questions[0].question, 'Edited by the reader');
     assert.equal(saved.questions[0].attempts[0].result, 'correct');
+    await app.openDiscoverReader({
+        ...sample, studyDataVersion: 2,
+        questions: [
+            ...sample.questions,
+            {id:'toeic-q3', question:'Newly published question', answer:'(C)', attempts:[]}
+        ]
+    });
+    assert.deepEqual(saved.questions.map(question => question.id), ['toeic-q1', 'toeic-q3']);
+    assert.equal(saved.questions[0].attempts[0].result, 'correct');
 });
 
 test('Existing Discover caches gain new catalog Problems without losing personal questions', async () => {
