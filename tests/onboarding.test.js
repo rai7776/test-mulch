@@ -23,7 +23,7 @@ test('first-run gating reuses initial workspace setup and never forces establish
     assert.match(tour, /if \(!state && setupPending\(\)\)/);
     assert.match(tour, /if \(!state\) return; \/\/ Existing users/);
     assert.match(tour, /phase: 'welcome'/);
-    assert.match(tour, /phase: 'setup'/);
+    assert.match(tour, /setPhase\('setup'\)/);
     assert.match(tour, /setupPending\(\) \? 'はじめる'/);
     assert.match(tour, /localStorage\.setItem/);
 });
