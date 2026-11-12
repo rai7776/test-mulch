@@ -2035,6 +2035,7 @@ function renderArticleText() {
         libraryItems, readingFromDiscover ? () => window.showDiscover?.() : goToFolder);
     const readerHeader = document.querySelector?.('.app-header');
     readerHeader?.classList?.toggle?.('is-discover-reader', readingFromDiscover);
+    readerHeader?.classList?.toggle?.('has-discover-actions', readingFromDiscover && !!currentArticle.isDiscoverArticle);
     readerHeader?.classList?.toggle?.('has-source-url', !!currentArticle.url);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
