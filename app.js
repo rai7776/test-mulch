@@ -1251,6 +1251,10 @@ function showLibrary() {
     libraryItems.filter(i => i.parentId === currentFolderId).forEach(item => {
         const card = document.createElement('div');
         card.className = `item-card ${item.type === 'folder' ? 'folder-icon' : 'article-icon'}`;
+        if (item.type === 'article') {
+            card.dataset.tourId = 'library-item';
+            card.dataset.libraryItemId = String(item.id);
+        }
         card.onclick = () => item.type === 'folder' ? goToFolder(item.id) : openArticle(item.id);
         card.innerHTML = `
             <h3>${escapeHtml(item.name || "無題")}</h3>
