@@ -79,19 +79,29 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
 .learning-ui .app-header.reader-header { grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:7px 16px; padding-top:max(7px,env(safe-area-inset-top)); }
 .learning-ui .reader-header .header-left, .learning-ui .reader-header .settings-hub-open-button { display:none; }
 .learning-ui .reader-header #article-meta { grid-column:2; grid-row:1; width:auto; padding:0; }
-/* Preserve the original one-tap source link: visibility is controlled by app.js. */
-.learning-ui .reader-header.has-source-url #article-meta {
-    grid-column:1 / -1;
-    grid-row:2;
-    width:100%;
-    min-width:0;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
+/* Keep the preexisting breadcrumb + Edit button on one row.
+   The source icon sits immediately before Edit, with no dedicated action row. */
+.learning-ui .reader-header #article-meta #display-url {
+    display:inline-flex;
+    flex:0 0 34px;
+    width:34px;
+    height:34px;
+    min-height:34px;
+    padding:0;
+    border:0;
+    border-radius:50%;
+    background:#efeff2;
+    color:#292b35;
+    order:-1;
+    align-items:center;
+    justify-content:center;
 }
-.learning-ui .reader-header.has-source-url #article-meta::-webkit-scrollbar { display:none; }
-.learning-ui .reader-header.has-source-url #article-meta #display-url {
-    order:-1; /* Always reachable first on narrow phones. */
+.learning-ui .reader-header #article-meta #display-url svg {
+    display:block;
+    pointer-events:none;
+}
+.learning-ui .reader-header #article-meta #display-url:hover {
+    background:#e1e1e8;
 }
 .learning-ui #reader-breadcrumbs ol, .learning-ui #breadcrumbs ol { display:flex; align-items:center; list-style:none; gap:0; padding:0; margin:0; overflow-x:auto; scrollbar-width:thin; }
 .learning-ui #reader-breadcrumbs li, .learning-ui #breadcrumbs li { display:flex; align-items:center; flex:0 0 auto; min-width:0; }
