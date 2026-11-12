@@ -105,9 +105,14 @@ def page_extract(html):
     return title,sorted(options,key=lambda b:(b["words"],b["paragraphs"]),reverse=True)
 
 def build_article(entry, source, html, min_words=250, max_words=1300):
-    heading, options=page_extract(html)
-    if not heading or clean(heading).casefold()!=entry["title"].casefold():
-        raise ValueError("RSS and page title mismatch")
+    if html:
+        heading, options=page_extract(html)
+        if not heading or clean(heading).casefold()!=entry["title"].casefold():
+            raise ValueError("RSS and page title mismatch")
+    else:
+        # Official NASA RSS can supply authoring text when article pages rate-limit clients.
+        # A missing page is allowed only when RSS content independently passes all checks.
+        options=[]
     if SKIP.search(entry["title"]):
         raise ValueError("Administrative/image-only content")
     if entry["html"]:
@@ -162,7 +167,8 @@ def run(args, getter=fetch):
         raise ValueError("No recognizable article URLs in RSS")
     entries.sort(key=lambda x:x["date"],reverse=True)
     report={"source":args.source,"feed":source["feed"],"items":len(entries),
-            "fetched":0,"rejections":[],"selected":None,"result":"none"}
+            "fetched":0,"rejections":[],"selected":None,"result":"none",
+            "rss_content_words":[{"title":e["title"],"words":blocks(e["html"],"rss")["words"] if e["html"] else 0} for e in entries[:10]]}
     now=datetime.now(timezone.utc).date()
     candidates=[]
     for e in entries[:args.max_candidates]:
@@ -178,7 +184,14 @@ def run(args, getter=fetch):
             continue
         report["fetched"]+=1
         try:
-            page=getter(e["url"],source["hosts"])
+            try:
+                page=getter(e["url"],source["hosts"])
+            except Exception as network_error:
+                # Never bypass a rate limit with retry bursts. Full official RSS text
+                # may be used instead; missing or short RSS text is rejected.
+                if "429" not in str(network_error) or not e["html"]:
+                    raise
+                page=None
             score,article,details=build_article(e,source,page,args.min_words,args.max_words)
             if is_duplicate(article,index["articles"]):
                 raise ValueError("duplicate ID/title/text")
