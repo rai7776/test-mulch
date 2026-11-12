@@ -25,5 +25,5 @@ test('Library and saved Discover Reader keep the original single-row Edit layout
     assert.doesNotMatch(css, /\.learning-ui \.reader-header\.has-source-url #article-meta\s*\{[^}]*grid-row:2/);
     assert.match(css, /\.learning-ui \.reader-header\.has-discover-actions #article-meta\s*\{\s*grid-column:1 \/ -1;\s*grid-row:2/);
     assert.match(app, /classList\?\.toggle\?\.\('has-discover-actions', readingFromDiscover && !!currentArticle\.isDiscoverArticle\)/);
-    assert.match(html, /learning-ui\.css\?v=9/);
+    assert.match(html, /learning-ui\.css\?v=10/);
 });
