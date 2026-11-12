@@ -20,6 +20,26 @@
   ],
   "articles": [
     {
+      "id": "tour-zh-001",
+      "type": "Learning Materials",
+      "genres": [
+        "Culture"
+      ],
+      "tags": [
+        "Smart Reader"
+      ],
+      "difficulty": "初級",
+      "minutes": 2,
+      "publishedAt": "2026-11-13",
+      "title": "每天学一点",
+      "content": "学习语言不需要每天花很长时间。每天读一小段文章，记住一个新词，就会慢慢进步。\n\n读的时候，遇到不认识的词，可以把它加到单词本里。以后再复习，就更容易记住。",
+      "language": "zh",
+      "descriptions": {
+        "zh": "阅读短文、记录生词，并在以后复习。"
+      },
+      "sourceName": "Smart Reader"
+    },
+    {
       "id": "sample-science-001",
       "type": "News",
       "genres": [
