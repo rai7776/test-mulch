@@ -2,13 +2,23 @@ name: Discover one-off article smoke test
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Add one verified VOA article to Discover (default: preview only)'
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
       - '.github/workflows/discover-smoke.yml'
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: discover-one-off-import
+  cancel-in-progress: false
 
 jobs:
   verify-article-fetch:
@@ -21,56 +31,160 @@ jobs:
           python-version: '3.12'
       - name: Install HTML parser
         run: python -m pip install 'beautifulsoup4>=4.12,<5'
-      - name: Fetch, parse, and validate one public-domain VOA original
+      - name: Decide whether to publish
         run: |
+          set -euo pipefail
+          publish=false
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            publish=$(jq -r '.inputs.publish // "false"' "$GITHUB_EVENT_PATH")
+          elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            if jq -r '.head_commit.message // ""' "$GITHUB_EVENT_PATH" | grep -Fq '[discover-publish-once]'; then
+              publish=true
+            fi
+          fi
+          if [ "$publish" != "true" ]; then publish=false; fi
+          echo "PUBLISH=$publish" >> "$GITHUB_ENV"
+          echo "Publish mode: $publish"
+      - name: Fetch and validate an original VOA article
+        run: |
+          set -euo pipefail
           python - <<'PY'
-          import json, re, urllib.request
+          import json
+          import os
+          import re
           from pathlib import Path
-          from bs4 import BeautifulSoup, Tag
-          url = 'https://learningenglish.voanews.com/a/learning-english-with-english-clubs-starting-and-organizing-your-club/3947928.html'
-          req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-          with urllib.request.urlopen(req, timeout=20) as response:
-              assert response.geturl().startswith('https://learningenglish.voanews.com/a/'), 'Unexpected redirect'
-              html = response.read(2_000_001)
-              assert len(html) <= 2_000_000, 'Article too large'
-          soup = BeautifulSoup(html, 'html.parser')
-          title = soup.select_one('h1')
-          assert title, 'Missing title'
-          candidates = [(selector, node) for selector in ('.wsw', '.article-body', '.article-content', '[itemprop=articleBody]') for node in soup.select(selector) if node.find('p')]
-          body = max((node for _, node in candidates), key=lambda n: len(n.select('p')), default=None)
-          assert body, 'Article body missing'
-          paras = []
-          for n in body.descendants:
-              if not isinstance(n, Tag):
+          from urllib.request import Request, urlopen
+          from bs4 import BeautifulSoup
+
+          url = "https://learningenglish.voanews.com/a/learning-english-with-english-clubs-starting-and-organizing-your-club/3947928.html"
+          request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; SmartReader/1.0)"})
+          with urlopen(request, timeout=20) as response:
+              assert response.geturl().split("?")[0] == url, "Unexpected redirect"
+              raw = response.read(2_000_001)
+              assert len(raw) <= 2_000_000, "HTML too large"
+          soup = BeautifulSoup(raw, "html.parser")
+          heading = soup.select_one("h1")
+          assert heading, "Article title not found"
+          title = re.sub(r"\s+", " ", heading.get_text(" ", strip=True)).strip()
+          assert title.casefold() == "learning english with english clubs", "Unexpected source article title"
+
+          # Fixed article and verified date for this one-off test; no generalized feed importer yet.
+          published = "2025-03-18"
+          body = soup.select_one(".wsw")
+          assert body is not None, "Known VOA article body container missing"
+          paragraphs = []
+          started = False
+          credit_seen = False
+          captions = {
+              "Students participating in a university English club.",
+              "Isidore Tine (right) teaches the English Club of Fandene, Senegal.",
+              "A university English club, with their adviser."
+          }
+          for node in body.select("p"):
+              text = re.sub(r"\s+", " ", node.get_text(separator="", strip=False)).strip()
+              if not started:
+                  if text.startswith("For many English learners, speaking is"):
+                      started = True
+                  else:
+                      continue
+              if not text:
                   continue
-              if n.name in ('h2','h3'):
+              if text.startswith("Hello readers!") or text.startswith("Words in This Story"):
+                  break
+              if node.find_parent(("figure", "figcaption")) or text in captions:
                   continue
-              if n.name != 'p':
+              if "No media source currently available" in text:
                   continue
-              paragraph = re.sub(r'\s+', ' ', n.get_text('', strip=False)).strip()
-              if paragraph and paragraph not in paras[-2:]:
-                  paras.append(paragraph)
-          content = '\n\n'.join(paras)
+              if re.search(r"\b(Reuters|Associated Press|Agence France-Presse|AFP|Getty Images|Shutterstock)\b", text, re.I):
+                  raise RuntimeError("Third-party agency credit detected")
+              paragraphs.append(text)
+              if re.search(r"Phil Dierking.*wrote this story for VOA Learning English", text, re.I):
+                  credit_seen = True
+                  break
+
+          assert started and credit_seen, "Source article boundaries or VOA production credit missing"
+          content = "\n\n".join(paragraphs)
           words = len(re.findall(r"\b[A-Za-z]+(?:[’'-][A-Za-z]+)*\b", content))
-          assert len(paras) >= 5 and 300 <= words <= 1800, f'Extraction suspicious: {len(paras)} paragraphs, {words} words'
-          assert re.search(r'wrote this story for VOA Learning English', content, re.I), 'Original VOA attribution not found'
-          assert not re.search(r'\b(Reuters|Associated Press|Agence France-Presse|AFP|Getty Images|Shutterstock)\b', content, re.I), 'Third-party text may be included'
-          data = json.loads(Path('discover-data/index.json').read_text())
-          assert data['version'] == 1 and 'Articles' in data['types'], 'Discover schema mismatch'
-          preview = {'title': title.get_text(' ', strip=True), 'sourceUrl': url, 'publishedAt': '2025-03-18', 'content': content, 'wordCount': words, 'note': 'Dry run only. No JSON changes; no site deployment.'}
-          Path('/tmp/discover-smoke-preview.json').write_text(json.dumps(preview, indent=2, ensure_ascii=False))
-          print(f"PASS: {preview['title']} / {words} words / {len(paras)} paragraphs")
-          print('Original English preserved; paragraphs and whitespace normalized.')
-          with open('/tmp/discover-smoke-report.txt', 'w') as report:
-              report.write(f"PASS: {preview['title']} / {words} words / {len(paras)} paragraphs\n")
+          assert len(paragraphs) >= 25 and 800 <= words <= 1500, f"Extraction suspicious: {len(paragraphs)} paragraphs / {words} words"
+          for excluded in ("No media source currently available", "Hello readers!", "Words in This Story",
+                           "advantage - n.", "Students participating in a university English club."):
+              assert excluded not in content, f"Non-article text detected: {excluded}"
+
+          article = {
+              "id": "voa-original-3947928",
+              "type": "Articles",
+              "genres": ["Culture", "Society"],
+              "tags": [],
+              "difficulty": "中級",
+              "minutes": max(1, (words + 179) // 180),
+              "publishedAt": published,
+              "title": title,
+              "content": content,
+              "language": "en",
+              "descriptions": {"en": "Practical advice on starting and running an English conversation club."},
+              "sourceName": "VOA Learning English",
+              "sourceUrl": url,
+              "licenseUrl": "https://learningenglish.voanews.com/p/6861.html",
+              "contentType": "original",
+              "wordCount": words
+          }
+          catalog_path = Path("discover-data/index.json")
+          catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+          assert catalog["version"] == 1 and article["type"] in catalog["types"], "Schema mismatch"
+          assert set(article["genres"]).issubset(set(catalog["genres"])), "Invalid genres"
+          assert isinstance(catalog["articles"], list), "Articles must be a list"
+          existing = catalog["articles"]
+          duplicate = any(
+              old.get("id") == article["id"]
+              or old.get("sourceUrl") == article["sourceUrl"]
+              or old.get("title", "").strip().casefold() == article["title"].casefold()
+              for old in existing
+          )
+          preview_path = Path("/tmp/discover-smoke-preview.json")
+          preview_path.write_text(json.dumps(article, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(f"PASS: {title}; {words} words, {len(paragraphs)} paragraphs; credit verified")
+          report = [
+              f"PASS: {title}",
+              f"Words: {words}; paragraphs: {len(paragraphs)}",
+              "Verified publisher: VOA Learning English (original production)",
+              "Excluded audio UI, images, glossary and postscript.",
+              "English sentences not rewritten.",
+          ]
+          if duplicate:
+              report.append("SKIPPED: Already in Discover (URL/ID/title deduplication).")
+          elif os.environ.get("PUBLISH") == "true":
+              catalog["articles"].append(article)
+              assert len({item["id"] for item in catalog["articles"]}) == len(catalog["articles"]), "Duplicate ID"
+              catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+              report.append("APPENDED: one original VOA article to discover-data/index.json")
+          else:
+              report.append("DRY RUN: no repository changes")
+          print("\n".join(report))
+          Path("/tmp/discover-smoke-report.txt").write_text("\n".join(report) + "\n", encoding="utf-8")
           PY
-      - name: Report smoke-test result
+      - name: Commit approved article to main
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH" != "true" ]; then
+            echo 'Preview mode; no commit.'
+            exit 0
+          fi
+          git add discover-data/index.json
+          if git diff --cached --quiet; then
+            echo 'Nothing to commit (probably duplicate).'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'content(discover): import one original VOA article'
+          git push origin HEAD:main
+          echo 'Article committed. GitHub Pages branch deployment may need a separate trigger.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Report import result
         if: success()
         run: |
-          echo '### Discover article smoke test' >> "$GITHUB_STEP_SUMMARY"
+          echo '### Discover article import' >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/discover-smoke-report.txt >> "$GITHUB_STEP_SUMMARY"
-          echo 'No article was committed; this is a one-off safe test.' >> "$GITHUB_STEP_SUMMARY"
-      - name: Save result as downloadable artifact
+      - name: Upload extracted original article
         if: always()
         uses: actions/upload-artifact@v4
         with:
