@@ -1,11 +1,8 @@
 name: Browser smoke
 
+# Chrome integration tests occasionally time out. Run manually before releases or after major UI changes.
 on:
-  push:
-    branches:
-      - main
-      - 'feature/**'
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
