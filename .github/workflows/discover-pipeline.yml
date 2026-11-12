@@ -1,0 +1,112 @@
+name: Discover RSS pipeline trial
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Append one NASA article (false = preview only)'
+        type: boolean
+        default: false
+        required: true
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/discover_pipeline.py'
+      - 'tests/test_discover_pipeline.py'
+      - 'discover-data/sources.json'
+      - '.github/workflows/discover-pipeline.yml'
+
+# Schedule deliberately disabled until live results have been inspected.
+permissions:
+  contents: write
+concurrency:
+  group: discover-rss-trial
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve prior main as a Git tag
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          tag='save/2026-11-12-before-discover-generic-pipeline'
+          old='fd0211d556a2f5ad252b2c42b61aaa811feeb0c2'
+          if ! git ls-remote --tags --exit-code origin "refs/tags/$tag" >/dev/null; then
+            git tag "$tag" "$old"
+            git push origin "refs/tags/$tag"
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install HTML parser
+        run: python -m pip install 'beautifulsoup4>=4.12,<5'
+      - name: Offline safety tests
+        run: python -m unittest discover -s tests -p test_discover_pipeline.py -v
+      - name: Select preview or publish
+        run: |
+          set -euo pipefail
+          publish=false
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            publish=$(jq -r '.inputs.publish // "false"' "$GITHUB_EVENT_PATH")
+          fi
+          if [ "$publish" != "true" ]; then publish=false; fi
+          echo "DISCOVER_PUBLISH=$publish" >> "$GITHUB_ENV"
+          echo "Publishing one article: $publish"
+      - name: Fetch, select, and validate NASA news
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$DISCOVER_PUBLISH" = "true" ]; then
+            python scripts/discover_pipeline.py --source nasa --max-age-days 30 --max-candidates 15 --publish
+          else
+            python scripts/discover_pipeline.py --source nasa --max-age-days 30 --max-candidates 15
+          fi
+      - name: Commit only when publish was requested
+        run: |
+          set -euo pipefail
+          if [ "$DISCOVER_PUBLISH" != "true" ]; then exit 0; fi
+          git add discover-data/index.json
+          if git diff --cached --quiet; then
+            echo 'No new eligible article.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'content(discover): import original NASA news'
+          git push origin HEAD:main
+      - name: Summarize discovery and rejected candidates
+        if: always()
+        run: |
+          echo '### Discover RSS pipeline' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/discover-report.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          r=json.load(open('/tmp/discover-report.json'))
+          print("Source:",r["source"],"| RSS items:",r["items"],"| Article pages fetched:",r["fetched"])
+          print("Result:",r["result"])
+          if r["selected"]:
+              a=r["selected"]
+              print("Selected:",a["title"],"|",a["wordCount"],"words |",a["paragraphs"],"paragraphs")
+          else:
+              print("No qualifying article; catalog unchanged.")
+          for x in r["rejections"][:10]:
+              print("- Skipped:",x["title"][:55],"—",x["reason"])
+          PY
+          else
+            echo 'Report missing; review job logs.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload article preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: discover-rss-trial
+          path: |
+            /tmp/discover-candidate.json
+            /tmp/discover-report.json
+          if-no-files-found: ignore
