@@ -271,9 +271,10 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
  .learning-ui .learning-section-tabs > span{min-width:84px;padding:7px 14px}
 }
 
-/* Discover uses the full Reader, with source attribution and optional Library save.
-   Keep extra actions in a scrollable second row on narrow phones. */
-.learning-ui .reader-header.is-discover-reader #article-meta {
+/* Unsaved Discover articles have Save/Share actions; only these use the
+   secondary action row. Library and saved articles retain their original
+   compact breadcrumb / Edit row, with the source icon immediately before Edit. */
+.learning-ui .reader-header.has-discover-actions #article-meta {
     grid-column:1 / -1;
     grid-row:2;
     width:100%;
@@ -282,4 +283,4 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
 }
-.learning-ui .reader-header.is-discover-reader #article-meta::-webkit-scrollbar { display:none; }
+.learning-ui .reader-header.has-discover-actions #article-meta::-webkit-scrollbar { display:none; }
