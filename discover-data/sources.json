@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "nasa",
+      "name": "NASA",
+      "enabled": true,
+      "feed": "https://www.nasa.gov/news-release/feed/",
+      "hosts": [
+        "www.nasa.gov"
+      ],
+      "article_paths": [
+        "/news-release/"
+      ],
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "rights": "NASA-authored text only; skip third-party works and all images."
+    },
+    {
+      "id": "usgs",
+      "name": "U.S. Geological Survey",
+      "enabled": false,
+      "feed": "https://www.usgs.gov/news/national-news-release/feed",
+      "hosts": [
+        "www.usgs.gov"
+      ],
+      "article_paths": [
+        "/news/"
+      ],
+      "licenseUrl": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "rights": "Candidate, disabled until live provenance and HTML extraction validated."
+    }
+  ]
+}
