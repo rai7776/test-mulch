@@ -1821,11 +1821,45 @@ function discoverSourceUrl(article) {
     return /^https?:\/\/[^\s/]+/i.test(url) ? url : '';
 }
 
+// Discover catalog study entries are templates. Copy them into the workspace only
+// once per version, so answering, editing or removing a seeded item is persistent.
+// Increment studyDataVersion in the catalog when intentionally adding new entries.
+function mergeDiscoverCatalogStudyData(article, catalogArticle) {
+    const collections = ['words', 'notes', 'questions'];
+    if (!collections.some(key => Array.isArray(catalogArticle?.[key]) && catalogArticle[key].length)) return false;
+    const version = Number(catalogArticle.studyDataVersion);
+    const studyVersion = Number.isSafeInteger(version) && version > 0 ? version : 1;
+    if (article.discoverStudyVersion === studyVersion) return false;
+
+    collections.forEach(key => {
+        if (!Array.isArray(article[key])) article[key] = [];
+        const existingIds = new Set(article[key]
+            .filter(entry => entry && entry.id !== undefined && entry.id !== null)
+            .map(entry => String(entry.id)));
+        (Array.isArray(catalogArticle[key]) ? catalogArticle[key] : []).forEach(entry => {
+            if (!entry || typeof entry !== 'object' || entry.id === undefined || entry.id === null || entry.id === '') return;
+            const id = String(entry.id);
+            if (existingIds.has(id)) return;
+            article[key].push(JSON.parse(JSON.stringify(entry)));
+            existingIds.add(id);
+        });
+    });
+    article.discoverStudyVersion = studyVersion;
+    return true;
+}
+
 async function openDiscoverReader(catalogArticle) {
     if (!catalogArticle?.id || typeof catalogArticle.content !== 'string') return;
     await window.SmartReaderAppReady;
     const existingSaved = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(catalogArticle.id));
-    if (existingSaved) { openArticle(existingSaved.id, 'discover'); return; }
+    if (existingSaved) {
+        if (mergeDiscoverCatalogStudyData(existingSaved, catalogArticle)) {
+            try { await db.setItem('library_items', libraryItems); }
+            catch (error) { console.error('Discover Library study data save failed', error); }
+        }
+        openArticle(existingSaved.id, 'discover');
+        return;
+    }
     const readerId = 'discover:' + String(catalogArticle.id);
     let article = discoverReaderItems.find(item => item.id === readerId);
     if (!article) {
@@ -1845,6 +1879,7 @@ async function openDiscoverReader(catalogArticle) {
         article.sourceName = catalogArticle.sourceName || article.sourceName || '';
         article.language = catalogArticle.language || article.language || 'en';
     }
+    mergeDiscoverCatalogStudyData(article, catalogArticle);
     try {
         await db.setItem(discoverReaderStorageKey(), discoverReaderItems);
     } catch (error) {
