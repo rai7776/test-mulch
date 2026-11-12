@@ -284,3 +284,31 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
     scrollbar-width:none;
 }
 .learning-ui .reader-header.has-discover-actions #article-meta::-webkit-scrollbar { display:none; }
+
+/* A single heading scale and rhythm for Discover, Vocabulary, Study, and Problems.
+   Keep the Library's compact folder/navigation layout unchanged. */
+.learning-ui #discover-section .discover-inner { max-width:980px; padding:28px 24px 90px; }
+.learning-ui #discover-section .discover-main-tabs { margin:0 0 10px; }
+.learning-ui .learning-section-heading { display:block; min-width:0; }
+.learning-ui .learning-section-heading > .study-center-eyebrow {
+    display:block; color:#9c7f66; font-size:.72rem; font-weight:800;
+    letter-spacing:.14em; line-height:1.4;
+}
+.learning-ui :is(#discover-section, #vocabulary-section, #study-center-section, #problems-section) .learning-section-heading > :is(h1, h2) {
+    margin:2px 0 4px; color:#3f352d; font-size:2rem; font-weight:800;
+    line-height:1.25; letter-spacing:-.025em; overflow-wrap:anywhere;
+}
+.learning-ui .learning-section-heading > :is(.discover-subtitle, .vocabulary-count, p) {
+    display:block; margin:0; color:#7b6f64; font-size:.82rem;
+    font-weight:500; line-height:1.5;
+}
+.learning-ui #discover-section .discover-heading { margin:0 0 18px; }
+
+@media(max-width:700px) {
+    .learning-ui #discover-section .discover-inner { padding:8px 12px 90px; }
+    .learning-ui #vocabulary-section, .learning-ui #problems-section { padding:8px 12px 90px; }
+    .learning-ui #study-center-section .study-center-shell { padding:8px 12px 48px; }
+    .learning-ui :is(#discover-section, #vocabulary-section, #study-center-section, #problems-section) .learning-section-heading > :is(h1, h2) {
+        font-size:1.55rem;
+    }
+}

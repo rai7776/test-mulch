@@ -26,7 +26,7 @@ function render(){
  const active=state.selectedTypes.length+state.selectedGenres.length+(state.difficulty!=='all'?1:0)+(state.sort!=='newest'?1:0);
  const items=results();
  root.innerHTML=`<div class="discover-inner"><nav class="learning-section-tabs discover-main-tabs" data-main-nav data-active-tab="discover" aria-label="メインセクション"></nav>
- <h2>Discover</h2><div class="discover-subtitle">Daily Reading</div>
+ <header class="learning-section-heading discover-heading"><span class="study-center-eyebrow">DISCOVER</span><h2>記事を探す</h2><p class="discover-subtitle">Daily Reading</p></header>
  <div class="discover-categories" role="group" aria-label="カテゴリ">${['All','News','TOEIC','Stories',...state.types.filter(t=>!['News','Stories'].includes(t)),...state.genres].map(c=>`<button type="button" data-category="${esc(c)}" class="${state.category===c?'is-selected':''}">${esc(c==='All'?'すべて':c)}</button>`).join('')}</div>
  <div class="discover-search-row"><input id="discover-search" type="search" placeholder="記事を検索..." aria-label="記事を検索"><button type="button" class="discover-filter-trigger" id="discover-filter-trigger" aria-label="フィルターを開く" aria-expanded="${state.filterOpen}"><span aria-hidden="true">☷</span><span class="discover-filter-label">フィルター</span>${active?`<small>${active}</small>`:''}</button></div>
  <div class="discover-results-label"><span>記事一覧</span><small>${items.length}件</small></div>

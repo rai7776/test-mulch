@@ -972,7 +972,7 @@
             <div class="study-center-shell">
                 <nav class="learning-section-tabs" data-main-nav data-active-tab="study" aria-label="メインセクション"></nav>
                 <header class="study-center-header">
-                    <div><span class="study-center-eyebrow">STUDY</span><h1>学習</h1><p>いつ、何を復習するかをここで管理します。</p></div>
+                    <div class="learning-section-heading"><span class="study-center-eyebrow">STUDY</span><h1>学習</h1><p>いつ、何を復習するかをここで管理します。</p></div>
                 </header>
                 <nav class="study-center-tabs" aria-label="学習メニュー">
                     <button type="button" data-study-tab="home" class="active">ホーム</button>
