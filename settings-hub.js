@@ -247,6 +247,18 @@
         return block;
     }
 
+    function createTutorialSection() {
+        const block = section('使い方ガイド', 'Smart Readerの基本操作を、あとからいつでも確認できます。');
+        const actions = document.createElement('div');
+        actions.className = 'settings-hub-actions';
+        actions.appendChild(button('チュートリアルをもう一度見る', 'btn-sub', () => {
+            closeSettings();
+            window.SmartReaderOnboarding?.restart();
+        }));
+        block.appendChild(actions);
+        return block;
+    }
+
     function createBackupSection() {
         const block = section('バックアップ', '教材・単語・学習履歴などをバックアップファイルとして保存・復元します。');
         const actions = document.createElement('div');
@@ -323,7 +335,8 @@
             createBackupSection(),
             createDisplaySection(),
             createLanguageSection(),
-            createWorkspaceSection()
+            createWorkspaceSection(),
+            createTutorialSection()
         );
     }
 
