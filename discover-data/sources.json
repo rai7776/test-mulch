@@ -33,7 +33,11 @@
       ],
       "licenseUrl": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
       "rights": "Dry-run evaluation only. USGS-authored content may be reused with credit, but extraction/provenance must pass review before publishing.",
-      "publish_approved": false
+      "publish_approved": false,
+      "feeds": [
+        "https://www.usgs.gov/news/national-news-release/feed",
+        "https://www.usgs.gov/news/featured-story/feed"
+      ]
     }
   ]
 }
