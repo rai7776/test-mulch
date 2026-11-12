@@ -68,6 +68,26 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(mod.is_duplicate(article,[article]))
         self.assertFalse(mod.is_duplicate(article,[]))
 
+    def test_full_official_rss_can_replace_rate_limited_page(self):
+        entry=self.entry()
+        entry["html"]=html().replace("<html><main><article><h1>NASA Discovers New Science</h1>","").replace("</article></main></html>","")
+        score,article,detail=mod.build_article(entry,NASA,None)
+        self.assertGreater(score,0)
+        self.assertEqual(detail["origin"],"rss-authoring-content")
+        self.assertEqual(article["wordCount"],len(mod.WORDS.findall(article["content"])))
+
+    def test_incomplete_rss_is_not_published_without_page(self):
+        entry=self.entry()
+        entry["html"]="<p>Space exploration matters.</p>"
+        with self.assertRaisesRegex(ValueError,"Insufficient"):
+            mod.build_article(entry,NASA,None)
+
+    def test_usgs_publish_is_denied_before_network_access(self):
+        from types import SimpleNamespace
+        args=SimpleNamespace(source="usgs",publish=True)
+        with self.assertRaisesRegex(ValueError,"not yet approved"):
+            mod.run(args,getter=lambda *_:self.fail("Network must not be accessed"))
+
     def test_no_rewriting_of_emphasis(self):
         raw="<div><p>NASA <em>researchers</em> explored the Moon.</p><p>They collected data.</p></div>"
         b=mod.blocks(raw,"fixture")
