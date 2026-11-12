@@ -12,8 +12,8 @@ const discover = read('discover.js');
 
 test('welcome and coachmark assets are loaded after the product UI scripts', () => {
     assert.match(html, /onboarding\.css\?v=1/);
-    assert.match(html, /onboarding\.js\?v=2/);
-    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=2'));
+    assert.match(html, /onboarding\.js\?v=3/);
+    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=3'));
     assert.match(tour, /読みながら、言葉を自分のものに。/);
     assert.match(tour, /Vocabular(y|ies)/i);
     assert.match(tour, /Problems/);
