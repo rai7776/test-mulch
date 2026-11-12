@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 ROOT = Path(__file__).resolve().parents[1]
 WORDS = re.compile(r"\b[A-Za-z]+(?:[’'-][A-Za-z]+)*\b")
 DANGER = re.compile(r"(?i)\b(?:Reuters|Associated Press|Agence France-Presse|AFP|Getty Images|Shutterstock|copyright|used with permission|licensed from)\b")
-SKIP = re.compile(r"(?i)(?:invites media|media advisory|media accreditation|funding opportunity|image of the day|apod:|photo of the day|seeks proposals|to welcome expedition|awards? .*contract)")
+SKIP = re.compile(r"(?i)(?:invites media|media advisory|media accreditation|funding opportunity|image of the day|apod:|photo of the day|seeks proposals|to welcome expedition|awards? .*contract|awards? \$|grant funding)")
 TOPICS = ("science","space","earth","moon","mars","planet","solar","astronaut","discovery","research","technology","exploration","climate","telescope","robot","mission","galaxy","universe","geology","earthquake","landslide","water","mineral","ecosystem","conservation")
 DROP = "script,style,nav,form,aside,footer,figure,figcaption,iframe,.wp-block-image,.wp-block-embed,.caption,.share-tools,.related-content,.author-bio,.media-contact"
 
@@ -165,6 +165,8 @@ def run(args, getter=fetch):
     source=next((x for x in config["sources"] if x["id"]==args.source and x["enabled"]),None)
     if not source:
         raise ValueError("Source is disabled until licensing and extraction are validated")
+    if args.publish and not source.get("publish_approved",False):
+        raise ValueError("Publishing from this source is not yet approved")
     index_path=ROOT/"discover-data/index.json"
     index=json.loads(index_path.read_text(encoding="utf-8"))
     if index.get("version")!=1 or "News" not in index.get("types",[]):
@@ -184,8 +186,6 @@ def run(args, getter=fetch):
     report={"source":args.source,"feed":source["feed"],"feed_errors":feed_errors,"items":len(entries),
             "fetched":0,"rejections":[],"selected":None,"result":"none",
             "rss_content_words":[{"title":e["title"],"words":blocks(e["html"],"rss")["words"] if e["html"] else 0} for e in entries[:10]]}
-    if args.publish and not source.get("publish_approved",False):
-        raise ValueError("Publishing from this source is not yet approved")
     now=datetime.now(timezone.utc).date()
     candidates=[]
     for e in entries[:args.max_candidates]:
