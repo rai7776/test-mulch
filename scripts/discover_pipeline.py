@@ -77,7 +77,9 @@ def blocks(raw, origin):
         line=clean(node.get_text(separator="",strip=False))
         if not line:
             continue
-        if re.fullmatch(r"(?i)(?:related (?:stories|articles)|share this|media contacts?|about the author)",line):
+        if re.fullmatch(r"(?i)(?:related (?:stories|articles)|share this|contacts?|media contacts?|about the author)",line) or line.startswith("The USGS provides science for a changing world."):
+            break
+        if line in ("Sources/Usage: Public Domain.","View Media Details"):
             break
         if re.match(r"(?i)^(?:image credit|photo credit|credit:|photo:|video:)",line):
             continue
@@ -89,13 +91,18 @@ def blocks(raw, origin):
     body="\n\n".join(text)
     return {"body":body,"words":len(WORDS.findall(body)),"paragraphs":len(text),"origin":origin}
 
-def page_extract(html):
+def page_extract(html, expected_title=""):
     soup=BeautifulSoup(html,"html.parser")
-    h=soup.select_one("h1.entry-title,main h1,article h1,h1")
-    title=clean(h.get_text(" ",strip=True)) if h else ""
+    # USGS news templates use h2 for the page headline; NASA usually uses h1.
+    headline_candidates=[clean(h.get_text(" ",strip=True)) for h in soup.select("h1,h2")]
+    expected=clean(expected_title).casefold()
+    title=next((t for t in headline_candidates if t.casefold()==expected), "")
+    if not title:
+        h=soup.select_one("h1.entry-title,main h1,article h1,h1")
+        title=clean(h.get_text(" ",strip=True)) if h else ""
     selectors=("article .entry-content","article .article-content","article .wp-block-post-content",
                ".hds-content",".entry-content",".article-content",".field--name-body","[itemprop=articleBody]",
-               ".wp-block-post-content","main article","article")
+               ".wp-block-post-content",".field--type-text-with-summary",".field--name-field-body","main article","article","main")
     options=[]
     for selector in selectors:
         for el in soup.select(selector)[:3]:
@@ -106,7 +113,7 @@ def page_extract(html):
 
 def build_article(entry, source, html, min_words=250, max_words=1300):
     if html:
-        heading, options=page_extract(html)
+        heading, options=page_extract(html, entry["title"])
         if not heading or clean(heading).casefold()!=entry["title"].casefold():
             raise ValueError("RSS and page title mismatch")
     else:
