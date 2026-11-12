@@ -89,9 +89,205 @@
       "content": "Notice to All Staff\n\nThe office cafeteria will be closed on Friday for maintenance. Employees may use the dining area on the first floor. Normal service will resume on Monday.",
       "language": "en",
       "descriptions": {
-        "en": "An office notice about temporary changes to cafeteria service."
+        "en": "Original TOEIC-style Part 7 reading practice based on a workplace notice (not an official TOEIC question)."
       },
-      "sourceName": "Smart Reader"
+      "sourceName": "Smart Reader",
+      "studyDataVersion": 1,
+      "words": [
+        {
+          "id": "toeic-office-w1",
+          "word": "maintenance",
+          "surfaceText": "maintenance",
+          "meaning": "保守点検、メンテナンス",
+          "partOfSpeech": "noun",
+          "tags": [
+            "TOEIC形式"
+          ],
+          "memo": "",
+          "context": "The office cafeteria will be closed on Friday for maintenance.",
+          "memorized": false
+        },
+        {
+          "id": "toeic-office-w2",
+          "word": "dining area",
+          "surfaceText": "dining area",
+          "meaning": "食事スペース",
+          "partOfSpeech": "phrase",
+          "tags": [
+            "TOEIC形式"
+          ],
+          "memo": "",
+          "context": "Employees may use the dining area on the first floor.",
+          "memorized": false
+        },
+        {
+          "id": "toeic-office-w3",
+          "word": "resume",
+          "surfaceText": "resume",
+          "meaning": "再開する",
+          "partOfSpeech": "verb",
+          "tags": [
+            "TOEIC形式"
+          ],
+          "memo": "",
+          "context": "Normal service will resume on Monday.",
+          "memorized": false
+        }
+      ],
+      "questions": [
+        {
+          "id": "toeic-office-q1",
+          "selectedText": "The office cafeteria will be closed on Friday for maintenance.",
+          "question": "1. Why will the cafeteria be closed on Friday?\n(A) To hold a private event\n(B) To carry out maintenance\n(C) To train new employees\n(D) To relocate the kitchen",
+          "answer": "(B) To carry out maintenance",
+          "explanation": "本文の for maintenance が理由を示しています。maintenance は「保守点検」です。",
+          "memo": "",
+          "questionType": "choice",
+          "tags": [
+            "TOEIC形式",
+            "Part 7",
+            "内容理解"
+          ],
+          "difficulty": 2,
+          "needsReview": false,
+          "attempts": []
+        },
+        {
+          "id": "toeic-office-q2",
+          "selectedText": "Employees may use the dining area on the first floor.",
+          "question": "2. Where can employees eat while the cafeteria is closed?\n(A) In the first-floor dining area\n(B) In the conference room\n(C) In the parking area\n(D) In the cafeteria",
+          "answer": "(A) In the first-floor dining area",
+          "explanation": "本文では Employees may use the dining area on the first floor. と案内しています。",
+          "memo": "",
+          "questionType": "choice",
+          "tags": [
+            "TOEIC形式",
+            "Part 7",
+            "内容理解"
+          ],
+          "difficulty": 2,
+          "needsReview": false,
+          "attempts": []
+        },
+        {
+          "id": "toeic-office-q3",
+          "selectedText": "Normal service will resume on Monday.",
+          "question": "3. When will normal cafeteria service resume?\n(A) On Friday afternoon\n(B) On Saturday\n(C) On Monday\n(D) On Thursday",
+          "answer": "(C) On Monday",
+          "explanation": "resume は「再開する」です。Normal service will resume on Monday. が根拠になります。",
+          "memo": "",
+          "questionType": "choice",
+          "tags": [
+            "TOEIC形式",
+            "Part 7",
+            "内容理解"
+          ],
+          "difficulty": 1,
+          "needsReview": false,
+          "attempts": []
+        }
+      ]
+    },
+    {
+      "id": "sample-toeic-part5-001",
+      "type": "Learning Materials",
+      "collection": "TOEIC",
+      "genres": [
+        "Business"
+      ],
+      "tags": [],
+      "difficulty": "中級",
+      "minutes": 4,
+      "publishedAt": "2026-11-13",
+      "title": "TOEIC-style Practice: Part 5 — Workplace English",
+      "content": "TOEIC-style Practice · Part 5\n\nChoose the best word or phrase to complete each sentence.\n\n1. The marketing team will submit its final proposal ___ noon on Thursday.\n\n2. Ms. Lopez requested that the equipment ___ inspected before the conference.\n\n3. Applicants should contact the hiring manager if they require ___ information.\n\nThese original practice questions were created by Smart Reader. They are not official TOEIC test questions.",
+      "language": "en",
+      "descriptions": {
+        "en": "Three original Part 5-style grammar and vocabulary questions with explanations."
+      },
+      "sourceName": "Smart Reader · Original Practice",
+      "studyDataVersion": 1,
+      "words": [
+        {
+          "id": "toeic-part5-w1",
+          "word": "proposal",
+          "surfaceText": "proposal",
+          "meaning": "提案書、提案",
+          "partOfSpeech": "noun",
+          "tags": [
+            "TOEIC形式"
+          ],
+          "memo": "",
+          "context": "The marketing team will submit its final proposal ___ noon on Thursday.",
+          "memorized": false
+        },
+        {
+          "id": "toeic-part5-w2",
+          "word": "applicant",
+          "surfaceText": "Applicants",
+          "meaning": "応募者",
+          "partOfSpeech": "noun",
+          "tags": [
+            "TOEIC形式"
+          ],
+          "memo": "",
+          "context": "Applicants should contact the hiring manager if they require ___ information.",
+          "memorized": false
+        }
+      ],
+      "questions": [
+        {
+          "id": "toeic-part5-q1",
+          "selectedText": "1. The marketing team will submit its final proposal ___ noon on Thursday.",
+          "question": "1. The marketing team will submit its final proposal ___ noon on Thursday.\n(A) by\n(B) until\n(C) between\n(D) during",
+          "answer": "(A) by",
+          "explanation": "期限を表す by noon は「正午までに」です。until は動作・状態の継続を表すため、この文の submit とは合いません。",
+          "memo": "",
+          "questionType": "choice",
+          "tags": [
+            "TOEIC形式",
+            "Part 5",
+            "文法・語法"
+          ],
+          "difficulty": 2,
+          "needsReview": false,
+          "attempts": []
+        },
+        {
+          "id": "toeic-part5-q2",
+          "selectedText": "2. Ms. Lopez requested that the equipment ___ inspected before the conference.",
+          "question": "2. Ms. Lopez requested that the equipment ___ inspected before the conference.\n(A) is\n(B) was\n(C) be\n(D) being",
+          "answer": "(C) be",
+          "explanation": "request that + 主語 + 動詞の原形という仮定法現在の形です。受動態なので be inspected となります。",
+          "memo": "",
+          "questionType": "choice",
+          "tags": [
+            "TOEIC形式",
+            "Part 5",
+            "文法・語法"
+          ],
+          "difficulty": 3,
+          "needsReview": false,
+          "attempts": []
+        },
+        {
+          "id": "toeic-part5-q3",
+          "selectedText": "3. Applicants should contact the hiring manager if they require ___ information.",
+          "question": "3. Applicants should contact the hiring manager if they require ___ information.\n(A) addition\n(B) additionally\n(C) add\n(D) additional",
+          "answer": "(D) additional",
+          "explanation": "information（名詞）を修飾するため形容詞 additional（追加の）が適切です。",
+          "memo": "",
+          "questionType": "choice",
+          "tags": [
+            "TOEIC形式",
+            "Part 5",
+            "文法・語法"
+          ],
+          "difficulty": 2,
+          "needsReview": false,
+          "attempts": []
+        }
+      ]
     },
     {
       "id": "voa-wright-brothers-7998765",
