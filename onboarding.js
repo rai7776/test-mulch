@@ -143,6 +143,13 @@
         if (config.onNext) footer.appendChild(action(config.nextText || '次へ', config.onNext));
         else footer.appendChild(el('span', 'sr-tour-waiting', '強調した場所を操作してください'));
         panel.appendChild(footer);
+        const target = config.find ? config.find() : document.querySelector(config.selector);
+        if (targetVisible(target)) {
+            const bounds = target.getBoundingClientRect();
+            if (bounds.top < 8 || bounds.bottom > window.innerHeight - 8) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            }
+        }
         queuePosition();
         setTimeout(queuePosition, 150);
     }
@@ -378,6 +385,13 @@
             write(STORAGE_KEY, state);
         }
         if (!state) return; // Existing users must not receive a forced onboarding.
+        const main = document.getElementById('main-reader');
+        if (main) new MutationObserver(queuePosition).observe(main, {
+            childList: true, subtree: true, attributes: true, attributeFilter: ['style']
+        });
+        new MutationObserver(() => {
+            if (state?.phase === 'setup' && document.getElementById('smart-reader-workspace-create-overlay')) decorateSetup();
+        }).observe(document.body, { childList: true });
         if (state.phase === 'setup' && !setupPending()) {
             beginDiscover();
         } else if (state.phase === 'welcome' || state.phase === 'setup') {
