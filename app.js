@@ -56,6 +56,22 @@ const db = localforage.createInstance({ name: "ProjectA_DB_v3" });
 const DEFAULT_READER_SETTINGS = Object.freeze({ fontSize: 18, lineHeight: 1.8, sentenceAudioButtonsVisible: false });
 
 let libraryItems = [], currentFolderId = null, currentArticle = null;
+let discoverReaderItems = [];
+let readerOrigin = 'library';
+let resolveSmartReaderReady;
+window.SmartReaderAppReady = new Promise(resolve => { resolveSmartReaderReady = resolve; });
+const DISCOVER_READER_STORAGE_PREFIX = 'discover_reader_items_v1:';
+function discoverReaderStorageKey() {
+    return DISCOVER_READER_STORAGE_PREFIX + (window.SmartReaderWorkspaceState?.activeWorkspaceId || 'default');
+}
+function allReaderArticles() {
+    return [...libraryItems.filter(item => item?.type === 'article'), ...discoverReaderItems.filter(item => item?.type === 'article')];
+}
+function findReaderArticle(id) {
+    return allReaderArticles().find(article => String(article.id) === String(id));
+}
+window.SmartReaderReaderArticles = Object.freeze({ all: allReaderArticles, find: findReaderArticle });
+
 let currentChapterId = null;
 let readerWordCounts = { articleId: null, chapterId: null, chapter: 0, book: 0, chapterChars: 0, bookChars: 0 };
 let pendingImportedDocument = null;
@@ -154,6 +170,17 @@ async function init() {
     // Always use the active Workspace library. Repair only Chinese sample data;
     // never seed the default English tutorial into a Chinese Workspace.
     libraryItems = await db.getItem('library_items') || [];
+    discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
+    if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
+    // Previously viewed Discover articles can later be saved to Library.
+    // Remove their separate cache copy to avoid duplicate global vocabulary.
+    const duplicateDiscoverRecords = discoverReaderItems.filter(item =>
+        libraryItems.some(saved => saved?.type === 'article' && item?.discoverId != null && saved.discoverId != null && String(saved.discoverId) === String(item.discoverId)));
+    if (duplicateDiscoverRecords.length) {
+        discoverReaderItems = discoverReaderItems.filter(item => !duplicateDiscoverRecords.includes(item));
+        try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
+        catch (error) { console.warn('Unable to clean duplicate Discover cache', error); }
+    }
     if (workspaceState?.activeWorkspace && window.SmartReaderWorkspaceSamples?.repairActiveChineseWorkspace) {
         try {
             const repaired = await window.SmartReaderWorkspaceSamples.repairActiveChineseWorkspace(
@@ -185,6 +212,7 @@ async function init() {
     showLibrary(); 
     renderList('words');
     setupEventListeners(); // リスナー設定を呼び出す
+    resolveSmartReaderReady();
     if (workspaceState) window.dispatchEvent(new CustomEvent('smartreader:workspace-ready', { detail: workspaceState }));
 }
 
@@ -1783,15 +1811,113 @@ function goToNextChapter() {
     if (index >= 0 && index < chapters.length - 1) void switchToChapter(chapters[index + 1].id);
 }
 
-function openArticle(id) {
-    const nextArticle = libraryItems.find(i => i.id === id);
+function readerBack() {
+    if (readerOrigin === 'discover') window.showDiscover?.();
+    else showLibrary();
+}
+
+function discoverSourceUrl(article) {
+    const url = String(article?.sourceUrl || article?.url || '').trim();
+    return /^https?:\/\/[^\s/]+/i.test(url) ? url : '';
+}
+
+async function openDiscoverReader(catalogArticle) {
+    if (!catalogArticle?.id || typeof catalogArticle.content !== 'string') return;
+    await window.SmartReaderAppReady;
+    const existingSaved = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(catalogArticle.id));
+    if (existingSaved) { openArticle(existingSaved.id, 'discover'); return; }
+    const readerId = 'discover:' + String(catalogArticle.id);
+    let article = discoverReaderItems.find(item => item.id === readerId);
+    if (!article) {
+        article = {
+            id: readerId, type: 'article', isDiscoverArticle: true,
+            discoverId: String(catalogArticle.id), parentId: null,
+            name: String(catalogArticle.title || '無題'),
+            content: catalogArticle.content, url: discoverSourceUrl(catalogArticle),
+            sourceName: catalogArticle.sourceName || '', language: catalogArticle.language || 'en',
+            words: [], notes: [], bookmarks: [], questions: []
+        };
+        discoverReaderItems.push(article);
+    } else {
+        article.name = String(catalogArticle.title || article.name);
+        article.content = catalogArticle.content;
+        article.url = discoverSourceUrl(catalogArticle) || article.url || '';
+        article.sourceName = catalogArticle.sourceName || article.sourceName || '';
+        article.language = catalogArticle.language || article.language || 'en';
+    }
+    try {
+        await db.setItem(discoverReaderStorageKey(), discoverReaderItems);
+    } catch (error) {
+        console.error('Discover reader cache save failed', error);
+        alert('この記事の学習データを保存できない可能性があります。端末の保存設定をご確認ください。');
+    }
+    openArticle(readerId, 'discover');
+}
+window.openDiscoverReader = openDiscoverReader;
+
+async function saveCurrentDiscoverToLibrary() {
+    const source = currentArticle;
+    if (!source?.isDiscoverArticle) return;
+    await flushReadingPositionSave();
+    const existing = libraryItems.find(item => item.type === 'article' && String(item.discoverId) === String(source.discoverId));
+    if (existing) { openArticle(existing.id, 'discover'); return; }
+    const article = JSON.parse(JSON.stringify(source));
+    article.id = Date.now();
+    while (libraryItems.some(item => String(item.id) === String(article.id))) article.id += 1;
+    article.parentId = null;
+    delete article.isDiscoverArticle;
+    libraryItems.push(article);
+    try {
+        await db.setItem('library_items', libraryItems);
+    } catch (error) {
+        libraryItems = libraryItems.filter(item => item !== article);
+        console.error('Discover Library save failed', error);
+        alert('Libraryに保存できませんでした。');
+        return;
+    }
+    discoverReaderItems = discoverReaderItems.filter(item => item.id !== source.id);
+    try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
+    catch (error) { console.warn('Discover cache cleanup will retry on next startup', error); }
+    openArticle(article.id, 'discover');
+}
+
+async function shareCurrentDiscoverReader() {
+    const id = currentArticle?.discoverId;
+    if (!id) return;
+    const url = new URL(location.href);
+    url.hash = 'discover/' + encodeURIComponent(id);
+    try {
+        if (navigator.share) await navigator.share({title: currentArticle.name, url: String(url)});
+        else {
+            await navigator.clipboard.writeText(String(url));
+            alert('記事のURLをコピーしました');
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') alert('共有できませんでした。');
+    }
+}
+
+function openArticle(id, origin = null) {
+    const nextArticle = findReaderArticle(id);
     if (!nextArticle) return;
 
     // 記事を切り替える前に、現在の記事の自動読書位置を確定する。
     if (currentArticle && currentArticle.id !== nextArticle.id) flushReadingPositionSave();
 
     currentArticle = nextArticle;
-    window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
+    readerOrigin = origin || (nextArticle.isDiscoverArticle ? 'discover' : 'library');
+    const back = document.getElementById('back-to-library');
+    if (back) {
+        back.textContent = readerOrigin === 'discover' ? '‹ Discover' : '📖 本棚';
+        back.onclick = readerBack;
+    }
+    const editButton = document.getElementById('reader-edit-article');
+    if (editButton) editButton.style.display = nextArticle.isDiscoverArticle ? 'none' : '';
+    const saveButton = document.getElementById('reader-save-discover');
+    if (saveButton) saveButton.style.display = nextArticle.isDiscoverArticle ? '' : 'none';
+    const shareButton = document.getElementById('reader-share-discover');
+    if (shareButton) shareButton.style.display = readerOrigin === 'discover' ? '' : 'none';
+    if (!currentArticle.isDiscoverArticle) window.SmartReaderLearningUI?.remember(window.localStorage, window.SmartReaderWorkspaceState, currentArticle);
     ensureArticleCollections(currentArticle);
     if (!currentArticle) return;
     currentChapterId = getInitialChapterId(currentArticle);
@@ -1803,6 +1929,7 @@ function openArticle(id) {
     document.getElementById('back-to-library').style.display = 'inline-block';
     document.getElementById('article-meta').style.display = 'flex';
     document.getElementById('display-url').href = currentArticle.url || '#';
+    document.getElementById('display-url').title = currentArticle.sourceName || '元記事';
     document.getElementById('display-url').style.display = currentArticle.url ? 'inline-flex' : 'none';
 
     renderChapterNavigation();
@@ -1902,7 +2029,14 @@ function renderQuestionMarkerText(selected, question, chapterId, questionIndex =
 function renderArticleText() {
     window.SmartReaderChinese?.stopSentenceAudio();
     if(!currentArticle) return;
-    window.SmartReaderReaderHeader?.render(document, currentArticle, libraryItems, goToFolder);
+    const readingFromDiscover = typeof readerOrigin !== 'undefined' && readerOrigin === 'discover';
+    window.SmartReaderReaderHeader?.render(document,
+        readingFromDiscover ? { ...currentArticle, readerSource: 'discover' } : currentArticle,
+        libraryItems, readingFromDiscover ? () => window.showDiscover?.() : goToFolder);
+    const readerHeader = document.querySelector?.('.app-header');
+    readerHeader?.classList?.toggle?.('is-discover-reader', readingFromDiscover);
+    readerHeader?.classList?.toggle?.('has-discover-actions', readingFromDiscover && !!currentArticle.isDiscoverArticle);
+    readerHeader?.classList?.toggle?.('has-source-url', !!currentArticle.url);
     ensureArticleCollections(currentArticle);
     const display = document.getElementById('text-display');
     const sourceType = String(currentArticle.sourceType || '').toLowerCase();
@@ -2893,10 +3027,14 @@ function scheduleReadingPositionSave() {
 function flushReadingPositionSave() {
     clearTimeout(readingPositionSaveTimer);
     readingPositionSaveTimer = null;
-    if (currentArticle) void saveCurrentReadingPosition();
+    if (currentArticle) return saveCurrentReadingPosition();
+    return Promise.resolve();
 }
 
-async function saveToDB() { await db.setItem('library_items', libraryItems); }
+async function saveToDB() {
+    await db.setItem('library_items', libraryItems);
+    await db.setItem(discoverReaderStorageKey(), discoverReaderItems);
+}
 
 // Existing Chinese Workspaces can opt in to the sample without replacing any articles.
 async function addChineseSampleToActiveWorkspace() {
@@ -3435,6 +3573,8 @@ async function confirmSmartReaderRestore() {
         await replaceSmartReaderPersistentData(restoreBackup.data);
 
         libraryItems = restoreBackup.data.library_items;
+        discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
+        if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
         readerSettings = { ...DEFAULT_READER_SETTINGS, ...restoreBackup.data.reader_settings };
         currentArticle = null;
         currentChapterId = null;
@@ -3452,6 +3592,8 @@ async function confirmSmartReaderRestore() {
             try {
                 await replaceSmartReaderPersistentData(safetyBackup.data, { removeAbsentKeys: true });
                 libraryItems = safetyBackup.data.library_items;
+                discoverReaderItems = await db.getItem(discoverReaderStorageKey()) || [];
+                if (!Array.isArray(discoverReaderItems)) discoverReaderItems = [];
                 readerSettings = { ...DEFAULT_READER_SETTINGS, ...safetyBackup.data.reader_settings };
                 rolledBack = true;
             } catch (rollbackError) {
@@ -3872,8 +4014,7 @@ function collectGlobalVocabulary() {
     let sequence = 0;
     const entries = [];
 
-    libraryItems
-        .filter(item => item && item.type === 'article')
+    allReaderArticles()
         .forEach(article => {
             const words = Array.isArray(article.words) ? article.words : [];
             words.forEach((word, sourceIndex) => {
@@ -3930,7 +4071,7 @@ function resolveGlobalWordSourceIndex(words, wordId, sourceIndex) {
 
 function getGlobalEntrySource(entry) {
     if (!entry) return null;
-    const article = libraryItems.find(item => item.type === 'article' && globalIdsEqual(item.id, entry.articleId));
+    const article = allReaderArticles().find(item => globalIdsEqual(item.id, entry.articleId));
     if (!article) return null;
     ensureArticleCollections(article);
 
@@ -4610,7 +4751,7 @@ function openGlobalVocabularyWordEditor(key) {
 async function saveGlobalVocabularyWordFromModal() {
     const reference = globalVocabularyEditRef;
     if (!reference) return;
-    const article = libraryItems.find(item => item.type === 'article' && globalIdsEqual(item.id, reference.articleId));
+    const article = allReaderArticles().find(item => globalIdsEqual(item.id, reference.articleId));
     if (!article) {
         closeModal();
         return;
@@ -4818,8 +4959,7 @@ function getGlobalProblemChapterInfo(article, question) {
 function collectGlobalProblems() {
     let sequence = 0;
     const entries = [];
-    libraryItems
-        .filter(item => item && item.type === 'article')
+    allReaderArticles()
         .forEach(article => {
             const questions = Array.isArray(article.questions) ? article.questions : [];
             questions.forEach((question, sourceIndex) => {
@@ -4872,7 +5012,7 @@ function resolveGlobalProblemSourceIndex(questions, questionId, sourceIndex) {
 
 function getGlobalProblemEntrySource(entry) {
     if (!entry) return null;
-    const article = libraryItems.find(item => item?.type === 'article' && globalIdsEqual(item.id, entry.articleId));
+    const article = allReaderArticles().find(item => globalIdsEqual(item.id, entry.articleId));
     if (!article) return null;
     ensureArticleCollections(article);
     const index = resolveGlobalProblemSourceIndex(article.questions, entry.questionId, entry.sourceIndex);
@@ -5018,7 +5158,7 @@ function renderGlobalProblemsControls() {
 
     sourceSelect.innerHTML = '';
     appendGlobalProblemOption(sourceSelect, 'all', 'すべての記事・書籍');
-    const articles = libraryItems.filter(item => item?.type === 'article');
+    const articles = allReaderArticles();
     articles.forEach(article => appendGlobalProblemOption(sourceSelect, article.id, getGlobalArticleTitle(article)));
     if (!articles.some(article => String(article.id) === String(state.sourceId))) state.sourceId = 'all';
     sourceSelect.value = String(state.sourceId);

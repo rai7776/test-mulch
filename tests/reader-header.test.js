@@ -32,3 +32,11 @@ test('breadcrumb renders safe text and working folder navigation, and hides outs
     assert.equal(nav.hidden, true);
     assert.equal(classes.has('reader-header'), false);
 });
+
+test('Discover Reader uses Discover breadcrumb, while ordinary Reader keeps Library', () => {
+    const discover = { id:'discover:article-1', name:'Example', isDiscoverArticle:true, parentId:null };
+    assert.deepEqual(header.path(discover, []).map(crumb => crumb.label), ['Discover', 'Example']);
+    const savedFromDiscover = { id:200, name:'Saved', readerSource:'discover', parentId:null };
+    assert.deepEqual(header.path(savedFromDiscover, []).map(crumb => crumb.label), ['Discover', 'Saved']);
+    assert.deepEqual(header.path({ id:201, name:'Local', parentId:null }, []).map(crumb => crumb.label), ['本棚', 'Local']);
+});

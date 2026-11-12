@@ -79,7 +79,30 @@ body.learning-ui { --bg:#f6f2ed; --primary:#6f5a48; --ui-border:#e4d9cf; color:#
 .learning-ui .app-header.reader-header { grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:7px 16px; padding-top:max(7px,env(safe-area-inset-top)); }
 .learning-ui .reader-header .header-left, .learning-ui .reader-header .settings-hub-open-button { display:none; }
 .learning-ui .reader-header #article-meta { grid-column:2; grid-row:1; width:auto; padding:0; }
-.learning-ui .reader-header #article-meta #display-url { display:none !important; }
+/* Keep the preexisting breadcrumb + Edit button on one row.
+   The source icon sits immediately before Edit, with no dedicated action row. */
+.learning-ui .reader-header #article-meta #display-url {
+    display:inline-flex;
+    flex:0 0 34px;
+    width:34px;
+    height:34px;
+    min-height:34px;
+    padding:0;
+    border:1px solid #e4dbd0;
+    border-radius:8px;
+    background:#fffdfa;
+    color:#6e5844;
+    order:-1;
+    align-items:center;
+    justify-content:center;
+}
+.learning-ui .reader-header #article-meta #display-url svg {
+    display:block;
+    pointer-events:none;
+}
+.learning-ui .reader-header #article-meta #display-url:hover {
+    background:#f3ede5;
+}
 .learning-ui #reader-breadcrumbs ol, .learning-ui #breadcrumbs ol { display:flex; align-items:center; list-style:none; gap:0; padding:0; margin:0; overflow-x:auto; scrollbar-width:thin; }
 .learning-ui #reader-breadcrumbs li, .learning-ui #breadcrumbs li { display:flex; align-items:center; flex:0 0 auto; min-width:0; }
 .learning-ui #reader-breadcrumbs li:last-child, .learning-ui #breadcrumbs li:last-child { flex:0 0 auto; }
@@ -247,3 +270,17 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
  .learning-ui .learning-section-tabs > button,
  .learning-ui .learning-section-tabs > span{min-width:84px;padding:7px 14px}
 }
+
+/* Unsaved Discover articles have Save/Share actions; only these use the
+   secondary action row. Library and saved articles retain their original
+   compact breadcrumb / Edit row, with the source icon immediately before Edit. */
+.learning-ui .reader-header.has-discover-actions #article-meta {
+    grid-column:1 / -1;
+    grid-row:2;
+    width:100%;
+    min-width:0;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+}
+.learning-ui .reader-header.has-discover-actions #article-meta::-webkit-scrollbar { display:none; }
