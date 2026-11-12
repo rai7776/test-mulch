@@ -1879,6 +1879,9 @@ async function saveCurrentDiscoverToLibrary() {
     try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
     catch (error) { console.warn('Discover cache cleanup will retry on next startup', error); }
     openArticle(article.id, 'discover');
+    window.dispatchEvent(new CustomEvent('smartreader:discover-saved', {
+        detail: { id: article.id, discoverId: article.discoverId, name: article.name }
+    }));
 }
 
 async function shareCurrentDiscoverReader() {
@@ -1938,6 +1941,9 @@ function openArticle(id, origin = null) {
     renderList('words');
     renderBookmarks();
     restoreReadingPosition(getSavedPositionForChapter(currentArticle, currentChapterId));
+    window.dispatchEvent(new CustomEvent('smartreader:article-opened', {
+        detail: { id: String(currentArticle.id), discoverId: currentArticle.discoverId || null, isDiscoverArticle: !!currentArticle.isDiscoverArticle, name: currentArticle.name }
+    }));
 }
 
 function isQuestionInChapter(question, chapterId) {
@@ -2668,6 +2674,9 @@ async function handleUnifiedSave(e) {
         }
         rerenderReaderAtPosition(readingPosition);
         renderList(currentTab, document.getElementById('list-search').value);
+        window.dispatchEvent(new CustomEvent('smartreader:unified-item-saved', {
+            detail: { type: currentModalType, articleId: targetArticle.id }
+        }));
     } catch (err) { console.error(err); }
 }
 
