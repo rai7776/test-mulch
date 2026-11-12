@@ -21,9 +21,9 @@ test('Reader source link is a compact accessible icon immediately left of Edit',
 
 test('Library and saved Discover Reader keep the original single-row Edit layout', () => {
     assert.match(css, /\.learning-ui \.reader-header #article-meta\s*\{\s*grid-column:2;\s*grid-row:1;/);
-    assert.match(css, /\.learning-ui \.reader-header #article-meta #display-url\s*\{[\s\S]*?width:34px;[\s\S]*?border-radius:50%;/);
+    assert.match(css, /\.learning-ui \.reader-header #article-meta #display-url\s*\{[\s\S]*?width:34px;[\s\S]*?border:1px solid #e4dbd0;[\s\S]*?border-radius:8px;[\s\S]*?background:#fffdfa;[\s\S]*?color:#6e5844;/);
     assert.doesNotMatch(css, /\.learning-ui \.reader-header\.has-source-url #article-meta\s*\{[^}]*grid-row:2/);
     assert.match(css, /\.learning-ui \.reader-header\.has-discover-actions #article-meta\s*\{\s*grid-column:1 \/ -1;\s*grid-row:2/);
     assert.match(app, /classList\?\.toggle\?\.\('has-discover-actions', readingFromDiscover && !!currentArticle\.isDiscoverArticle\)/);
-    assert.match(html, /learning-ui\.css\?v=8/);
+    assert.match(html, /learning-ui\.css\?v=9/);
 });
