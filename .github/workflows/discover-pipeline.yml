@@ -67,6 +67,10 @@ jobs:
           else
             python scripts/discover_pipeline.py --source nasa --max-age-days 30 --max-candidates 15
           fi
+      - name: Probe USGS as a separate read-only candidate
+        continue-on-error: true
+        run: |
+          python scripts/discover_pipeline.py --source usgs --max-age-days 180 --min-words 200 --max-candidates 12 --report /tmp/usgs-report.json --preview /tmp/usgs-candidate.json
       - name: Commit only when publish was requested
         run: |
           set -euo pipefail
@@ -109,4 +113,6 @@ jobs:
           path: |
             /tmp/discover-candidate.json
             /tmp/discover-report.json
+            /tmp/usgs-candidate.json
+            /tmp/usgs-report.json
           if-no-files-found: ignore
