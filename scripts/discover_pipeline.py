@@ -16,8 +16,8 @@ from bs4 import BeautifulSoup
 ROOT = Path(__file__).resolve().parents[1]
 WORDS = re.compile(r"\b[A-Za-z]+(?:[’'-][A-Za-z]+)*\b")
 DANGER = re.compile(r"(?i)\b(?:Reuters|Associated Press|Agence France-Presse|AFP|Getty Images|Shutterstock|copyright|used with permission|licensed from)\b")
-SKIP = re.compile(r"(?i)(?:invites media|media advisory|media accreditation|funding opportunity|image of the day|apod:|photo of the day|seeks proposals)")
-TOPICS = ("science","space","earth","moon","mars","planet","solar","astronaut","discovery","research","technology","exploration","climate","telescope","robot","mission","galaxy","universe")
+SKIP = re.compile(r"(?i)(?:invites media|media advisory|media accreditation|funding opportunity|image of the day|apod:|photo of the day|seeks proposals|to welcome expedition|awards? .*contract)")
+TOPICS = ("science","space","earth","moon","mars","planet","solar","astronaut","discovery","research","technology","exploration","climate","telescope","robot","mission","galaxy","universe","geology","earthquake","landslide","water","mineral","ecosystem","conservation")
 DROP = "script,style,nav,form,aside,footer,figure,figcaption,iframe,.wp-block-image,.wp-block-embed,.caption,.share-tools,.related-content,.author-bio,.media-contact"
 
 def clean(s):
@@ -94,7 +94,7 @@ def page_extract(html):
     h=soup.select_one("h1.entry-title,main h1,article h1,h1")
     title=clean(h.get_text(" ",strip=True)) if h else ""
     selectors=("article .entry-content","article .article-content","article .wp-block-post-content",
-               ".hds-content",".entry-content",".article-content","[itemprop=articleBody]",
+               ".hds-content",".entry-content",".article-content",".field--name-body","[itemprop=articleBody]",
                ".wp-block-post-content","main article","article")
     options=[]
     for selector in selectors:
@@ -134,12 +134,12 @@ def build_article(entry, source, html, min_words=250, max_words=1300):
         genres.append("Technology")
     elif any(x in haystack for x in ("earth","climate","ocean","weather")):
         genres.append("Society")
-    article={"id":"nasa-"+hashlib.sha256(entry["url"].encode()).hexdigest()[:16],
+    article={"id":source["id"]+"-"+hashlib.sha256(entry["url"].encode()).hexdigest()[:16],
              "type":"News","genres":genres,"tags":[],
              "difficulty":"初級" if word_count<450 else "中級" if word_count<950 else "上級",
              "minutes":max(1,(word_count+179)//180),
              "publishedAt":entry["date"].isoformat(),"title":entry["title"],"content":body,
-             "language":"en","descriptions":{"en":"An original NASA science news release."},
+             "language":"en","descriptions":{"en":"An original article from "+source["name"]+"."},
              "sourceName":source["name"],"sourceUrl":entry["url"],"licenseUrl":source["licenseUrl"],
              "contentType":"original","wordCount":word_count}
     score=(2 if 350<=word_count<=900 else 0)+min(word_count,900)/100
@@ -162,13 +162,23 @@ def run(args, getter=fetch):
     index=json.loads(index_path.read_text(encoding="utf-8"))
     if index.get("version")!=1 or "News" not in index.get("types",[]):
         raise ValueError("Discover index schema changed")
-    entries=feed_entries(getter(source["feed"],source["hosts"]),source)
+    feed_urls=source.get("feeds") or [source["feed"]]
+    entries=[]
+    feed_errors=[]
+    for feed_url in feed_urls:
+        try:
+            entries+=feed_entries(getter(feed_url,source["hosts"]),source)
+        except Exception as error:
+            feed_errors.append({"url":feed_url,"error":str(error)[:100]})
     if not entries:
-        raise ValueError("No recognizable article URLs in RSS")
+        raise ValueError("No recognizable RSS articles; feeds: "+str(feed_errors))
+    entries=list({e["url"]:e for e in entries}.values())
     entries.sort(key=lambda x:x["date"],reverse=True)
-    report={"source":args.source,"feed":source["feed"],"items":len(entries),
+    report={"source":args.source,"feed":source["feed"],"feed_errors":feed_errors,"items":len(entries),
             "fetched":0,"rejections":[],"selected":None,"result":"none",
             "rss_content_words":[{"title":e["title"],"words":blocks(e["html"],"rss")["words"] if e["html"] else 0} for e in entries[:10]]}
+    if args.publish and not source.get("publish_approved",False):
+        raise ValueError("Publishing from this source is not yet approved")
     now=datetime.now(timezone.utc).date()
     candidates=[]
     for e in entries[:args.max_candidates]:
@@ -184,15 +194,17 @@ def run(args, getter=fetch):
             continue
         report["fetched"]+=1
         try:
-            try:
+            # Prefer the official RSS authoring content and avoid extra article requests.
+            # Only if full RSS text fails validation should we fetch the HTML page.
+            if e["html"]:
+                try:
+                    score,article,details=build_article(e,source,None,args.min_words,args.max_words)
+                except ValueError:
+                    page=getter(e["url"],source["hosts"])
+                    score,article,details=build_article(e,source,page,args.min_words,args.max_words)
+            else:
                 page=getter(e["url"],source["hosts"])
-            except Exception as network_error:
-                # Never bypass a rate limit with retry bursts. Full official RSS text
-                # may be used instead; missing or short RSS text is rejected.
-                if "429" not in str(network_error) or not e["html"]:
-                    raise
-                page=None
-            score,article,details=build_article(e,source,page,args.min_words,args.max_words)
+                score,article,details=build_article(e,source,page,args.min_words,args.max_words)
             if is_duplicate(article,index["articles"]):
                 raise ValueError("duplicate ID/title/text")
             candidates.append((score,e["date"],article,details))
