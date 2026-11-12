@@ -1829,21 +1829,31 @@ function mergeDiscoverCatalogStudyData(article, catalogArticle) {
     if (!collections.some(key => Array.isArray(catalogArticle?.[key]) && catalogArticle[key].length)) return false;
     const version = Number(catalogArticle.studyDataVersion);
     const studyVersion = Number.isSafeInteger(version) && version > 0 ? version : 1;
-    if (article.discoverStudyVersion === studyVersion) return false;
+    if (Number(article.discoverStudyVersion || 0) >= studyVersion) return false;
 
+    // Keep track of all IDs previously supplied by the catalog, including
+    // items the reader has since deleted. A later version must not restore them.
+    const previous = article.discoverSeededStudyIds && typeof article.discoverSeededStudyIds === 'object'
+        ? article.discoverSeededStudyIds : {};
+    const seededIds = {};
     collections.forEach(key => {
         if (!Array.isArray(article[key])) article[key] = [];
         const existingIds = new Set(article[key]
             .filter(entry => entry && entry.id !== undefined && entry.id !== null)
             .map(entry => String(entry.id)));
+        const suppliedIds = new Set(Array.isArray(previous[key]) ? previous[key].map(String) : []);
         (Array.isArray(catalogArticle[key]) ? catalogArticle[key] : []).forEach(entry => {
             if (!entry || typeof entry !== 'object' || entry.id === undefined || entry.id === null || entry.id === '') return;
             const id = String(entry.id);
-            if (existingIds.has(id)) return;
-            article[key].push(JSON.parse(JSON.stringify(entry)));
-            existingIds.add(id);
+            if (!suppliedIds.has(id) && !existingIds.has(id)) {
+                article[key].push(JSON.parse(JSON.stringify(entry)));
+                existingIds.add(id);
+            }
+            suppliedIds.add(id);
         });
+        seededIds[key] = [...suppliedIds];
     });
+    article.discoverSeededStudyIds = seededIds;
     article.discoverStudyVersion = studyVersion;
     return true;
 }
