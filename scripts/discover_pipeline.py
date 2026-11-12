@@ -77,7 +77,7 @@ def blocks(raw, origin):
         line=clean(node.get_text(separator="",strip=False))
         if not line:
             continue
-        if re.fullmatch(r"(?i)(?:related (?:stories|articles)|share this|contacts?|media contacts?|about the author)",line) or line.startswith("The USGS provides science for a changing world."):
+        if re.fullmatch(r"(?i)(?:related(?: (?:stories|articles))?|authors?|share this|contacts?|media contacts?|about the author)",line) or line.startswith("The USGS provides science for a changing world."):
             break
         if line in ("Sources/Usage: Public Domain.","View Media Details"):
             break
