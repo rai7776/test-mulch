@@ -329,8 +329,8 @@
         const card = el('section', 'sr-tour-completion-card');
         card.setAttribute('role', 'dialog');
         card.setAttribute('aria-modal', 'true');
-        card.append(el('div', 'sr-tour-success-icon', '✓'), el('h2', '', '最初の学習が完了しました！'),
-            el('p', '', '文章を読む、単語を登録する、記事を保存する。これからも、自分のペースで学びましょう。'),
+        card.append(el('div', 'sr-tour-success-icon', '✓'), el('h2', '', '使い方の案内が完了しました！'),
+            el('p', '', '読む・単語を登録する・記事を保存する流れを確認しました。これからも、自分のペースで学びましょう。'),
             action('学習を続ける', () => overlay.remove()));
         overlay.appendChild(card);
         document.body.appendChild(overlay);
@@ -412,7 +412,7 @@
     }
     window.addEventListener('smartreader:article-opened', event => {
         const detail = event.detail || {};
-        if (state?.phase === 'discover' && String(detail.discoverId) === sampleId()) {
+        if (state?.phase === 'discover' && detail.discoverId) {
             setPhase('reader', { articleName: detail.name });
         }
     });
