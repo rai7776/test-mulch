@@ -6,14 +6,14 @@
     const HINTS_KEY = 'smart-reader-tab-hints-v1';
     const SAMPLES = Object.freeze({ en: 'sample-story-001', zh: 'tour-zh-001' });
     const TARGETS = Object.freeze({
-        discover: id => '#discover-section .discover-card[data-article="' + id + '"]',
-        reader: '#text-display',
-        add: '#add-btn',
-        word: '#input-word-text',
-        note: '#unified-modal-overlay input[name="modal-type"][value="note"]',
-        question: '#unified-modal-overlay input[name="modal-type"][value="question"]',
-        save: '#reader-save-discover',
-        library: '#library-list .item-card',
+        discover: id => '[data-tour-id="discover-article"][data-article="' + id + '"]',
+        reader: '[data-tour-id="reader-text"]',
+        add: '[data-tour-id="add-entry"]',
+        word: '[data-tour-id="word-input"]',
+        note: '[data-tour-id="note-type"]',
+        question: '[data-tour-id="question-type"]',
+        save: '[data-tour-id="save-discover"]',
+        library: '#library-list [data-tour-id="library-item"]',
         vocabulary: '#vocabulary-section .learning-section-heading',
         study: '#study-center-section .learning-section-heading',
         problems: '#problems-section .learning-section-heading'
@@ -202,8 +202,8 @@
         renderPhase();
     }
     function savedArticleCard() {
-        const cards = Array.from(document.querySelectorAll('#library-list .item-card'));
-        return cards.find(card => card.querySelector('h3')?.textContent?.trim() === state?.articleName) || cards[0] || document.querySelector('#library-list');
+        const cards = Array.from(document.querySelectorAll('#library-list [data-tour-id="library-item"]'));
+        return cards.find(card => card.dataset.libraryItemId === String(state?.articleId)) || cards.find(card => card.querySelector('h3')?.textContent?.trim() === state?.articleName) || cards[0] || document.querySelector('#library-list');
     }
     function renderPhase() {
         if (updating) return;
@@ -409,7 +409,7 @@
     });
     window.addEventListener('smartreader:discover-saved', event => {
         if (['save', 'saved'].includes(state?.phase)) {
-            setPhase('saved', { articleName: event.detail?.name || state.articleName });
+            setPhase('saved', { articleName: event.detail?.name || state.articleName, articleId: event.detail?.id });
         }
     });
     document.addEventListener('click', onClick, true);
