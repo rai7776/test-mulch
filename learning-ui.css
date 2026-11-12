@@ -273,4 +273,3 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
     scrollbar-width:none;
 }
 .learning-ui .reader-header.is-discover-reader #article-meta::-webkit-scrollbar { display:none; }
-.learning-ui .reader-header.is-discover-reader.has-source-url #article-meta #display-url { display:inline-flex !important; }
