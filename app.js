@@ -1279,6 +1279,11 @@ function showLibrary() {
         }
         list.appendChild(card);
     });
+    // Inform the guided walkthrough after Library is fully rendered.
+    // Breadcrumb navigation is dynamic; it does not use #back-to-library.
+    if (typeof CustomEvent === 'function') {
+        window.dispatchEvent?.(new CustomEvent('smartreader:library-shown', { detail: { folderId: currentFolderId } }));
+    }
 }
 
 function goToFolder(id) { currentFolderId = id; showLibrary(); }
