@@ -11,9 +11,9 @@ const css = read('onboarding.css');
 const app = read('app.js');
 
 test('six welcome slides cover the real five main sections and an overview', () => {
-    assert.match(html, /onboarding\.css\?v=3/);
-    assert.match(html, /onboarding\.js\?v=6/);
-    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=6'));
+    assert.match(html, /onboarding\.css\?v=4/);
+    assert.match(html, /onboarding\.js\?v=7/);
+    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=7'));
     const slides = ['overview', 'library', 'discover', 'vocabulary', 'study', 'problems'];
     for (const kind of slides) assert.ok(tour.includes("kind: '" + kind + "'"), kind);
     assert.match(tour, /INTRO_PAGES\.forEach/);
@@ -126,6 +126,62 @@ test('chapter coach automatically proceeds to selection, while hiding competing 
     assert.match(css, /body\.sr-tour-reader-focus #add-btn/);
     assert.match(css, /body\.sr-tour-reader-focus #fab-toggle/);
     assert.match(tour, /\['chapter', 'select'\]\.includes\(state\?\.phase\)/);
+});
+
+
+test('back to Library targets the visible breadcrumb and advances after navigation', () => {
+    const readerHeader = read('reader-header.js');
+    const readerHeaderCss = read('reader-header.css');
+    assert.match(readerHeader, /nav\.replaceChildren\(list\)/);
+    assert.match(readerHeader, /label\.addEventListener\('click', \(\) => navigate\(crumb\.id\)\)/);
+    assert.match(readerHeaderCss, /\.reader-header #app-title, \.reader-header #back-to-library/);
+    assert.match(tour, /libraryBack: '#reader-breadcrumbs ol > li:first-child button'/);
+    assert.match(tour, /window\.addEventListener\('smartreader:library-shown'/);
+    assert.match(tour, /state\?\.phase === 'return-library'/);
+    assert.match(app, /new CustomEvent\('smartreader:library-shown'/);
+    assert.doesNotMatch(tour, /event\.target\.closest\?\.\(TARGETS\.libraryBack\)/);
+    assert.match(css, /body\.sr-tour-return-library #reader-breadcrumbs li:first-child button/);
+});
+
+test('showLibrary signals completion after the Library list is rendered', () => {
+    const start = app.indexOf('function showLibrary() {');
+    const end = app.indexOf('\nfunction createManualChapterId', start);
+    assert.ok(start >= 0 && end > start);
+    const events = [];
+    const library = { style: { display: 'none' } };
+    const elements = {
+        'library-section': library,
+        'library-list': { innerHTML: '' },
+        breadcrumbs: {}
+    };
+    const ctx = {
+        currentFolderId: null,
+        libraryItems: [],
+        window: { dispatchEvent(e) { events.push({type:e.type,detail:e.detail,display:library.style.display}); } },
+        document: { getElementById(id) { return elements[id] || null; } },
+        CustomEvent: class {
+            constructor(type, options) { this.type = type; this.detail = options.detail; }
+        },
+        flushReadingPositionSave() {},
+        hideAllSections() {},
+        resetImportReviewSearch() {}
+    };
+    vm.runInNewContext(app.slice(start,end),ctx);
+    ctx.showLibrary();
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'smartreader:library-shown');
+    assert.equal(events[0].display, 'block');
+    ctx.goToFolder(null);
+    assert.equal(events.length, 2);
+});
+
+test('unified word modal is horizontally locked but vertically scrollable', () => {
+    const style = read('style.css');
+    assert.match(style, /#unified-modal-overlay \.unified-modal-content \{[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/);
+    assert.match(style, /#unified-modal-overlay \.unified-modal-content \{[\s\S]*?touch-action: pan-y;/);
+    assert.match(style, /#unified-modal-overlay \.unified-modal-content form,[\s\S]*?max-width: 100%;/);
+    assert.match(style, /#unified-modal-overlay \.unified-modal-content input,[\s\S]*?max-width: 100%;/);
+    assert.match(html, /style\.css\?v=1\.7/);
 });
 
 test('the onboarding sample preserves existing Library entries and has two chapters', async () => {
