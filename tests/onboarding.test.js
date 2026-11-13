@@ -12,7 +12,7 @@ const app = read('app.js');
 
 test('six welcome slides cover the real five main sections and an overview', () => {
     assert.match(html, /onboarding\.css\?v=2/);
-    assert.match(html, /onboarding\.js\?v=4/);
+    assert.match(html, /onboarding\.js\?v=5/);
     assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=5'));
     const slides = ['overview', 'library', 'discover', 'vocabulary', 'study', 'problems'];
     for (const kind of slides) assert.ok(tour.includes("kind: '" + kind + "'"), kind);
