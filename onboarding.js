@@ -12,7 +12,7 @@
         word: '[data-tour-id="word-input"]',
         note: '[data-tour-id="note-type"]',
         question: '[data-tour-id="question-type"]',
-        libraryBack: '#back-to-library',
+        libraryBack: '#reader-breadcrumbs ol > li:first-child button',
         addMaterial: '#library-section .library-actions .start-btn',
         discoverTab: '#library-section [data-main-tab-target="discover"]',
         discoverSearch: '#discover-search',
@@ -46,7 +46,7 @@
         renderPhase();
     }
     function clearPresentation() {
-        document.body.classList.remove('sr-tour-welcome-active', 'sr-tour-setup-active', 'sr-tour-reader-focus');
+        document.body.classList.remove('sr-tour-welcome-active', 'sr-tour-setup-active', 'sr-tour-reader-focus', 'sr-tour-return-library');
         document.querySelector('#sr-tour-welcome')?.remove();
         document.querySelector('#sr-tour-completion')?.remove();
         removeCoach();
@@ -285,6 +285,7 @@
             // Hide unrelated floating add/list controls until the guide reaches them.
             // Do not change their app-managed inline display styles.
             document.body.classList.toggle('sr-tour-reader-focus', ['chapter', 'select'].includes(state?.phase));
+            document.body.classList.toggle('sr-tour-return-library', state?.phase === 'return-library');
             if (!state || ['done', 'skipped'].includes(state.phase)) return;
             if (state.phase === 'welcome') { welcome(); return; }
             if (state.phase === 'setup') {
@@ -349,11 +350,19 @@
                     skip: () => { window.closeModal?.(); setPhase('return-library'); }
                 });
             } else if (state.phase === 'return-library') {
+                // Handle an already completed navigation (including a cached screen).
+                if (document.getElementById('library-section')?.style.display === 'block') {
+                    setTimeout(() => { if (state?.phase === 'return-library') setPhase('library-tools'); }, 0);
+                    return;
+                }
                 coach({
                     selector: TARGETS.libraryBack, step: 'LIBRARY · 06',
                     title: 'Libraryに戻りましょう',
-                    description: '記事を読み終えたら、左上の「本棚」からLibraryへ戻れます。',
-                    onSkip: () => { window.goToFolder?.(null); setPhase('library-tools'); }
+                    description: '画面左上のパンくずリストにある「本棚」をタップしてください。戻ると自動で次の案内へ進みます。',
+                    onSkip: () => {
+                        window.goToFolder?.(null);
+                        if (state?.phase === 'return-library') setPhase('library-tools');
+                    }
                 });
             } else if (state.phase === 'library-tools') {
                 coach({
@@ -434,9 +443,6 @@
         const add = event.target.closest?.(TARGETS.add);
         if (add && state?.phase === 'add') setTimeout(() => setPhase('word'), 80);
         else if (add && state?.phase === 'extras') setTimeout(() => setPhase('note'), 80);
-        if (event.target.closest?.(TARGETS.libraryBack) && state?.phase === 'return-library') {
-            setTimeout(() => setPhase('library-tools'), 80);
-        }
         const tab = event.target.closest?.('[data-main-tab-target]')?.dataset?.mainTabTarget;
         if (tab === 'discover' && state?.phase === 'discover-tab') {
             setTimeout(() => setPhase('discover-guide'), 80);
@@ -477,6 +483,9 @@
             && (!state.articleId || String(detail.id) === String(state.articleId))) {
             setPhase('chapter', { articleName: detail.name, articleId: String(detail.id) });
         }
+    });
+    window.addEventListener('smartreader:library-shown', () => {
+        if (state?.phase === 'return-library') setPhase('library-tools');
     });
     window.addEventListener('smartreader:chapter-changed', event => {
         if (state?.phase !== 'chapter') return;
