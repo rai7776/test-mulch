@@ -219,3 +219,114 @@ test('first-visit tab guides remain optional and can be replayed from Settings',
     assert.match(read('settings-hub.js'), /window\.SmartReaderOnboarding\?\.restart\(\)/);
     assert.match(read('note-structure-ui.js'), /settings-hub\.js\?v=4/);
 });
+
+test('all walkthrough steps expose actionable guidance, verified against real navigation targets', () => {
+    const navigation = read('main-navigation.js');
+    const discover = read('discover.js');
+    const header = read('reader-header.js');
+    const study = read('study-center.js');
+    const buttonTargets = [
+        ['chapter', /id="chapter-title-btn"/, html],
+        ['add', /data-tour-id="add-entry"/, html],
+        ['word', /data-tour-id="word-input"/, html],
+        ['note', /data-tour-id="note-type"/, html],
+        ['question', /data-tour-id="question-type"/, html],
+        ['add-material', /class="start-btn" onclick="showInputArea\(\)"/, html],
+        ['discover-search', /id="discover-search"/, discover],
+        ['Library breadcrumb', /nav\.replaceChildren\(list\)/, header],
+        ['Study heading', /class="learning-section-heading"/, study]
+    ];
+    for (const [name, regex, source] of buttonTargets) assert.match(source, regex, name);
+    assert.match(navigation, /item\.dataset\.mainTabTarget = tab\.id/);
+    assert.match(html, /data-main-nav data-active-tab="library"/);
+    assert.match(tour, /discoverTab: '#library-section \[data-main-tab-target="discover"\]'/);
+    assert.match(tour, /discoverSearch: '#discover-search'/);
+});
+
+test('the whole main walkthrough contains every phase and a skip or next action', () => {
+    const start = tour.indexOf('function renderPhase() {');
+    const end = tour.indexOf('function finishWithoutTour()', start);
+    assert.ok(start >= 0 && end > start);
+    const phases = [
+        'welcome', 'setup', 'library-article', 'chapter', 'select',
+        'add', 'word', 'extras', 'note', 'question',
+        'return-library', 'library-tools', 'discover-tab', 'discover-guide'
+    ];
+    const source = tour.slice(start, end);
+    for (const phase of phases) assert.ok(source.includes("state.phase === '" + phase + "'"), phase);
+    for (const phase of ['library-article', 'chapter', 'select', 'add', 'extras', 'return-library', 'library-tools', 'discover-tab']) {
+        const startOfStep = source.indexOf("state.phase === '" + phase + "'");
+        const nextStep = source.indexOf("} else if", startOfStep + 1);
+        const segment = source.slice(startOfStep, nextStep < 0 ? undefined : nextStep);
+        assert.match(segment, /onSkip:|onNext:|nextText:/, phase);
+    }
+    assert.match(source, /function/); // Every phase is in a callable renderer.
+});
+
+test('first-visit tab hints are available to existing users without forcing main onboarding', () => {
+    const start = tour.indexOf('function showTabHint(tab) {');
+    const end = tour.indexOf('function onClick(event) {', start);
+    assert.ok(start >= 0 && end > start);
+    const calls = [];
+    const context = {
+        HINT_COPY: { vocabulary: ['単語帳へ', '単語帳です'] },
+        TARGETS: { vocabulary: '.vocabulary-header' },
+        activeHint: null,
+        state: null,
+        read: () => ({}),
+        document: { getElementById: () => ({ style: { display: 'block' } }) },
+        coach(options) { calls.push(options); },
+        write() {}, removeCoach() {}
+    };
+    vm.runInNewContext(tour.slice(start, end), context);
+    context.showTabHint('vocabulary');
+    assert.equal(calls.length, 1, 'existing users without a main tour should get a hint');
+    calls[0].onNext();
+    assert.equal(context.activeHint, null);
+    context.state = { phase: 'chapter' };
+    context.showTabHint('vocabulary');
+    assert.equal(calls.length, 1, 'hints must not interrupt the main walkthrough');
+    context.state = { phase: 'done' };
+    context.showTabHint('vocabulary');
+    assert.equal(calls.length, 2, 'hints should work after the walkthrough completes');
+});
+
+test('canceling a tutorial modal recovers a visible step rather than leaving a stale guide', () => {
+    const start = tour.indexOf('function onClick(event) {');
+    const end = tour.indexOf('function init() {', start);
+    assert.ok(start >= 0 && end > start);
+    const queued = [];
+    const context = {
+        state: { phase: 'word' },
+        TARGETS: { add: '#add-btn', libraryBack: '#back-to-library' },
+        HINT_COPY: {},
+        activeHint: null,
+        document: {
+            querySelector: () => ({ classList: { contains: () => false } })
+        },
+        setTimeout(fn) { queued.push(fn); },
+        setPhase(phase) { context.state = { phase }; },
+        removeCoach() {},
+        showTabHint() {}
+    };
+    vm.runInNewContext(tour.slice(start, end), context);
+    const clicked = {
+        target: {
+            closest(selector) {
+                return selector.includes('.modal-actions button') ? {} : null;
+            }
+        }
+    };
+    context.onClick(clicked);
+    assert.equal(queued.length, 1);
+    queued.shift()();
+    assert.equal(context.state.phase, 'add', 'word edit cancel should return to the add button');
+    context.state.phase = 'note';
+    context.onClick(clicked);
+    queued.shift()();
+    assert.equal(context.state.phase, 'return-library', 'note edit cancel should not trap the user');
+    context.state.phase = 'question';
+    context.onClick(clicked);
+    queued.shift()();
+    assert.equal(context.state.phase, 'return-library', 'question edit cancel should not trap the user');
+});
