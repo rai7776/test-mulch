@@ -4,7 +4,6 @@
 
     const STORAGE_KEY = 'smart-reader-onboarding-v2';
     const HINTS_KEY = 'smart-reader-tab-hints-v1';
-    const SAMPLES = Object.freeze({ en: 'sample-story-001', zh: 'tour-zh-001' });
     const TARGETS = Object.freeze({
         libraryArticle: '[data-tour-id="library-item"]',
         chapter: '#chapter-title-btn',
@@ -71,7 +70,6 @@
         const code = String(window.SmartReaderWorkspaceState?.activeWorkspace?.contentLanguage || 'en');
         return code.startsWith('zh') ? 'zh' : 'en';
     }
-    function sampleId() { return SAMPLES[state?.sampleLanguage || activeLanguage()] || SAMPLES.en; }
     function targetVisible(target) {
         return !!target && target.isConnected && target.getClientRects().length > 0;
     }
@@ -457,7 +455,9 @@
             });
         }
         if (typeof MutationObserver !== 'undefined') new MutationObserver(() => {
-            if (state?.phase === 'setup' && document.querySelector('#smart-reader-workspace-create-overlay .workspace-create-card:not(:has(#sr-tour-setup-heading))')) decorateSetup();
+            if (state?.phase !== 'setup') return;
+            const card = document.querySelector('#smart-reader-workspace-create-overlay .workspace-create-card');
+            if (card && !card.querySelector('#sr-tour-setup-heading')) decorateSetup();
         }).observe(document.body, { childList: true });
         if (state.phase === 'setup' && !setupPending()) void beginLibrary();
         else if (state.phase === 'welcome' || state.phase === 'setup') renderPhase();
