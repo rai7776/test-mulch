@@ -1251,6 +1251,10 @@ function showLibrary() {
     libraryItems.filter(i => i.parentId === currentFolderId).forEach(item => {
         const card = document.createElement('div');
         card.className = `item-card ${item.type === 'folder' ? 'folder-icon' : 'article-icon'}`;
+        if (item.type === 'article') {
+            card.dataset.tourId = 'library-item';
+            card.dataset.libraryItemId = String(item.id);
+        }
         card.onclick = () => item.type === 'folder' ? goToFolder(item.id) : openArticle(item.id);
         card.innerHTML = `
             <h3>${escapeHtml(item.name || "無題")}</h3>
@@ -1275,6 +1279,11 @@ function showLibrary() {
         }
         list.appendChild(card);
     });
+    // Inform the guided walkthrough after Library is fully rendered.
+    // Breadcrumb navigation is dynamic; it does not use #back-to-library.
+    if (typeof CustomEvent === 'function') {
+        window.dispatchEvent?.(new CustomEvent('smartreader:library-shown', { detail: { folderId: currentFolderId } }));
+    }
 }
 
 function goToFolder(id) { currentFolderId = id; showLibrary(); }
@@ -1797,6 +1806,11 @@ async function switchToChapter(chapterId, options = {}) {
     }
     await saveToDB();
     if (!options.skipPositionRestore) restoreReadingPosition(savedPosition);
+    // Emit only after a real chapter change has been committed and rendered.
+    // The onboarding guide listens to this, rather than guessing from taps.
+    window.dispatchEvent?.(new CustomEvent('smartreader:chapter-changed', {
+        detail: { articleId: String(currentArticle.id), chapterId: targetId, title: target.title }
+    }));
 }
 
 function goToPreviousChapter() {
@@ -1924,6 +1938,9 @@ async function saveCurrentDiscoverToLibrary() {
     try { await db.setItem(discoverReaderStorageKey(), discoverReaderItems); }
     catch (error) { console.warn('Discover cache cleanup will retry on next startup', error); }
     openArticle(article.id, 'discover');
+    window.dispatchEvent?.(new CustomEvent('smartreader:discover-saved', {
+        detail: { id: article.id, discoverId: article.discoverId, name: article.name }
+    }));
 }
 
 async function shareCurrentDiscoverReader() {
@@ -1941,6 +1958,41 @@ async function shareCurrentDiscoverReader() {
         if (error.name !== 'AbortError') alert('共有できませんでした。');
     }
 }
+
+
+/* Non-destructive sample for the opt-in Library-first onboarding.
+   Called only when a user starts/restarts the guide. Never seed on normal app load. */
+const ONBOARDING_LIBRARY_SAMPLE_KEY = 'smart-reader-library-tour-v2';
+async function ensureOnboardingLibrarySample() {
+    const existing = libraryItems.find(item => item?.type === 'article' && item.tourSampleKey === ONBOARDING_LIBRARY_SAMPLE_KEY);
+    if (existing) return { id: existing.id, name: existing.name };
+    const lang = String(window.SmartReaderWorkspaceState?.activeWorkspace?.contentLanguage || 'en').startsWith('zh') ? 'zh' : 'en';
+    const chapters = lang === 'zh'
+        ? [
+            { id: 'tour-zh-1', title: '第一章：阅读', content: '每天读一点文章，是学习语言的好习惯。我在图书馆找到了一本有趣的书。\n\n遇到不认识的词，我会先选中这个词，再把它保存到单词本里。' },
+            { id: 'tour-zh-2', title: '第二章：复习', content: '读完文章以后，我会复习今天记录的词语。每天练习一点，就能慢慢记住更多词。' }
+        ]
+        : [
+            { id: 'tour-en-1', title: 'Chapter 1 · Reading', content: 'Reading a little every day is a good habit. I enjoy finding new stories and learning new words.\n\nWhen I find an interesting word, I select it in the text and save it in my vocabulary list.' },
+            { id: 'tour-en-2', title: 'Chapter 2 · Reviewing', content: 'After reading, I review the words I saved. A short review helps me remember what I learned.\n\nEach small step helps me build a stronger reading habit.' }
+        ];
+    const article = {
+        id: Date.now(), type: 'article', parentId: null,
+        name: lang === 'zh' ? 'Smart Reader 入门（操作サンプル）' : 'Smart Reader · Getting Started',
+        language: lang, tourSampleKey: ONBOARDING_LIBRARY_SAMPLE_KEY,
+        content: chapters.map(chapter => chapter.content).join('\n\n'), chapters,
+        words: [], notes: [], questions: [], bookmarks: []
+    };
+    while (libraryItems.some(item => String(item.id) === String(article.id))) article.id += 1;
+    libraryItems.push(article);
+    try { await db.setItem('library_items', libraryItems); }
+    catch (error) {
+        libraryItems = libraryItems.filter(item => item !== article);
+        throw error;
+    }
+    return { id: article.id, name: article.name };
+}
+window.SmartReaderOnboardingEnsureSample = ensureOnboardingLibrarySample;
 
 function openArticle(id, origin = null) {
     const nextArticle = findReaderArticle(id);
@@ -1983,6 +2035,9 @@ function openArticle(id, origin = null) {
     renderList('words');
     renderBookmarks();
     restoreReadingPosition(getSavedPositionForChapter(currentArticle, currentChapterId));
+    window.dispatchEvent?.(new CustomEvent('smartreader:article-opened', {
+        detail: { id: String(currentArticle.id), discoverId: currentArticle.discoverId || null, isDiscoverArticle: !!currentArticle.isDiscoverArticle, name: currentArticle.name }
+    }));
 }
 
 function isQuestionInChapter(question, chapterId) {
@@ -2713,6 +2768,9 @@ async function handleUnifiedSave(e) {
         }
         rerenderReaderAtPosition(readingPosition);
         renderList(currentTab, document.getElementById('list-search').value);
+        window.dispatchEvent?.(new CustomEvent('smartreader:unified-item-saved', {
+            detail: { type: currentModalType, articleId: targetArticle.id }
+        }));
     } catch (err) { console.error(err); }
 }
 

@@ -1302,3 +1302,53 @@ input, textarea, select { font-size: 16px !important; }
     .word-statistics-modal { width: calc(100% - 24px); }
 }
 
+
+
+/* Unified add/edit modal: lock the horizontal axis on mobile Safari.
+   The form remains vertically scrollable even when the keyboard appears. */
+#unified-modal-overlay {
+    max-width: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
+}
+#unified-modal-overlay .unified-modal-content {
+    box-sizing: border-box;
+    width: min(92vw, 520px);
+    max-width: calc(100vw - 24px);
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-x: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+#unified-modal-overlay .unified-modal-content form,
+#unified-modal-overlay .unified-modal-content .modal-type-switch,
+#unified-modal-overlay .unified-modal-content .modal-actions,
+#unified-modal-overlay .unified-modal-content #form-word-section,
+#unified-modal-overlay .unified-modal-content #form-note-section,
+#unified-modal-overlay .unified-modal-content #form-question-section {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+#unified-modal-overlay .unified-modal-content input,
+#unified-modal-overlay .unified-modal-content textarea,
+#unified-modal-overlay .unified-modal-content select {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+}
+#unified-modal-overlay .unified-modal-content label,
+#unified-modal-overlay .unified-modal-content small,
+#unified-modal-overlay .unified-modal-content .sr-tour-inline-guide {
+    overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+    #unified-modal-overlay .unified-modal-content {
+        width: 100%;
+        max-width: 100%;
+    }
+}
