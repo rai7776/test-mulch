@@ -184,3 +184,139 @@
     .sr-tour-success-icon, .sr-tour-coach-card { animation: none !important; }
     .sr-tour-coach-card, .sr-tour-spotlight { transition: none !important; }
 }
+
+/* Six intro pages: product-screen previews use the same warm UI vocabulary. */
+.sr-tour-page-badge {
+    display: block;
+    margin: 4px 0 7px;
+    color: #98816c;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .07em;
+}
+.sr-tour-welcome-actions {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 9px;
+}
+.sr-tour-welcome-actions .sr-tour-button { flex: 1; width: auto; }
+.sr-tour-welcome-actions .sr-tour-button--quiet { flex: 0 0 85px; border-color: #e2d6ca; }
+.sr-tour-progress { margin: 12px 0 10px; }
+.sr-tour-progress span { transition: width .2s ease, background-color .2s ease; }
+.sr-tour-preview {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    width: 100%;
+    height: 206px;
+    padding: 15px 17px;
+    margin: 6px 0 4px;
+    overflow: hidden;
+    border: 1px solid #e6d9cc;
+    border-radius: 18px;
+    background: #f4efe8;
+    text-align: left;
+    pointer-events: none;
+}
+.sr-tour-preview--overview {
+    height: 215px;
+    align-items: center;
+    justify-content: center;
+    border-color: transparent;
+    background: radial-gradient(ellipse at 50% 65%, #eee4d8 0%, #f7f4ee 73%);
+}
+.sr-tour-preview--overview .sr-tour-book-scene { background: none; margin: 0; width: min(100%, 275px); }
+.sr-tour-mini-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex: none;
+    gap: 5px;
+    padding: 7px 9px;
+    border-radius: 10px;
+    background: #fffdf9;
+    color: #a08f7e;
+    font-size: 10px;
+    white-space: nowrap;
+}
+.sr-tour-mini-tabs b { color: #705641; font-size: 11px; }
+.sr-tour-mini-actions { display: flex; gap: 6px; margin: 2px 0; }
+.sr-tour-mini-actions span, .sr-tour-mini-actions strong {
+    flex: 1; padding: 9px 6px; border-radius: 7px; background: white;
+    color: #705641; font-size: 9px; text-align: center; white-space: nowrap;
+}
+.sr-tour-mini-actions strong { background: #705641; color: #fff; }
+.sr-tour-mini-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 13px;
+    border: 1px solid #e4d9cf;
+    border-radius: 12px;
+    background: #fffdf9;
+}
+.sr-tour-mini-row > span {
+    display: grid; flex: none; place-items: center;
+    width: 37px; height: 37px; border-radius: 9px;
+    background: #f0e7dc; color: #81644e; font-size: 12px; font-weight: 650;
+}
+.sr-tour-mini-row > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sr-tour-mini-row b { color: #4f4136; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-tour-mini-row small { color: #a08e7e; font-size: 10px; }
+.sr-tour-mini-search {
+    padding: 10px 13px; border: 1px solid #e4d9cf; border-radius: 10px;
+    background: #fffdf9; color: #a08e7e; font-size: 11px;
+}
+.sr-tour-mini-study {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex: 1; gap: 12px; border: 1px solid #dfd0be; border-radius: 14px;
+    background: #fffdf9; color: #594737;
+}
+.sr-tour-mini-study b { font-size: 24px; }
+.sr-tour-mini-study small, .sr-tour-mini-study span { font-size: 11px; color: #958574; }
+.sr-tour-mini-problem {
+    display: flex; flex-direction: column; gap: 8px; flex: 1;
+    padding: 10px 15px; border: 1px solid #e5d8ca; border-radius: 12px;
+    background: #fffdfa; color: #4f4136; font-size: 10px;
+}
+.sr-tour-mini-problem small { color: #998270; }
+.sr-tour-mini-problem b { font-size: 12px; }
+.sr-tour-mini-problem div { padding: 5px 10px; border: 1px solid #e8ddd1; border-radius: 6px; }
+
+/* Inline form guidance is part of normal modal layout: it cannot cover the
+   word-meaning field or intercept selection handles / Safari keyboard focus. */
+.sr-tour-inline-guide {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    margin: 0 0 15px;
+    padding: 12px 13px;
+    border: 1px solid #dfcbb7;
+    border-radius: 12px;
+    background: #f7f0e8;
+    color: #524235;
+    text-align: left;
+}
+.sr-tour-inline-guide strong { font-size: 13px; color: #6e5540; }
+.sr-tour-inline-guide p { margin: 0; font-size: 12px; line-height: 1.6; }
+.sr-tour-inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.sr-tour-inline-actions .sr-tour-button { min-height: 37px; padding: 8px 12px; font-size: 12px; }
+.sr-tour-inline-actions .sr-tour-button--quiet { margin-left: auto; }
+.sr-tour-spotlight { transition: none !important; }
+.sr-tour-coach-card { transition: none !important; }
+@media (max-width: 480px) {
+    .sr-tour-preview { height: 175px; padding: 12px; gap: 7px; }
+    .sr-tour-preview--overview { height: 182px; }
+    .sr-tour-preview--overview .sr-tour-book-scene { width: min(100%, 240px); }
+    .sr-tour-mini-row { padding: 8px 9px; }
+    .sr-tour-mini-row > span { width: 29px; height: 29px; }
+    .sr-tour-mini-actions span, .sr-tour-mini-actions strong { padding: 7px 3px; font-size: 8px; }
+    .sr-tour-inline-guide { padding: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sr-tour-progress span { transition: none; }
+}
