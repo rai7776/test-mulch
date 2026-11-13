@@ -12,8 +12,8 @@ const app = read('app.js');
 
 test('six welcome slides cover the real five main sections and an overview', () => {
     assert.match(html, /onboarding\.css\?v=4/);
-    assert.match(html, /onboarding\.js\?v=7/);
-    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=7'));
+    assert.match(html, /onboarding\.js\?v=8/);
+    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=8'));
     const slides = ['overview', 'library', 'discover', 'vocabulary', 'study', 'problems'];
     for (const kind of slides) assert.ok(tour.includes("kind: '" + kind + "'"), kind);
     assert.match(tour, /INTRO_PAGES\.forEach/);
@@ -184,6 +184,69 @@ test('unified word modal is horizontally locked but vertically scrollable', () =
     assert.match(html, /style\.css\?v=1\.7/);
 });
 
+
+test('all 12 interactive phases render a usable coaching instruction', () => {
+    const start = tour.indexOf('function renderPhase() {');
+    const end = tour.indexOf('function finishWithoutTour()', start);
+    assert.ok(start >= 0 && end > start);
+    const screens = [
+        'library-article', 'chapter', 'select', 'add',
+        'word', 'extras', 'note', 'question',
+        'return-library', 'library-tools', 'discover-tab', 'discover-guide'
+    ];
+    const seen = [];
+    const targets = {
+        libraryArticle: '[data-tour-id="library-item"]',
+        chapter: '#chapter-title-btn',
+        readerSentence: '#text-display p',
+        add: '#add-btn',
+        libraryBack: '#reader-breadcrumbs ol > li:first-child button',
+        addMaterial: '#library-section .library-actions .start-btn',
+        discoverTab: '#library-section [data-main-tab-target="discover"]',
+        discoverSearch: '#discover-search'
+    };
+    const context = {
+        TARGETS: targets,
+        state: null,
+        updating: false,
+        document: {
+            body: { classList: { toggle() {} } },
+            querySelector: () => ({ isConnected: true, getClientRects: () => [true] }),
+            getElementById: () => ({ style: { display: 'none' } })
+        },
+        targetVisible: () => true,
+        removeCoach() {},
+        clearInlineGuide() {},
+        tourArticleCard: () => ({ dataset: { libraryItemId: '42' } }),
+        coach(config) { seen.push({ phase: context.state.phase, title: config.title, config }); },
+        inlineGuide(title, description, options) {
+            seen.push({ phase: context.state.phase, title, config: options });
+        },
+        window: {
+            switchModalType() {}, closeModal() {}, goToFolder() {}, showDiscover() {}
+        },
+        setPhase(phase) { context.state.phase = phase; },
+        setTimeout() {}
+    };
+    vm.runInNewContext(tour.slice(start, end), context);
+    for (const phase of screens) {
+        context.state = { phase, articleId: 42, articleName: 'Sample' };
+        context.renderPhase();
+    }
+    assert.deepEqual(seen.map(item => item.phase), screens);
+    for (const item of seen) {
+        assert.ok(item.title, item.phase + ' must have a title');
+        assert.ok(item.config.onSkip || item.config.skip || item.config.onNext || item.config.next,
+            item.phase + ' must allow moving on or skipping');
+    }
+    const libraryBack = seen.find(item => item.phase === 'return-library');
+    assert.equal(libraryBack.config.selector, targets.libraryBack);
+    const discover = seen.find(item => item.phase === 'discover-tab');
+    assert.equal(discover.config.selector, targets.discoverTab);
+    const word = seen.find(item => item.phase === 'word');
+    assert.match(word.title, /意味を入力/);
+});
+
 test('the onboarding sample preserves existing Library entries and has two chapters', async () => {
     const a = app.indexOf('const ONBOARDING_LIBRARY_SAMPLE_KEY');
     const b = app.indexOf('\nfunction openArticle(id', a);
@@ -269,6 +332,7 @@ test('first-visit tab hints are available to existing users without forcing main
     assert.ok(start >= 0 && end > start);
     const calls = [];
     const context = {
+        HINTS_KEY: 'smart-reader-tab-hints-v1',
         HINT_COPY: { vocabulary: ['単語帳へ', '単語帳です'] },
         TARGETS: { vocabulary: '.vocabulary-header' },
         activeHint: null,
