@@ -226,7 +226,8 @@ test('all 12 interactive phases render a usable coaching instruction', () => {
             switchModalType() {}, closeModal() {}, goToFolder() {}, showDiscover() {}
         },
         setPhase(phase) { context.state.phase = phase; },
-        setTimeout() {}
+        setTimeout() {},
+        finishTour() {}
     };
     vm.runInNewContext(tour.slice(start, end), context);
     for (const phase of screens) {
