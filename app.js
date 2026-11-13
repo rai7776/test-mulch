@@ -1904,6 +1904,41 @@ async function shareCurrentDiscoverReader() {
     }
 }
 
+
+/* Non-destructive sample for the opt-in Library-first onboarding.
+   Called only when a user starts/restarts the guide. Never seed on normal app load. */
+const ONBOARDING_LIBRARY_SAMPLE_KEY = 'smart-reader-library-tour-v2';
+async function ensureOnboardingLibrarySample() {
+    const existing = libraryItems.find(item => item?.type === 'article' && item.tourSampleKey === ONBOARDING_LIBRARY_SAMPLE_KEY);
+    if (existing) return { id: existing.id, name: existing.name };
+    const lang = String(window.SmartReaderWorkspaceState?.activeWorkspace?.contentLanguage || 'en').startsWith('zh') ? 'zh' : 'en';
+    const chapters = lang === 'zh'
+        ? [
+            { id: 'tour-zh-1', title: '第一章：阅读', content: '每天读一点文章，是学习语言的好习惯。我在图书馆找到了一本有趣的书。\n\n遇到不认识的词，我会先选中这个词，再把它保存到单词本里。' },
+            { id: 'tour-zh-2', title: '第二章：复习', content: '读完文章以后，我会复习今天记录的词语。每天练习一点，就能慢慢记住更多词。' }
+        ]
+        : [
+            { id: 'tour-en-1', title: 'Chapter 1 · Reading', content: 'Reading a little every day is a good habit. I enjoy finding new stories and learning new words.\n\nWhen I find an interesting word, I select it in the text and save it in my vocabulary list.' },
+            { id: 'tour-en-2', title: 'Chapter 2 · Reviewing', content: 'After reading, I review the words I saved. A short review helps me remember what I learned.\n\nEach small step helps me build a stronger reading habit.' }
+        ];
+    const article = {
+        id: Date.now(), type: 'article', parentId: null,
+        name: lang === 'zh' ? 'Smart Reader 入门（操作サンプル）' : 'Smart Reader · Getting Started',
+        language: lang, tourSampleKey: ONBOARDING_LIBRARY_SAMPLE_KEY,
+        content: chapters.map(chapter => chapter.content).join('\n\n'), chapters,
+        words: [], notes: [], questions: [], bookmarks: []
+    };
+    while (libraryItems.some(item => String(item.id) === String(article.id))) article.id += 1;
+    libraryItems.push(article);
+    try { await db.setItem('library_items', libraryItems); }
+    catch (error) {
+        libraryItems = libraryItems.filter(item => item !== article);
+        throw error;
+    }
+    return { id: article.id, name: article.name };
+}
+window.SmartReaderOnboardingEnsureSample = ensureOnboardingLibrarySample;
+
 function openArticle(id, origin = null) {
     const nextArticle = findReaderArticle(id);
     if (!nextArticle) return;
