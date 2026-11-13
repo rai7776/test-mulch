@@ -2,18 +2,21 @@
 (function () {
     'use strict';
 
-    const STORAGE_KEY = 'smart-reader-onboarding-v1';
+    const STORAGE_KEY = 'smart-reader-onboarding-v2';
     const HINTS_KEY = 'smart-reader-tab-hints-v1';
     const SAMPLES = Object.freeze({ en: 'sample-story-001', zh: 'tour-zh-001' });
     const TARGETS = Object.freeze({
-        discover: id => '[data-tour-id="discover-article"][data-article="' + id + '"]',
-        reader: '[data-tour-id="reader-text"]',
+        libraryArticle: '[data-tour-id="library-item"]',
+        chapter: '#chapter-title-btn',
+        readerSentence: '#text-display p',
         add: '[data-tour-id="add-entry"]',
         word: '[data-tour-id="word-input"]',
         note: '[data-tour-id="note-type"]',
         question: '[data-tour-id="question-type"]',
-        save: '[data-tour-id="save-discover"]',
-        library: '#library-list [data-tour-id="library-item"]',
+        libraryBack: '#back-to-library',
+        addMaterial: '#library-section .library-actions .start-btn',
+        discoverTab: '#library-section [data-main-tab-target="discover"]',
+        discoverSearch: '#discover-search',
         vocabulary: '#vocabulary-section .learning-section-heading',
         study: '#study-center-section .learning-section-heading',
         problems: '#problems-section .learning-section-heading'
@@ -47,6 +50,7 @@
         document.querySelector('#sr-tour-welcome')?.remove();
         document.querySelector('#sr-tour-completion')?.remove();
         removeCoach();
+        clearInlineGuide();
     }
     function el(tag, className, text) {
         const node = document.createElement(tag);
@@ -84,6 +88,23 @@
             document.body.appendChild(layer);
         }
         return layer;
+    }
+    function clearInlineGuide() {
+        document.querySelectorAll('.sr-tour-inline-guide').forEach(element => element.remove());
+    }
+    function inlineGuide(title, description, options = {}) {
+        removeCoach();
+        clearInlineGuide();
+        const form = document.querySelector('#unified-modal-overlay.show form');
+        if (!form) return;
+        const section = el('section', 'sr-tour-inline-guide');
+        section.setAttribute('aria-label', '使い方ガイド');
+        section.append(el('strong', '', title), el('p', '', description));
+        const footer = el('div', 'sr-tour-inline-actions');
+        if (options.next) footer.appendChild(action(options.nextText || '次へ', options.next));
+        if (options.skip) footer.appendChild(action('スキップ', options.skip, 'quiet'));
+        section.appendChild(footer);
+        form.prepend(section);
     }
     function removeCoach() {
         document.getElementById('sr-tour-coach')?.remove();
@@ -143,15 +164,40 @@
         if (config.onNext) footer.appendChild(action(config.nextText || '次へ', config.onNext));
         else footer.appendChild(el('span', 'sr-tour-waiting', '強調した場所を操作してください'));
         panel.appendChild(footer);
-        const target = config.find ? config.find() : document.querySelector(config.selector);
-        if (targetVisible(target)) {
-            const bounds = target.getBoundingClientRect();
-            if (bounds.top < 8 || bounds.bottom > window.innerHeight - 8) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-            }
-        }
+        // Never auto-scroll a highlighted target. Sliding the page while the
+        // spotlight follows it was disorienting on iPhone Safari.
         queuePosition();
         setTimeout(queuePosition, 150);
+    }
+
+    const INTRO_PAGES = Object.freeze([
+        { title: '読みながら、言葉を自分のものに。', description: '文章の中で気になる単語を単語帳に追加し、あとから復習できます。', kind: 'overview', badge: 'SMART READER' },
+        { title: 'Library', description: '記事・書籍を自分の本棚で管理。ファイルやフォルダを追加し、章ごとに読み進められます。', kind: 'library', badge: '読む・整理する' },
+        { title: 'Discover', description: '興味のある文章を探して、学習する記事を増やしましょう。', kind: 'discover', badge: '文章を探す' },
+        { title: 'Vocabulary', description: '読書中に保存した単語をまとめて管理。意味を確認し、覚えた言葉を整理できます。', kind: 'vocabulary', badge: '単語帳' },
+        { title: 'Study', description: '保存した単語をカードで復習。読むだけでは終わらない学習へ。', kind: 'study', badge: '復習する' },
+        { title: 'Problems', description: '自分で作成した問題を解いて、文章の理解度を確かめられます。', kind: 'problems', badge: '理解を確かめる' }
+    ]);
+    function introPreview(kind) {
+        const frame = el('div', 'sr-tour-preview sr-tour-preview--' + kind);
+        frame.setAttribute('aria-hidden', 'true');
+        if (kind === 'overview') {
+            const visual = el('div', 'sr-tour-book-scene');
+            visual.innerHTML = '<svg viewBox="0 0 340 230" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sr-cover" x1="69" y1="62" x2="276" y2="194" gradientUnits="userSpaceOnUse"><stop stop-color="#A58A72"/><stop offset="1" stop-color="#79614E"/></linearGradient><linearGradient id="sr-paper" x1="83" y1="69" x2="184" y2="181" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFDF9"/><stop offset="1" stop-color="#E8DDCD"/></linearGradient><filter id="sr-shadow" x="20" y="30" width="310" height="190"><feGaussianBlur stdDeviation="11"/></filter></defs><ellipse cx="171" cy="190" rx="119" ry="18" fill="#6E5848" opacity=".13" filter="url(#sr-shadow)"/><path d="M36 159C78 129 120 127 171 160C218 127 264 130 307 159L300 190C256 161 212 158 171 185C122 158 76 163 44 189Z" fill="url(#sr-cover)"/><path d="M48 67C91 56 135 65 170 91V173C126 144 84 142 48 153V67Z" fill="url(#sr-paper)" stroke="#D9CBBB" stroke-width="2"/><path d="M170 91C208 66 258 57 292 67V153C251 140 207 145 170 173V91Z" fill="#FFF9EF" stroke="#D9CBBB" stroke-width="2"/><path d="M169 91V173" stroke="#CEBFAA" stroke-width="3"/><path d="M59 81C100 73 132 84 159 102M59 94C100 86 132 95 159 112M181 103C211 87 251 76 281 82M181 114C212 99 249 90 281 94" stroke="#DBCFC0" stroke-width="1.7" stroke-linecap="round"/><path d="M58 142C97 132 134 143 168 165M172 165C209 142 253 133 282 143" stroke="#DED1C2" stroke-width="1.6"/><rect x="185" y="20" width="98" height="49" rx="12" fill="#FFFEFC" stroke="#E7D9C9"/><rect x="197" y="33" width="58" height="5" rx="2.5" fill="#B59D83"/><rect x="197" y="44" width="73" height="5" rx="2.5" fill="#E6DACE"/><rect x="197" y="55" width="44" height="4" rx="2" fill="#E6DACE"/><rect x="84" y="16" width="72" height="39" rx="10" fill="#F5EDE2" stroke="#E6D9C7"/><rect x="95" y="28" width="48" height="5" rx="2.5" fill="#9B806A"/><rect x="95" y="39" width="34" height="4" rx="2" fill="#D9C7B5"/></svg>';
+            frame.appendChild(visual);
+            return frame;
+        }
+        // Compact static compositions match the actual tab labels and UI
+        // patterns, without mounting a second live copy of the application.
+        const mock = {
+            library: '<div class="sr-tour-mini-tabs"><b>Library</b><span>Discover</span><span>Vocabulary</span></div><div class="sr-tour-mini-actions"><span>＋ フォルダ作成</span><strong>＋ 記事・ファイル追加</strong></div><div class="sr-tour-mini-row"><span>📖</span><div><b>Smart Readerの使い方</b><small>Chapter 1 / Chapter 2</small></div></div>',
+            discover: '<div class="sr-tour-mini-tabs"><span>Library</span><b>Discover</b><span>Study</span></div><div class="sr-tour-mini-search">⌕　記事を検索...</div><div class="sr-tour-mini-row"><span>▤</span><div><b>The Secret of the Old Library</b><small>Stories · 初級</small></div></div><div class="sr-tour-mini-row"><span>▤</span><div><b>Exploring Our Changing Planet</b><small>News · 中級</small></div></div>',
+            vocabulary: '<div class="sr-tour-mini-tabs"><span>Library</span><b>Vocabulary</b><span>Study</span></div><div class="sr-tour-mini-search">⌕　単語を検索...</div><div class="sr-tour-mini-row"><span>Aa</span><div><b>habit</b><small>習慣 · 未暗記</small></div></div><div class="sr-tour-mini-row"><span>Ab</span><div><b>discover</b><small>発見する · 未暗記</small></div></div>',
+            study: '<div class="sr-tour-mini-tabs"><span>Vocabulary</span><b>Study</b><span>Problems</span></div><div class="sr-tour-mini-study"><small>復習カード 1 / 5</small><b>habit</b><span>タップして意味を確認</span></div>',
+            problems: '<div class="sr-tour-mini-tabs"><span>Study</span><b>Problems</b><span>Library</span></div><div class="sr-tour-mini-problem"><small>QUESTION</small><b>habit の意味は？</b><div>① 習慣</div><div>② 発明</div><div>③ 理由</div></div>'
+        };
+        frame.innerHTML = mock[kind] || '';
+        return frame;
     }
     function welcome() {
         clearPresentation();
@@ -162,34 +208,33 @@
         card.setAttribute('role', 'dialog');
         card.setAttribute('aria-modal', 'true');
         card.setAttribute('aria-labelledby', 'sr-tour-welcome-title');
+        const slide = Math.min(INTRO_PAGES.length - 1, Math.max(0, Number(state?.slide) || 0));
+        const page = INTRO_PAGES[slide];
         const header = el('header', 'sr-tour-welcome-header');
         header.append(el('span', '', 'SMART READER'), action('スキップ', finishWithoutTour, 'quiet'));
-        const visual = el('div', 'sr-tour-book-scene');
-        visual.setAttribute('aria-hidden', 'true');
-        visual.innerHTML = '<svg viewBox="0 0 340 230" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sr-cover" x1="69" y1="62" x2="276" y2="194" gradientUnits="userSpaceOnUse"><stop stop-color="#A58A72"/><stop offset="1" stop-color="#79614E"/></linearGradient><linearGradient id="sr-paper" x1="83" y1="69" x2="184" y2="181" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFDF9"/><stop offset="1" stop-color="#E8DDCD"/></linearGradient><filter id="sr-shadow" x="20" y="30" width="310" height="190"><feGaussianBlur stdDeviation="11"/></filter></defs><ellipse cx="171" cy="190" rx="119" ry="18" fill="#6E5848" opacity=".13" filter="url(#sr-shadow)"/><path d="M36 159C78 129 120 127 171 160C218 127 264 130 307 159L300 190C256 161 212 158 171 185C122 158 76 163 44 189Z" fill="url(#sr-cover)"/><path d="M48 67C91 56 135 65 170 91V173C126 144 84 142 48 153V67Z" fill="url(#sr-paper)" stroke="#D9CBBB" stroke-width="2"/><path d="M170 91C208 66 258 57 292 67V153C251 140 207 145 170 173V91Z" fill="#FFF9EF" stroke="#D9CBBB" stroke-width="2"/><path d="M169 91V173" stroke="#CEBFAA" stroke-width="3"/><path d="M59 81C100 73 132 84 159 102M59 94C100 86 132 95 159 112M181 103C211 87 251 76 281 82M181 114C212 99 249 90 281 94" stroke="#DBCFC0" stroke-width="1.7" stroke-linecap="round"/><path d="M58 142C97 132 134 143 168 165M172 165C209 142 253 133 282 143" stroke="#DED1C2" stroke-width="1.6"/><rect x="185" y="20" width="98" height="49" rx="12" fill="#FFFEFC" stroke="#E7D9C9"/><rect x="197" y="33" width="58" height="5" rx="2.5" fill="#B59D83"/><rect x="197" y="44" width="73" height="5" rx="2.5" fill="#E6DACE"/><rect x="197" y="55" width="44" height="4" rx="2" fill="#E6DACE"/><rect x="84" y="16" width="72" height="39" rx="10" fill="#F5EDE2" stroke="#E6D9C7"/><rect x="95" y="28" width="48" height="5" rx="2.5" fill="#9B806A"/><rect x="95" y="39" width="34" height="4" rx="2" fill="#D9C7B5"/></svg>';
-        const dots = el('div', 'sr-tour-progress');
-        dots.append(el('span', 'is-current'), el('span'));
-        const heading = el('h2', '', '読みながら、言葉を自分のものに。');
-        heading.id = 'sr-tour-welcome-title';
-        const subtitle = el('p', 'sr-tour-welcome-subtitle', '文章を読みながら気になる単語を単語帳に追加。あとから復習して、少しずつ身につけましょう。');
-        const features = el('div', 'sr-tour-features');
-        [['Library', '記事・資料を保存'], ['Vocabulary', '単語を整理'], ['Study', '復習して定着'], ['Problems', '問題で理解度を確認']].forEach(row => {
-            const item = el('div', 'sr-tour-feature');
-            item.append(el('strong', '', row[0]), el('span', '', row[1]));
-            features.appendChild(item);
+        const progress = el('div', 'sr-tour-progress');
+        progress.setAttribute('aria-label', (slide + 1) + ' / ' + INTRO_PAGES.length);
+        INTRO_PAGES.forEach((_, i) => {
+            const dot = el('span', i === slide ? 'is-current' : '');
+            progress.appendChild(dot);
         });
+        const heading = el('h2', '', page.title);
+        heading.id = 'sr-tour-welcome-title';
+        const badge = el('small', 'sr-tour-page-badge', page.badge);
+        const subtitle = el('p', 'sr-tour-welcome-subtitle', page.description);
         const buttons = el('div', 'sr-tour-welcome-actions');
-        buttons.appendChild(action(setupPending() ? 'はじめる' : '実際に使ってみる', () => {
-            layer.remove();
-            document.body.classList.remove('sr-tour-welcome-active');
-            if (setupPending()) setPhase('setup');
-            else beginDiscover();
+        if (slide > 0) buttons.appendChild(action('戻る', () => setPhase('welcome', { slide: slide - 1 }), 'quiet'));
+        const last = slide === INTRO_PAGES.length - 1;
+        buttons.appendChild(action(last ? (setupPending() ? '学習スペースを設定' : 'Libraryで始める') : '次へ', () => {
+            if (!last) setPhase('welcome', { slide: slide + 1 });
+            else if (setupPending()) setPhase('setup');
+            else void beginLibrary();
         }));
-        const note = el('small', 'sr-tour-time', '操作ガイドはいつでもスキップできます');
-        card.append(header, visual, dots, heading, subtitle, features, buttons, note);
+        card.append(header, introPreview(page.kind), progress, badge, heading, subtitle, buttons,
+            el('small', 'sr-tour-time', '全6ページ · あとから設定で見直せます'));
         layer.appendChild(card);
         document.body.appendChild(layer);
-        card.querySelector('.sr-tour-welcome-actions button')?.focus();
+        card.querySelector('.sr-tour-welcome-actions button:last-child')?.focus();
     }
     function decorateSetup() {
         clearPresentation();
@@ -201,119 +246,127 @@
             card.prepend(label);
         }
     }
-    function beginDiscover() {
+    async function beginLibrary() {
         clearPresentation();
-        state = Object.assign({}, state || {}, { phase: 'discover', sampleLanguage: activeLanguage() });
+        state = Object.assign({}, state || {}, { phase: 'library-article', sampleLanguage: activeLanguage() });
         write(STORAGE_KEY, state);
-        window.showDiscover?.();
+        let sample = null;
+        try { sample = await window.SmartReaderOnboardingEnsureSample?.(); }
+        catch (error) { console.warn('Tutorial sample could not be prepared', error); }
+        if (!state || ['done', 'skipped', 'welcome'].includes(state.phase)) return;
+        if (sample) {
+            state.articleId = String(sample.id);
+            state.articleName = sample.name;
+            write(STORAGE_KEY, state);
+        }
+        window.goToFolder?.(null);
         renderPhase();
     }
-    function savedArticleCard() {
+    function tourArticleCard() {
         const cards = Array.from(document.querySelectorAll('#library-list [data-tour-id="library-item"]'));
-        return cards.find(card => card.dataset.libraryItemId === String(state?.articleId)) || cards.find(card => card.querySelector('h3')?.textContent?.trim() === state?.articleName) || cards[0] || document.querySelector('#library-list');
+        return cards.find(card => card.dataset.libraryItemId === String(state?.articleId)) || null;
     }
     function renderPhase() {
         if (updating) return;
         updating = true;
         try {
             removeCoach();
-            if (!state || state.phase === 'done' || state.phase === 'skipped') return;
+            clearInlineGuide();
+            if (!state || ['done', 'skipped'].includes(state.phase)) return;
             if (state.phase === 'welcome') { welcome(); return; }
             if (state.phase === 'setup') {
-                if (setupPending()) decorateSetup(); else beginDiscover();
+                if (setupPending()) decorateSetup();
+                else void beginLibrary();
                 return;
             }
-            if (state.phase === 'discover') {
+            if (state.phase === 'library-article') {
+                const card = tourArticleCard();
                 coach({
-                    selector: TARGETS.discover(sampleId()), step: 'STEP 03 · DISCOVER',
-                    title: 'まずは記事を開いてみましょう',
-                    description: 'サンプル記事をタップすると、読む画面が開きます。',
-                    onSkip: () => setPhase('done')
+                    selector: TARGETS.libraryArticle, find: tourArticleCard,
+                    step: 'LIBRARY · 01', title: 'Libraryで記事を開きましょう',
+                    description: card ? '用意したサンプル記事をタップして、本文を開いてみましょう。' :
+                        'Libraryには記事を保存できます。サンプルが見当たらなければDiscoverから記事を探せます。',
+                    nextText: 'Discoverへ進む', onNext: () => setPhase('discover-tab'),
+                    onSkip: () => setPhase('discover-tab')
                 });
-            } else if (state.phase === 'reader') {
+            } else if (state.phase === 'chapter') {
+                const chapter = document.querySelector(TARGETS.chapter);
+                if (!targetVisible(chapter)) { setPhase('select'); return; }
                 coach({
-                    selector: TARGETS.reader, step: 'STEP 04 · READER',
-                    title: '文章を読みながら学べます',
-                    description: '本文中の気になる単語や表現を確認できます。次は、単語帳に登録してみましょう。',
-                    nextText: '追加方法を見る', onNext: () => setPhase('add'),
-                    onSkip: () => setPhase('save')
+                    selector: TARGETS.chapter, step: 'READER · 02',
+                    title: '章を切り替えられます',
+                    description: '章タイトルをタップすると章一覧が開きます。前後の矢印でも移動できます。自由に試してみましょう。',
+                    nextText: '単語の選択へ', onNext: () => setPhase('select'),
+                    onSkip: () => setPhase('select')
+                });
+            } else if (state.phase === 'select') {
+                coach({
+                    selector: TARGETS.readerSentence, step: 'READER · 03',
+                    title: 'まず、本文の単語を選択',
+                    description: 'iPhoneでは単語を長押しして選択範囲を調整します。PCではドラッグして選択してください。選択できると次へ進みます。',
+                    onSkip: () => setPhase('add')
                 });
             } else if (state.phase === 'add') {
                 coach({
-                    selector: TARGETS.add, step: 'STEP 05 · 追加',
-                    title: '「＋」から単語を追加',
-                    description: 'このボタンから、単語・ノート・問題を登録できます。タップしてみましょう。',
-                    onSkip: () => setPhase('save')
+                    selector: TARGETS.add, step: 'READER · 04',
+                    title: '選択した単語を追加しましょう',
+                    description: '選択した状態で「＋」ボタンをタップしてください。単語・ノート・問題の追加画面が開きます。',
+                    onSkip: () => setPhase('return-library')
                 });
             } else if (state.phase === 'word') {
-                coach({
-                    selector: TARGETS.word, step: 'STEP 05 · 単語',
-                    title: '単語と意味を登録しましょう',
-                    description: '単語・フレーズと意味を入力して「保存」を押してください。実際の単語帳に登録されます。',
-                    onSkip: () => { window.closeModal?.(); setPhase('save'); }
+                inlineGuide('単語と意味を入力', '選択した単語が入力されているか確認し、意味を入力して保存してください。本文での表現や例文も残せます。', {
+                    skip: () => { window.closeModal?.(); setPhase('extras'); }
                 });
             } else if (state.phase === 'extras') {
                 coach({
-                    selector: TARGETS.add, step: 'STEP 05 · ノートと問題',
-                    title: 'ノートや問題もここから',
-                    description: '単語を保存できました。もう一度「＋」を押すと、ノートや問題の追加も選べます。',
-                    onSkip: () => setPhase('save')
+                    selector: TARGETS.add, step: 'READER · 05',
+                    title: 'ノートや問題も追加できます',
+                    description: '先ほどの「＋」をもう一度タップしましょう。ノート・問題の登録方法を短くご紹介します。',
+                    onSkip: () => setPhase('return-library')
                 });
             } else if (state.phase === 'note') {
-                coach({
-                    selector: TARGETS.note, step: 'STEP 05 · ノート',
-                    title: '文法や気づきをノートに',
-                    description: '「ノート」を選ぶと、原文・訳・解説を残せます。ここでは説明だけでも大丈夫です。',
-                    nextText: '問題について見る', onNext: () => setPhase('question'),
-                    onSkip: () => { window.closeModal?.(); setPhase('save'); }
+                window.switchModalType?.('note');
+                inlineGuide('ノート：文法や解説を残す', '「対象の原文」「訳・意味」「解説・解釈」を記録できます。ここでは保存せず、画面の使い方だけ確認します。', {
+                    nextText: '問題も確認', next: () => setPhase('question'),
+                    skip: () => { window.closeModal?.(); setPhase('return-library'); }
                 });
             } else if (state.phase === 'question') {
-                coach({
-                    selector: TARGETS.question, step: 'STEP 05 · 問題',
-                    title: '自分で問題を作れます',
-                    description: '「問題」を選ぶと、設問・答え・解説を登録できます。必要になったときに試してみましょう。',
-                    nextText: '記事の保存へ', onNext: () => { window.closeModal?.(); setPhase('save'); },
-                    onSkip: () => { window.closeModal?.(); setPhase('save'); }
+                window.switchModalType?.('question');
+                inlineGuide('問題：理解度を確かめる', '「問題」「回答」「解説」を入力して、自分用の確認問題を作れます。必要になったときに使ってみましょう。', {
+                    nextText: 'Libraryへ戻る', next: () => { window.closeModal?.(); setPhase('return-library'); },
+                    skip: () => { window.closeModal?.(); setPhase('return-library'); }
                 });
-            } else if (state.phase === 'save') {
-                const button = document.querySelector(TARGETS.save);
-                if (targetVisible(button)) {
-                    coach({
-                        selector: TARGETS.save, step: 'STEP 06 · LIBRARY',
-                        title: '記事をLibraryに保存しましょう',
-                        description: '「Libraryに保存」を押すと、後から記事を読み返せます。',
-                        onSkip: () => showLibraryGuide()
-                    });
-                } else {
-                    coach({
-                        selector: '#reader-breadcrumbs', step: 'STEP 06 · LIBRARY',
-                        title: 'Libraryで管理しましょう',
-                        description: 'この記事はすでにLibraryに保存されているようです。',
-                        nextText: 'Libraryを見る', onNext: showLibraryGuide
-                    });
-                }
-            } else if (state.phase === 'saved') {
+            } else if (state.phase === 'return-library') {
                 coach({
-                    selector: '#reader-breadcrumbs', step: 'STEP 06 · 保存完了',
-                    title: '記事を保存しました！',
-                    description: 'Libraryに移動して、保存した記事を確認してみましょう。',
-                    nextText: 'Libraryで確認', onNext: showLibraryGuide
+                    selector: TARGETS.libraryBack, step: 'LIBRARY · 06',
+                    title: 'Libraryに戻りましょう',
+                    description: '記事を読み終えたら、左上の「本棚」からLibraryへ戻れます。',
+                    onSkip: () => { window.goToFolder?.(null); setPhase('library-tools'); }
                 });
-            } else if (state.phase === 'library') {
+            } else if (state.phase === 'library-tools') {
                 coach({
-                    selector: TARGETS.library, find: savedArticleCard, step: 'STEP 07 · 完了',
-                    title: 'ここがあなたのLibraryです',
-                    description: '保存した記事や自分で追加した資料が並びます。いつでもここから読み直せます。',
-                    nextText: 'チュートリアルを完了', onNext: finishTour
+                    selector: TARGETS.addMaterial, step: 'LIBRARY · 07',
+                    title: 'Libraryに資料を増やせます',
+                    description: '「＋ 記事・ファイル追加」から資料を取り込み、「＋ フォルダ作成」で整理できます。今は操作しなくても大丈夫です。',
+                    nextText: 'Discoverへ', onNext: () => setPhase('discover-tab'),
+                    onSkip: () => setPhase('discover-tab')
+                });
+            } else if (state.phase === 'discover-tab') {
+                coach({
+                    selector: TARGETS.discoverTab, step: 'DISCOVER · 08',
+                    title: 'Discoverで文章を探しましょう',
+                    description: 'Libraryの基本操作を確認できました。続けて「Discover」タブをタップして、文章を増やしてみましょう。',
+                    onSkip: () => { window.showDiscover?.(); setPhase('discover-guide'); }
+                });
+            } else if (state.phase === 'discover-guide') {
+                coach({
+                    selector: TARGETS.discoverSearch, step: 'DISCOVER · 09',
+                    title: 'ここから新しい文章を見つけましょう',
+                    description: '記事を検索したり、カテゴリから探したりできます。気になった記事はReaderで読み、Libraryにも保存できます。',
+                    nextText: 'ガイドを完了', onNext: finishTour
                 });
             }
         } finally { updating = false; }
-    }
-    function showLibraryGuide() {
-        state = Object.assign({}, state || {}, { phase: 'library' });
-        write(STORAGE_KEY, state);
-        window.goToFolder?.(null);
-        renderPhase();
     }
     function finishWithoutTour() {
         clearPresentation();
@@ -330,7 +383,7 @@
         card.setAttribute('role', 'dialog');
         card.setAttribute('aria-modal', 'true');
         card.append(el('div', 'sr-tour-success-icon', '✓'), el('h2', '', '使い方の案内が完了しました！'),
-            el('p', '', '読む・単語を登録する・記事を保存する流れを確認しました。これからも、自分のペースで学びましょう。'),
+            el('p', '', 'Libraryの基本操作と単語登録を体験しました。Discoverから新しい文章を見つけて、読書と復習を続けましょう。'),
             action('学習を続ける', () => overlay.remove()));
         overlay.appendChild(card);
         document.body.appendChild(overlay);
@@ -338,7 +391,7 @@
     }
     function restart() {
         clearPresentation();
-        state = { phase: 'welcome' };
+        state = { phase: 'welcome', slide: 0 };
         write(STORAGE_KEY, state);
         welcome();
     }
@@ -367,9 +420,15 @@
     }
     function onClick(event) {
         const add = event.target.closest?.(TARGETS.add);
-        if (add && state?.phase === 'add') setTimeout(() => setPhase('word'), 50);
-        else if (add && state?.phase === 'extras') setTimeout(() => setPhase('note'), 50);
+        if (add && state?.phase === 'add') setTimeout(() => setPhase('word'), 80);
+        else if (add && state?.phase === 'extras') setTimeout(() => setPhase('note'), 80);
+        if (event.target.closest?.(TARGETS.libraryBack) && state?.phase === 'return-library') {
+            setTimeout(() => setPhase('library-tools'), 80);
+        }
         const tab = event.target.closest?.('[data-main-tab-target]')?.dataset?.mainTabTarget;
+        if (tab === 'discover' && state?.phase === 'discover-tab') {
+            setTimeout(() => setPhase('discover-guide'), 80);
+        }
         if (tab && HINT_COPY[tab]) {
             if (activeHint) { removeCoach(); activeHint = null; }
             setTimeout(() => showTabHint(tab), 150);
@@ -381,50 +440,45 @@
     function init() {
         state = read(STORAGE_KEY, null);
         if (!state && setupPending()) {
-            state = { phase: 'welcome' };
+            state = { phase: 'welcome', slide: 0 };
             write(STORAGE_KEY, state);
         }
         if (!state) return; // Existing users must not receive a forced onboarding.
         const main = document.getElementById('main-reader');
-        if (main) new MutationObserver(queuePosition).observe(main, {
-            childList: true, subtree: true, attributes: true, attributeFilter: ['style']
-        });
-        new MutationObserver(() => {
+        if (main && typeof MutationObserver !== 'undefined') {
+            new MutationObserver(queuePosition).observe(main, {
+                childList: true, subtree: true, attributes: true, attributeFilter: ['style']
+            });
+        }
+        if (typeof MutationObserver !== 'undefined') new MutationObserver(() => {
             if (state?.phase === 'setup' && document.getElementById('smart-reader-workspace-create-overlay')) decorateSetup();
         }).observe(document.body, { childList: true });
-        if (state.phase === 'setup' && !setupPending()) {
-            beginDiscover();
-        } else if (state.phase === 'welcome' || state.phase === 'setup') {
-            renderPhase();
-        } else if (!['done', 'skipped'].includes(state.phase)) {
-            // Resume after refresh. Only navigate when actually continuing an unfinished tour.
-            if (state.phase === 'discover') window.showDiscover?.();
-            else if (state.phase === 'library') window.goToFolder?.(null);
-            else {
-                // Reader and modal state are not reliably restorable across reloads.
-                // Return to Discover without mutating learning data.
-                state.phase = 'discover';
-                write(STORAGE_KEY, state);
-                window.showDiscover?.();
-            }
-            renderPhase();
-        }
+        if (state.phase === 'setup' && !setupPending()) void beginLibrary();
+        else if (state.phase === 'welcome' || state.phase === 'setup') renderPhase();
+        else if (!['done', 'skipped'].includes(state.phase)) void beginLibrary();
     }
     window.addEventListener('smartreader:article-opened', event => {
         const detail = event.detail || {};
-        if (state?.phase === 'discover' && detail.discoverId) {
-            setPhase('reader', { articleName: detail.name });
+        if (state?.phase === 'library-article'
+            && (!state.articleId || String(detail.id) === String(state.articleId))) {
+            setPhase('chapter', { articleName: detail.name, articleId: String(detail.id) });
         }
+    });
+    document.addEventListener('selectionchange', () => {
+        if (state?.phase !== 'select') return;
+        const selection = window.getSelection?.();
+        if (!selection || !selection.rangeCount || !selection.toString().trim()) return;
+        const root = document.getElementById('text-display');
+        if (!root?.contains(selection.getRangeAt(0).commonAncestorContainer)) return;
+        setPhase('add', { capturedText: selection.toString().trim().slice(0, 100) });
     });
     window.addEventListener('smartreader:unified-item-saved', event => {
         if (state?.phase === 'word' && event.detail?.type === 'word') {
-            setTimeout(() => setPhase('extras'), 40);
+            setTimeout(() => setPhase('extras'), 60);
         }
     });
-    window.addEventListener('smartreader:discover-saved', event => {
-        if (['save', 'saved'].includes(state?.phase)) {
-            setPhase('saved', { articleName: event.detail?.name || state.articleName, articleId: event.detail?.id });
-        }
+    window.addEventListener('smartreader:discover-saved', () => {
+        // Saved Discover articles remain usable as normal Library articles.
     });
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', event => {
@@ -434,7 +488,7 @@
     window.addEventListener('resize', queuePosition, { passive: true });
     window.addEventListener('scroll', queuePosition, true);
     window.addEventListener('orientationchange', queuePosition);
-    window.SmartReaderOnboarding = Object.freeze({ restart, getState: () => state ? Object.assign({}, state) : null, targets: TARGETS });
+    window.SmartReaderOnboarding = Object.freeze({ restart, getState: () => state ? Object.assign({}, state) : null, targets: TARGETS, pages: INTRO_PAGES });
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => Promise.resolve(window.SmartReaderAppReady).then(init), { once: true });
     } else {
