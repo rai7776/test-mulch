@@ -131,6 +131,12 @@
         }
         currentTarget = target;
         const rect = target.getBoundingClientRect();
+        if (rect.bottom <= 0 || rect.top >= window.innerHeight || rect.right <= 0 || rect.left >= window.innerWidth) {
+            spot.hidden = true;
+            panel.style.left = Math.max(12, (window.innerWidth - width) / 2) + 'px';
+            panel.style.top = Math.max(12, window.innerHeight - panel.offsetHeight - 18) + 'px';
+            return;
+        }
         const pad = 5;
         const left = Math.max(5, rect.left - pad);
         const right = Math.min(window.innerWidth - 5, rect.right + pad);
@@ -291,7 +297,7 @@
                 });
             } else if (state.phase === 'chapter') {
                 const chapter = document.querySelector(TARGETS.chapter);
-                if (!targetVisible(chapter)) { setPhase('select'); return; }
+                if (!targetVisible(chapter)) { setTimeout(() => setPhase('select'), 0); return; }
                 coach({
                     selector: TARGETS.chapter, step: 'READER · 02',
                     title: '章を切り替えられます',
@@ -451,7 +457,7 @@
             });
         }
         if (typeof MutationObserver !== 'undefined') new MutationObserver(() => {
-            if (state?.phase === 'setup' && document.getElementById('smart-reader-workspace-create-overlay')) decorateSetup();
+            if (state?.phase === 'setup' && document.querySelector('#smart-reader-workspace-create-overlay .workspace-create-card:not(:has(#sr-tour-setup-heading))')) decorateSetup();
         }).observe(document.body, { childList: true });
         if (state.phase === 'setup' && !setupPending()) void beginLibrary();
         else if (state.phase === 'welcome' || state.phase === 'setup') renderPhase();
