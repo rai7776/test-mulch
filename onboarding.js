@@ -51,6 +51,7 @@
         document.querySelector('#sr-tour-completion')?.remove();
         removeCoach();
         clearInlineGuide();
+        activeHint = null;
     }
     function el(tag, className, text) {
         const node = document.createElement(tag);
@@ -417,7 +418,9 @@
         welcome();
     }
     function showTabHint(tab) {
-        if (!HINT_COPY[tab] || activeHint || !state || !['done', 'skipped'].includes(state.phase)) return;
+        // Tab introductions are opt-in by visiting a tab, for both new and existing users.
+        // Only suppress them while the main walkthrough is actively running.
+        if (!HINT_COPY[tab] || activeHint || (state && !['done', 'skipped'].includes(state.phase))) return;
         const hints = read(HINTS_KEY, {});
         if (hints[tab]) return;
         const section = document.getElementById(tab === 'study' ? 'study-center-section' : tab + '-section');
@@ -440,6 +443,17 @@
         });
     }
     function onClick(event) {
+        // The native Cancel button closes the modal without saving. Resume
+        // guidance at a real, visible UI step instead of leaving a stale hint.
+        const cancel = event.target.closest?.('#unified-modal-overlay .modal-actions button[type="button"]');
+        const phaseAtCancel = state?.phase;
+        if (cancel && ['word', 'note', 'question'].includes(phaseAtCancel)) {
+            setTimeout(() => {
+                if (state?.phase !== phaseAtCancel) return;
+                if (document.querySelector('#unified-modal-overlay')?.classList.contains('show')) return;
+                setPhase(phaseAtCancel === 'word' ? 'add' : 'return-library');
+            }, 100);
+        }
         const add = event.target.closest?.(TARGETS.add);
         if (add && state?.phase === 'add') setTimeout(() => setPhase('word'), 80);
         else if (add && state?.phase === 'extras') setTimeout(() => setPhase('note'), 80);
