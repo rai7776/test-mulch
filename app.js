@@ -1801,6 +1801,11 @@ async function switchToChapter(chapterId, options = {}) {
     }
     await saveToDB();
     if (!options.skipPositionRestore) restoreReadingPosition(savedPosition);
+    // Emit only after a real chapter change has been committed and rendered.
+    // The onboarding guide listens to this, rather than guessing from taps.
+    window.dispatchEvent?.(new CustomEvent('smartreader:chapter-changed', {
+        detail: { articleId: String(currentArticle.id), chapterId: targetId, title: target.title }
+    }));
 }
 
 function goToPreviousChapter() {
