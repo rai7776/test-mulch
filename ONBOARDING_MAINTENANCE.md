@@ -1,61 +1,77 @@
 # Smart Reader チュートリアル保守ガイド
 
-このファイルは、今後のUI変更でチュートリアルを更新し忘れないためのチェックリストです。
+この文書は、Smart Readerの既存UIが変わったときに、チュートリアルの案内が古くならないようにするためのチェックリストです。
 
-## 現行フロー（v1）
+## 現行フロー（v2）
 
-1. **ウェルカム**: 「読みながら、言葉を自分のものに。」と、本＋単語カードのイラスト。Library / Vocabulary / Study / Problemsの概要を表示。
-2. **初回の学習スペース設定**: 既存の必須設定画面を使用（言語・スペース名）。二重の言語設定画面を作らない。
-3. **Discover**: 英語なら既存 \`sample-story-001\`、中国語なら \`tour-zh-001\` のカードを強調し、実際に記事を開く。
-4. **Reader**: 本文の読み方と追加操作を案内。
-5. **追加メニュー**: 既存の＋ボタン→実際の単語入力と保存。ノート・問題は追加フォームの切り替え位置を短く説明（作成は強制しない）。
-6. **Library**: 既存の「Libraryに保存」で記事を保存。その後、Libraryの該当記事を強調。
-7. **完了**: 次の学習を促す。
-8. **Vocabulary / Study / Problems**: メインガイドとは独立し、初めてタブへ移動したときにそれぞれ1回だけ表示。
+### ウォークスルー：6ページの概要
 
-既存ユーザーにはメインガイドを自動表示しません。設定 > 使い方ガイド から再実行できます。既存ユーザーの再実行では、既存の学習スペース設定を変更せずにDiscoverの操作体験へ進みます。
+1. **Smart Readerの概要**：「読みながら、言葉を自分のものに。」本＋単語カードの暫定SVGを維持
+2. **Library**：記事・ファイル・フォルダ・章で教材を管理
+3. **Discover**：新しい記事を探す
+4. **Vocabulary**：単語を整理・確認
+5. **Study**：カードなどで復習
+6. **Problems**：問題で理解度を確認
 
-## ファイル・接続点
+2〜6ページの画面は既存UIの構造に寄せた縮小プレビューで、**実際のスクリーンショットではありません**。将来デザインが更新されたらプレビューも更新します。
+
+### 実操作：Library → Reader → Discover
+
+1. 初回のみ既存の学習スペース作成画面（言語とスペース名）を使います。
+2. ワークスペース設定完了後は**Libraryから開始**します。ガイドを開始した際だけ、2章構成のサンプル記事をLibraryに追加します（既存データは保持し、同じサンプルは二重追加しない）。
+3. Libraryのサンプル記事をタップします。
+4. Readerの**章切り替え**を紹介します。操作体験は任意です。
+5. **本文で単語を選択**します。iPhoneは長押し、PCはドラッグ。選択できたら＋ボタンの説明に進みます（スキップ可能）。
+6. 既存の＋から単語を追加し、**単語と意味を入力して実際に保存**します。
+7. 同じ追加メニューの**ノート・問題**を軽く紹介します。保存は強制しません。
+8. Libraryへ戻り、ファイルとフォルダの追加を短く紹介します。
+9. **Discover**タブを強調し、「Discoverで文章を探し、教材を増やしましょう」と案内してから完了します。
+
+Vocabulary・Study・Problemsについては、メインガイドとは独立した初回タブ訪問時の説明を維持します。既存ユーザーにメインガイドを強制表示しません。「設定 > 使い方ガイド」からいつでも再開できます。
+
+## 画面変更時のチェックリスト
+
+- [ ] 6ページのウォークスルーが**実際の画面デザイン**と整合していること
+- [ ] メインナビゲーションのLibrary/Discover/Vocabulary/Study/Problemsの名称や並びが変わったら、ガイド本文とプレビューを確認
+- [ ] Library記事カードの `data-tour-id="library-item"` と `data-library-item-id` が残っている
+- [ ] Readerの章ボタン `#chapter-title-btn` が存在し、2章以上の教材で表示される
+- [ ] Reader本文 `#text-display` 内のテキスト選択がiPhone/PCで可能である
+- [ ] ＋ボタン `data-tour-id="add-entry"` と単語・ノート・問題の既存フォームが使える
+- [ ] 単語を保存すると `smartreader:unified-item-saved` が**保存成功後**に発火する
+- [ ] ReaderのLibraryへ戻るボタン `#back-to-library` で実際にLibraryへ移る
+- [ ] Discoverタブ `data-main-tab-target="discover"`、Discover検索 `#discover-search` が使える
+- [ ] コーチマークはスクロールに遅れて追従せず、外れた対象にスポットライトを描画しない
+- [ ] 単語・意味の入力欄を説明カードが覆わない。モーダルのガイドは通常のレイアウト内に表示
+- [ ] 新規ワークスペース作成後、**Libraryが開いたままでガイドが始まる**
+- [ ] 途中でリロード・ガイドをスキップ・設定から再実行しても通常の学習データを失わない
+- [ ] iPhone Safariの長押し選択ハンドル、ソフトウェアキーボード、縦横変更時の位置を確認
+- [ ] `prefers-reduced-motion` が有効でも操作できる
+- [ ] JS/CSS更新時は `index.html` のバージョン番号を更新
+
+## 進行状態と教材
+
+- `smart-reader-onboarding-v2`：6ページ表示位置とメイン実操作の進行状態。以前のv1の進行状態を引き継がず、安全に切り替えます。
+- `smart-reader-tab-hints-v1`：Vocabulary・Study・Problemsの初回説明を閉じたかどうか。
+- `tourSampleKey = smart-reader-library-tour-v2`：英語・中国語に対応する、2章構成の説明用記事。**チュートリアル開始時のみ**作成し、Libraryの通常記事として保存されます。
+
+リロード時、編集フォーム・選択範囲は無理に復元せずLibraryのサンプル記事から案内し直します。学習履歴はリセットしません。
+
+## コードの接続先
 
 | 用途 | ファイル |
 | --- | --- |
-| ステップの文章・セレクタ・進行状態・初回タブガイド | \`onboarding.js\` |
-| イラスト・コーチマーク・アニメーション・iPhone向け表示 | \`onboarding.css\` |
-| ロードとReader/追加フォームの \`data-tour-id\` | \`index.html\` |
-| Discoverカードの \`data-tour-id\` | \`discover.js\` |
-| 追加・保存成功イベント / Library記事カードの \`data-tour-id\` | \`app.js\` |
-| 再表示ボタン | \`settings-hub.js\` |
-| サンプル記事 | \`discover-data/index.json\` |
-| 回帰テスト | \`tests/onboarding.test.js\` |
+| スライドとコーチマーク、文言・順序・進行状態 | `onboarding.js` |
+| ウォークスルーの見た目、スポットライト、モーダル内説明 | `onboarding.css` |
+| Reader・入力フォームの操作対象、ロード順 | `index.html` |
+| Libraryサンプル生成と保存成功イベント、記事カードの識別 | `app.js` |
+| DiscoverカードUI | `discover.js` |
+| ガイド再表示 | `settings-hub.js` |
+| 自動検証 | `tests/onboarding.test.js` |
 
-重要: DOMの見た目（ラベルや位置）ではなく \`data-tour-id\` で強調対象を指定します。座標は \`getBoundingClientRect()\` で毎回計算します。要素のリネーム・削除・DOM差し替え時には \`onboarding.js\` の \`TARGETS\` を必ず確認してください。
+DOM構造やボタン位置に依存しないよう、可能な範囲で `data-tour-id` を使います。既存の固定IDが変わった場合は、`onboarding.js` の `TARGETS` を更新します。
 
-## UI変更時の必須チェック
+## 確認と公開
 
-- [ ] Discoverの記事カードが \`data-tour-id="discover-article"\` と \`data-article\` を持つ。
-- [ ] Reader本文 \`reader-text\`、＋ \`add-entry\`、単語入力 \`word-input\` が存在する。
-- [ ] 追加モーダルの「ノート」「問題」がそれぞれ \`note-type\` / \`question-type\` を維持する。
-- [ ] 「Libraryに保存」 \`save-discover\` が保存可能な記事で表示される。
-- [ ] Libraryの記事カードに \`library-item\` と \`data-library-item-id\` が付与される。
-- [ ] \`smartreader:article-opened\` はReader表示後、\`smartreader:unified-item-saved\` と \`smartreader:discover-saved\` は永続化成功後に発火する。
-- [ ] iPhone Safariで、コーチマークの対象位置・モーダル内のスクロール・キーボード表示が崩れない。
-- [ ] ガイドをスキップ／途中でリロード／設定から再実行しても、記事・単語・Study履歴を変更しない。
-- [ ] Reduced Motion設定で不要な移動・回転演出を省略する。
-- [ ] JS/CSS更新時は読み込みURLのバージョンを更新する。
+`npm test` と `npm run check:foundation` を実行します。通常のPRではBrowser smokeを頻繁に実行しません。
 
-## 状態の保存
-
-- \`smart-reader-onboarding-v1\`: メインガイドの進行状態。初回学習スペース設定が未完了の場合のみ初期状態を作成します。Readerの途中で再読み込みした場合は、データを改変せずにDiscoverのステップから再開します。
-- \`smart-reader-tab-hints-v1\`: Vocabulary・Study・Problems各タブの初回説明を閉じたかどうか。メインガイドとは別に記録します。
-
-ローカルストレージへの保存に失敗しても通常の読書操作は妨げないようにしています。端末をまたぐ同期はまだありません。
-
-## デザイン上の留意点
-
-初期ウェルカムの本は、最初に提案した「開いた本＋浮かぶカード」の構図をSVGで近似した暫定版です。形・ベージュとブラウンの色合いを優先し、紙の自然な陰影を追加しています。後日より適切な画像に差し替える場合は \`onboarding.js\` の \`sr-tour-book-scene\` 内だけを変更してください。
-
-## 動作確認
-
-\`npm test\` と \`npm run check:foundation\` を実行します。通常のPRではBrowser smokeを自動で起動せず、必要なときだけ手動確認してください。
-
-メインガイドは本番サイトの \`main\` へマージする前に、特に **新規ユーザーの初回設定からのリロード復帰**、**単語の保存成功**、**Discover記事のLibrary保存** を実際のブラウザで確認してください。
+公開前の実機確認では、**6ページの切り替え → 新規ワークスペース設定 → Libraryのサンプル記事 → 章 → 文字選択 → ＋ → 意味入力 → 保存 → Libraryへ戻る → Discover** をひと続きで確認してください。マージ前に最終UI確認を行います。
