@@ -320,3 +320,10 @@
 @media (prefers-reduced-motion: reduce) {
     .sr-tour-progress span { transition: none; }
 }
+
+/* During chapter navigation and text selection, these unrelated floating controls
+   compete with the active coaching target. Restore them from the next step. */
+body.sr-tour-reader-focus #add-btn,
+body.sr-tour-reader-focus #fab-toggle {
+    display: none !important;
+}
