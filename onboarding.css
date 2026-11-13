@@ -327,3 +327,13 @@ body.sr-tour-reader-focus #add-btn,
 body.sr-tour-reader-focus #fab-toggle {
     display: none !important;
 }
+
+
+/* Emphasize the breadcrumb's actual Library action, not the legacy hidden button. */
+body.sr-tour-return-library #reader-breadcrumbs li:first-child button {
+    outline: 2px solid #c79e70;
+    outline-offset: 3px;
+    border-radius: 4px;
+    background: #fff6e9;
+    color: #684d38;
+}
