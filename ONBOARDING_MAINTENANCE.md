@@ -35,6 +35,8 @@ Vocabulary・Study・Problemsについては、メインガイドとは独立し
 - [ ] メインナビゲーションのLibrary/Discover/Vocabulary/Study/Problemsの名称や並びが変わったら、ガイド本文とプレビューを確認
 - [ ] Library記事カードの `data-tour-id="library-item"` と `data-library-item-id` が残っている
 - [ ] Readerの章ボタン `#chapter-title-btn` が存在し、2章以上の教材で表示される
+- [ ] 章切り替えが保存されたあと `smartreader:chapter-changed` を発火し、ガイドが自動的に「単語を選択」に進む（左右矢印・章一覧どちらでも）
+- [ ] 章・文字選択を案内中は右下の `#add-btn` と `#fab-toggle` を一時的に隠し、追加ステップ以降は正常に再表示する
 - [ ] Reader本文 `#text-display` 内のテキスト選択がiPhone/PCで可能である
 - [ ] ＋ボタン `data-tour-id="add-entry"` と単語・ノート・問題の既存フォームが使える
 - [ ] 単語を保存すると `smartreader:unified-item-saved` が**保存成功後**に発火する
