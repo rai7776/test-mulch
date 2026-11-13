@@ -31,6 +31,7 @@
     let activeHint = null;
     let raf = 0;
     let updating = false;
+    let selectionTimer = null;
 
     function read(key, fallback) {
         try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; }
@@ -143,6 +144,11 @@
         spot.hidden = false;
         Object.assign(spot.style, { left: left + 'px', top: top + 'px', width: Math.max(0, right - left) + 'px', height: Math.max(0, bottom - top) + 'px' });
         const x = Math.max(12, Math.min(window.innerWidth - width - 12, rect.left + rect.width / 2 - width / 2));
+        if (activeCoach.placement === 'bottom') {
+            panel.style.left = x + 'px';
+            panel.style.top = Math.max(12, window.innerHeight - panel.offsetHeight - 18) + 'px';
+            return;
+        }
         let y = rect.bottom + 18;
         const panelHeight = panel.offsetHeight;
         if (y + panelHeight > window.innerHeight - 16) y = rect.top - panelHeight - 18;
@@ -297,7 +303,7 @@
                 const chapter = document.querySelector(TARGETS.chapter);
                 if (!targetVisible(chapter)) { setTimeout(() => setPhase('select'), 0); return; }
                 coach({
-                    selector: TARGETS.chapter, step: 'READER · 02',
+                    selector: TARGETS.chapter, placement: 'bottom', step: 'READER · 02',
                     title: '章を切り替えられます',
                     description: '章タイトルをタップすると章一覧が開きます。前後の矢印でも移動できます。自由に試してみましょう。',
                     nextText: '単語の選択へ', onNext: () => setPhase('select'),
@@ -305,7 +311,7 @@
                 });
             } else if (state.phase === 'select') {
                 coach({
-                    selector: TARGETS.readerSentence, step: 'READER · 03',
+                    selector: TARGETS.readerSentence, placement: 'bottom', step: 'READER · 03',
                     title: 'まず、本文の単語を選択',
                     description: 'iPhoneでは単語を長押しして選択範囲を調整します。PCではドラッグして選択してください。選択できると次へ進みます。',
                     onSkip: () => setPhase('add')
@@ -472,11 +478,16 @@
     });
     document.addEventListener('selectionchange', () => {
         if (state?.phase !== 'select') return;
-        const selection = window.getSelection?.();
-        if (!selection || !selection.rangeCount || !selection.toString().trim()) return;
-        const root = document.getElementById('text-display');
-        if (!root?.contains(selection.getRangeAt(0).commonAncestorContainer)) return;
-        setPhase('add', { capturedText: selection.toString().trim().slice(0, 100) });
+        if (selectionTimer) clearTimeout(selectionTimer);
+        // Allow iPhone selection handles to settle before switching the spotlight.
+        selectionTimer = setTimeout(() => {
+            if (state?.phase !== 'select') return;
+            const selection = window.getSelection?.();
+            if (!selection || !selection.rangeCount || !selection.toString().trim()) return;
+            const root = document.getElementById('text-display');
+            if (!root?.contains(selection.getRangeAt(0).commonAncestorContainer)) return;
+            setPhase('add', { capturedText: selection.toString().trim().slice(0, 100) });
+        }, 350);
     });
     window.addEventListener('smartreader:unified-item-saved', event => {
         if (state?.phase === 'word' && event.detail?.type === 'word') {
