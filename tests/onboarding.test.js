@@ -72,6 +72,62 @@ test('chapters are explained before word selection, Library tools before Discove
     assert.match(tour, /Discoverで文章を探しましょう/);
 });
 
+test('chapter navigation emits success only after changing and saving', async () => {
+    const start = app.indexOf('async function switchToChapter(chapterId, options = {}) {');
+    const end = app.indexOf('\nfunction goToPreviousChapter()', start);
+    assert.ok(start >= 0 && end > start);
+    const events = [];
+    let current = 'chapter-a';
+    let saves = 0;
+    const ctx = {
+        currentArticle: { id: 1234 },
+        currentTab: 'words',
+        currentChapterId: current,
+        getCurrentChapters: () => [
+            { id: 'chapter-a', title: 'First' },
+            { id: 'chapter-b', title: 'Second' }
+        ],
+        getCurrentChapterId: () => ctx.currentChapterId,
+        closeChapterDropdown: () => {},
+        rememberReadingPosition: () => {},
+        async saveToDB() { saves++; },
+        renderChapterNavigation: () => {},
+        renderArticleText: () => {},
+        reapplyReaderSearchForCurrentContent: () => {},
+        renderList: () => {},
+        document: { getElementById: () => ({ value: '' }) },
+        renderBookmarks: () => {},
+        getSavedPositionForChapter: () => null,
+        hasStoredChapters: () => false,
+        restoreReadingPosition: () => {},
+        window: { dispatchEvent(event) { events.push(event); } },
+        CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } },
+        Date
+    };
+    vm.runInNewContext(app.slice(start, end), ctx);
+    await ctx.switchToChapter('chapter-a');
+    assert.equal(events.length, 0);
+    await ctx.switchToChapter('chapter-b');
+    assert.equal(ctx.currentChapterId, 'chapter-b');
+    assert.equal(saves, 2);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'smartreader:chapter-changed');
+    assert.equal(events[0].detail.chapterId, 'chapter-b');
+    assert.equal(events[0].detail.articleId, '1234');
+});
+
+test('chapter coach automatically proceeds to selection, while hiding competing FABs', () => {
+    assert.match(tour, /window\.addEventListener\('smartreader:chapter-changed'/);
+    assert.match(tour, /state\?\.phase !== 'chapter'/);
+    assert.match(tour, /setPhase\('select'\)/);
+    assert.match(tour, /切り替えが完了すると自動で次へ進みます/);
+    assert.doesNotMatch(tour, /nextText: '単語の選択へ'/);
+    assert.match(tour, /sr-tour-reader-focus/);
+    assert.match(css, /body\.sr-tour-reader-focus #add-btn/);
+    assert.match(css, /body\.sr-tour-reader-focus #fab-toggle/);
+    assert.match(tour, /\['chapter', 'select'\]\.includes\(state\?\.phase\)/);
+});
+
 test('the onboarding sample preserves existing Library entries and has two chapters', async () => {
     const a = app.indexOf('const ONBOARDING_LIBRARY_SAMPLE_KEY');
     const b = app.indexOf('\nfunction openArticle(id', a);
