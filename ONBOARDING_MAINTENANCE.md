@@ -40,7 +40,9 @@ Vocabulary・Study・Problemsについては、メインガイドとは独立し
 - [ ] Reader本文 `#text-display` 内のテキスト選択がiPhone/PCで可能である
 - [ ] ＋ボタン `data-tour-id="add-entry"` と単語・ノート・問題の既存フォームが使える
 - [ ] 単語を保存すると `smartreader:unified-item-saved` が**保存成功後**に発火する
-- [ ] ReaderのLibraryへ戻るボタン `#back-to-library` で実際にLibraryへ移る
+- [ ] Readerの実際の戻り口は `#reader-breadcrumbs ol > li:first-child button`（表示されない旧 `#back-to-library` は強調しない）
+- [ ] パンくずの「本棚」から戻った際、Library描画完了後に `smartreader:library-shown` が発火し、チュートリアルが自動進行する
+- [ ] 単語・ノート・問題の追加モーダルは iPhone Safari で左右に動かず、縦方向にだけスクロールできる
 - [ ] Discoverタブ `data-main-tab-target="discover"`、Discover検索 `#discover-search` が使える
 - [ ] コーチマークはスクロールに遅れて追従せず、外れた対象にスポットライトを描画しない
 - [ ] 単語・意味の入力欄を説明カードが覆わない。モーダルのガイドは通常のレイアウト内に表示
