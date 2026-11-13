@@ -46,7 +46,7 @@
         renderPhase();
     }
     function clearPresentation() {
-        document.body.classList.remove('sr-tour-welcome-active', 'sr-tour-setup-active');
+        document.body.classList.remove('sr-tour-welcome-active', 'sr-tour-setup-active', 'sr-tour-reader-focus');
         document.querySelector('#sr-tour-welcome')?.remove();
         document.querySelector('#sr-tour-completion')?.remove();
         removeCoach();
@@ -282,6 +282,9 @@
         try {
             removeCoach();
             clearInlineGuide();
+            // Hide unrelated floating add/list controls until the guide reaches them.
+            // Do not change their app-managed inline display styles.
+            document.body.classList.toggle('sr-tour-reader-focus', ['chapter', 'select'].includes(state?.phase));
             if (!state || ['done', 'skipped'].includes(state.phase)) return;
             if (state.phase === 'welcome') { welcome(); return; }
             if (state.phase === 'setup') {
@@ -305,8 +308,7 @@
                 coach({
                     selector: TARGETS.chapter, placement: 'bottom', step: 'READER · 02',
                     title: '章を切り替えられます',
-                    description: '章タイトルをタップすると章一覧が開きます。前後の矢印でも移動できます。自由に試してみましょう。',
-                    nextText: '単語の選択へ', onNext: () => setPhase('select'),
+                    description: '章タイトルから別の章を選ぶか、左右の矢印で章を切り替えてください。切り替えが完了すると自動で次へ進みます。',
                     onSkip: () => setPhase('select')
                 });
             } else if (state.phase === 'select') {
@@ -475,6 +477,11 @@
             && (!state.articleId || String(detail.id) === String(state.articleId))) {
             setPhase('chapter', { articleName: detail.name, articleId: String(detail.id) });
         }
+    });
+    window.addEventListener('smartreader:chapter-changed', event => {
+        if (state?.phase !== 'chapter') return;
+        if (state.articleId && String(event.detail?.articleId) !== String(state.articleId)) return;
+        setPhase('select');
     });
     document.addEventListener('selectionchange', () => {
         if (state?.phase !== 'select') return;
