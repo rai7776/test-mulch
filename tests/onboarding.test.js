@@ -248,6 +248,62 @@ test('all 12 interactive phases render a usable coaching instruction', () => {
     assert.match(word.title, /意味を入力/);
 });
 
+
+test('Step 7 article-add screen uses an inline return guide and never traps Step 8 over its Cancel button', () => {
+    const helperStart = tour.indexOf('function libraryVisible() {');
+    const helperEnd = tour.indexOf('function removeCoach() {', helperStart);
+    const clickStart = tour.indexOf('function onClick(event) {');
+    const clickEnd = tour.indexOf('function init() {', clickStart);
+    assert.ok(helperStart >= 0 && helperEnd > helperStart && clickStart >= 0 && clickEnd > clickStart);
+    const timers = [];
+    const editorTitle = { after(node) { editorTitle.guide = node; } };
+    const editor = { style: { display: 'block' }, querySelector: () => editorTitle };
+    const library = { style: { display: 'none' } };
+    let navigations = 0;
+    const ctx = {
+        state: { phase: 'library-tools' },
+        TARGETS: { addMaterial: '#library-section .library-actions .start-btn', add: '#add-btn' },
+        HINT_COPY: {},
+        activeHint: null,
+        document: {
+            getElementById(id) { return id === 'input-area' ? editor : id === 'library-section' ? library : null; }
+        },
+        window: { goToFolder() { navigations++; editor.style.display = 'none'; library.style.display = 'block'; } },
+        removeCoach() {},
+        clearInlineGuide() {},
+        el(tag, className, value) {
+            return {
+                tag, className, value, children: [],
+                setAttribute() {},
+                append(...children) { this.children.push(...children); },
+                appendChild(child) { this.children.push(child); }
+            };
+        },
+        action(label, callback) { return { label, callback }; },
+        finishWithoutTour() {},
+        setTimeout(callback) { timers.push(callback); },
+        setPhase(phase) { ctx.state.phase = phase; }
+    };
+    vm.runInNewContext(tour.slice(helperStart, helperEnd), ctx);
+    vm.runInNewContext(tour.slice(clickStart, clickEnd), ctx);
+    ctx.onClick({ target: { closest(selector) { return selector === ctx.TARGETS.addMaterial ? {} : null; } } });
+    assert.equal(ctx.state.phase, 'library-tools');
+    assert.equal(timers.length, 1);
+    timers.shift()();
+    assert.equal(ctx.state.phase, 'library-preview');
+    ctx.showArticleEditorGuide();
+    assert.ok(editorTitle.guide, 'the guide should appear within article registration layout');
+    const actions = editorTitle.guide.children.at(-1).children;
+    assert.match(actions[0].label, /Libraryに戻ってDiscoverへ/);
+    actions[0].callback();
+    assert.equal(navigations, 1, 'must first navigate back to Library');
+    assert.equal(ctx.state.phase, 'discover-tab');
+    assert.equal(library.style.display, 'block');
+    assert.match(tour, /state\.phase === 'discover-tab'\) \{\s*if \(!libraryVisible\(\)\) window\.goToFolder\?\.\(null\)/);
+    assert.match(tour, /else if \(state\?\.phase === 'library-preview'\) setPhase\('discover-tab'\)/);
+    assert.match(read('onboarding.css'), /#input-area \.sr-tour-article-guide/);
+});
+
 test('the onboarding sample preserves existing Library entries and has two chapters', async () => {
     const a = app.indexOf('const ONBOARDING_LIBRARY_SAMPLE_KEY');
     const b = app.indexOf('\nfunction openArticle(id', a);
