@@ -189,6 +189,12 @@
         panel.style.top = y + 'px';
     }
     function queuePosition() {
+        // Additional safety net when article editor is opened by any route:
+        // never leave a floating coachmark above native Save/Cancel buttons.
+        if (editorVisible() && state && !['done', 'skipped', 'library-preview', 'welcome', 'setup'].includes(state.phase)) {
+            setPhase('library-preview');
+            return;
+        }
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(positionCoach);
     }
@@ -314,6 +320,12 @@
         try {
             removeCoach();
             clearInlineGuide();
+            // Never float a coachmark on top of the full-page article editor.
+            // Switching the phase here also recovers a stale state after reload.
+            if (editorVisible() && state && !['done', 'skipped', 'welcome', 'setup', 'library-preview'].includes(state.phase)) {
+                state = Object.assign({}, state, { phase: 'library-preview' });
+                write(STORAGE_KEY, state);
+            }
             // Hide unrelated floating add/list controls until the guide reaches them.
             // Do not change their app-managed inline display styles.
             document.body.classList.toggle('sr-tour-reader-focus', ['chapter', 'select'].includes(state?.phase));
@@ -479,13 +491,6 @@
         });
     }
     function onClick(event) {
-        // Exploring the article-add button opens a full page, not a popup.
-        // Wait for the existing onclick handler to finish changing screens.
-        if (state?.phase === 'library-tools' && event.target.closest?.(TARGETS.addMaterial)) {
-            setTimeout(() => {
-                if (state?.phase === 'library-tools' && editorVisible()) setPhase('library-preview');
-            }, 0);
-        }
         // The native Cancel button closes the modal without saving. Resume
         // guidance at a real, visible UI step instead of leaving a stale hint.
         const cancel = event.target.closest?.('#unified-modal-overlay .modal-actions button[type="button"]');
@@ -542,6 +547,11 @@
         if (state?.phase === 'library-article'
             && (!state.articleId || String(detail.id) === String(state.articleId))) {
             setPhase('chapter', { articleName: detail.name, articleId: String(detail.id) });
+        }
+    });
+    window.addEventListener('smartreader:article-editor-opened', () => {
+        if (state && !['welcome', 'setup', 'done', 'skipped'].includes(state.phase)) {
+            setPhase('library-preview');
         }
     });
     window.addEventListener('smartreader:library-shown', () => {
