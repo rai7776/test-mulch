@@ -115,7 +115,7 @@
     function proceedToDiscover() {
         // Never show a Discover coachmark over the article registration page.
         if (!libraryVisible()) window.goToFolder?.(null);
-        setPhase('discover-tab');
+        if (state?.phase !== 'discover-tab') setPhase('discover-tab');
     }
     function showArticleEditorGuide() {
         removeCoach();
