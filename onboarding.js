@@ -106,6 +106,37 @@
         section.appendChild(footer);
         form.prepend(section);
     }
+    function libraryVisible() {
+        return document.getElementById('library-section')?.style.display === 'block';
+    }
+    function editorVisible() {
+        return document.getElementById('input-area')?.style.display === 'block';
+    }
+    function proceedToDiscover() {
+        // Never show a Discover coachmark over the article registration page.
+        if (!libraryVisible()) window.goToFolder?.(null);
+        setPhase('discover-tab');
+    }
+    function showArticleEditorGuide() {
+        removeCoach();
+        clearInlineGuide();
+        if (!editorVisible()) {
+            proceedToDiscover();
+            return;
+        }
+        const editor = document.getElementById('input-area');
+        const section = el('section', 'sr-tour-inline-guide sr-tour-article-guide');
+        section.setAttribute('aria-label', '記事登録の使い方ガイド');
+        section.append(el('strong', '', 'ここから記事やファイルを追加できます'),
+            el('p', '', 'EPUB・PDFなどの読み込みや、本文の直接入力ができます。今は登録せずに戻っても大丈夫です。'));
+        const actions = el('div', 'sr-tour-inline-actions');
+        actions.append(
+            action('Libraryに戻ってDiscoverへ', proceedToDiscover),
+            action('ここで記事を作成する（ガイドを終了）', finishWithoutTour, 'quiet')
+        );
+        section.appendChild(actions);
+        (editor.querySelector('#input-title-label') || editor).after(section);
+    }
     function removeCoach() {
         document.getElementById('sr-tour-coach')?.remove();
         currentTarget = null;
@@ -370,10 +401,15 @@
                     selector: TARGETS.addMaterial, step: 'LIBRARY · 07',
                     title: 'Libraryに資料を増やせます',
                     description: '「＋ 記事・ファイル追加」から資料を取り込み、「＋ フォルダ作成」で整理できます。今は操作しなくても大丈夫です。',
-                    nextText: 'Discoverへ', onNext: () => setPhase('discover-tab'),
-                    onSkip: () => setPhase('discover-tab')
+                    nextText: 'Discoverへ', onNext: proceedToDiscover,
+                    onSkip: proceedToDiscover
                 });
+            } else if (state.phase === 'library-preview') {
+                // The article editor is a separate screen: use in-flow advice,
+                // never an overlay that can cover the native Cancel button.
+                showArticleEditorGuide();
             } else if (state.phase === 'discover-tab') {
+                if (!libraryVisible()) window.goToFolder?.(null);
                 coach({
                     selector: TARGETS.discoverTab, step: 'DISCOVER · 08',
                     title: 'Discoverで文章を探しましょう',
@@ -443,6 +479,13 @@
         });
     }
     function onClick(event) {
+        // Exploring the article-add button opens a full page, not a popup.
+        // Wait for the existing onclick handler to finish changing screens.
+        if (state?.phase === 'library-tools' && event.target.closest?.(TARGETS.addMaterial)) {
+            setTimeout(() => {
+                if (state?.phase === 'library-tools' && editorVisible()) setPhase('library-preview');
+            }, 0);
+        }
         // The native Cancel button closes the modal without saving. Resume
         // guidance at a real, visible UI step instead of leaving a stale hint.
         const cancel = event.target.closest?.('#unified-modal-overlay .modal-actions button[type="button"]');
@@ -493,6 +536,9 @@
     }
     window.addEventListener('smartreader:article-opened', event => {
         const detail = event.detail || {};
+        // A user choosing to save a new article is doing real work;
+        // leave the editor/tutorial without taking them away from the article.
+        if (state?.phase === 'library-preview') { finishWithoutTour(); return; }
         if (state?.phase === 'library-article'
             && (!state.articleId || String(detail.id) === String(state.articleId))) {
             setPhase('chapter', { articleName: detail.name, articleId: String(detail.id) });
@@ -500,6 +546,7 @@
     });
     window.addEventListener('smartreader:library-shown', () => {
         if (state?.phase === 'return-library') setPhase('library-tools');
+        else if (state?.phase === 'library-preview') setPhase('discover-tab');
     });
     window.addEventListener('smartreader:chapter-changed', event => {
         if (state?.phase !== 'chapter') return;
