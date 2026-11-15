@@ -360,3 +360,11 @@ body.sr-tour-return-library #reader-breadcrumbs li:first-child button {
 #input-area .sr-tour-article-guide .sr-tour-button--quiet {
     margin-left: 0;
 }
+
+
+/* Fail-safe on iPhone Safari: even before JS processes a screen switch,
+   a visible article editor must never have a floating coachcard over its
+   Cancel or Save actions. The inline guide is unaffected. */
+body:has(#input-area[style*="display: block"]) #sr-tour-coach {
+    display: none !important;
+}
