@@ -11,9 +11,9 @@ const css = read('onboarding.css');
 const app = read('app.js');
 
 test('six welcome slides cover the real five main sections and an overview', () => {
-    assert.match(html, /onboarding\.css\?v=4/);
-    assert.match(html, /onboarding\.js\?v=8/);
-    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=8'));
+    assert.match(html, /onboarding\.css\?v=6/);
+    assert.match(html, /onboarding\.js\?v=10/);
+    assert.ok(html.indexOf('discover.js?v=5') < html.indexOf('onboarding.js?v=10'));
     const slides = ['overview', 'library', 'discover', 'vocabulary', 'study', 'problems'];
     for (const kind of slides) assert.ok(tour.includes("kind: '" + kind + "'"), kind);
     assert.match(tour, /INTRO_PAGES\.forEach/);
@@ -227,7 +227,10 @@ test('all 12 interactive phases render a usable coaching instruction', () => {
         },
         setPhase(phase) { context.state.phase = phase; },
         setTimeout() {},
-        finishTour() {}
+        finishTour() {},
+        editorVisible: () => false,
+        libraryVisible: () => true,
+        proceedToDiscover() {}
     };
     vm.runInNewContext(tour.slice(start, end), context);
     for (const phase of screens) {
@@ -249,22 +252,17 @@ test('all 12 interactive phases render a usable coaching instruction', () => {
 });
 
 
-test('Step 7 article-add screen uses an inline return guide and never traps Step 8 over its Cancel button', () => {
+test('Step 7 editor guide is inline, and native Cancel/Save are never covered', () => {
     const helperStart = tour.indexOf('function libraryVisible() {');
     const helperEnd = tour.indexOf('function removeCoach() {', helperStart);
-    const clickStart = tour.indexOf('function onClick(event) {');
-    const clickEnd = tour.indexOf('function init() {', clickStart);
-    assert.ok(helperStart >= 0 && helperEnd > helperStart && clickStart >= 0 && clickEnd > clickStart);
-    const timers = [];
+    assert.ok(helperStart >= 0 && helperEnd > helperStart);
     const editorTitle = { after(node) { editorTitle.guide = node; } };
     const editor = { style: { display: 'block' }, querySelector: () => editorTitle };
     const library = { style: { display: 'none' } };
     let navigations = 0;
+    let tourEnded = 0;
     const ctx = {
-        state: { phase: 'library-tools' },
-        TARGETS: { addMaterial: '#library-section .library-actions .start-btn', add: '#add-btn' },
-        HINT_COPY: {},
-        activeHint: null,
+        state: { phase: 'library-preview' },
         document: {
             getElementById(id) { return id === 'input-area' ? editor : id === 'library-section' ? library : null; }
         },
@@ -280,28 +278,60 @@ test('Step 7 article-add screen uses an inline return guide and never traps Step
             };
         },
         action(label, callback) { return { label, callback }; },
-        finishWithoutTour() {},
-        setTimeout(callback) { timers.push(callback); },
+        finishWithoutTour() { tourEnded++; },
         setPhase(phase) { ctx.state.phase = phase; }
     };
     vm.runInNewContext(tour.slice(helperStart, helperEnd), ctx);
-    vm.runInNewContext(tour.slice(clickStart, clickEnd), ctx);
-    ctx.onClick({ target: { closest(selector) { return selector === ctx.TARGETS.addMaterial ? {} : null; } } });
-    assert.equal(ctx.state.phase, 'library-tools');
-    assert.equal(timers.length, 1);
-    timers.shift()();
-    assert.equal(ctx.state.phase, 'library-preview');
     ctx.showArticleEditorGuide();
-    assert.ok(editorTitle.guide, 'the guide should appear within article registration layout');
+    assert.ok(editorTitle.guide, 'in-flow guide should be inserted next to the article title');
     const actions = editorTitle.guide.children.at(-1).children;
     assert.match(actions[0].label, /Libraryに戻ってDiscoverへ/);
+    assert.match(actions[1].label, /ここで記事を作成する/);
+    assert.equal(navigations, 0, 'must not force navigation before a user clicks');
     actions[0].callback();
-    assert.equal(navigations, 1, 'must first navigate back to Library');
+    assert.equal(navigations, 1);
     assert.equal(ctx.state.phase, 'discover-tab');
     assert.equal(library.style.display, 'block');
-    assert.match(tour, /state\.phase === 'discover-tab'\) \{\s*if \(!libraryVisible\(\)\) window\.goToFolder\?\.\(null\)/);
-    assert.match(tour, /else if \(state\?\.phase === 'library-preview'\) setPhase\('discover-tab'\)/);
-    assert.match(read('onboarding.css'), /#input-area \.sr-tour-article-guide/);
+    actions[1].callback();
+    assert.equal(tourEnded, 1);
+    assert.match(html, /<button onclick="showLibrary\(\)" class="btn-cancel">キャンセル<\/button>/);
+    assert.match(html, /<button onclick="saveNewArticle\(\)" class="start-btn">保存して読む<\/button>/);
+    assert.match(css, /body:has\(#input-area\[style\*="display: block"\]\) #sr-tour-coach \{\s*display: none !important;/);
+    assert.match(css, /#input-area \.sr-tour-article-guide/);
+});
+
+test('opening the article editor removes a floating coachmark synchronously', () => {
+    const start = app.indexOf('function showInputArea() {');
+    const end = app.indexOf('\nfunction editCurrentArticle()', start);
+    assert.ok(start >= 0 && end > start);
+    const nodes = new Map();
+    const input = { style: { display: 'none' }, value: '' };
+    nodes.set('input-area', input);
+    const events = [];
+    const ctx = {
+        flushReadingPositionSave() {},
+        hideAllSections() {},
+        resetImportReviewSearch() {},
+        setFileImportStatus() {},
+        CustomEvent: class { constructor(type) { this.type = type; } },
+        window: {
+            dispatchEvent(event) { events.push({ type: event.type, visible: input.style.display }); }
+        },
+        document: {
+            getElementById(id) {
+                if (!nodes.has(id)) nodes.set(id, { style: {}, value: '', innerText: '', checked: false });
+                return nodes.get(id);
+            }
+        }
+    };
+    vm.runInNewContext(app.slice(start, end), ctx);
+    ctx.showInputArea();
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'smartreader:article-editor-opened');
+    assert.equal(events[0].visible, 'block');
+    assert.match(tour, /window\.addEventListener\('smartreader:article-editor-opened'/);
+    assert.match(tour, /setPhase\('library-preview'\)/);
+    assert.match(tour, /if \(editorVisible\(\) && state/);
 });
 
 test('the onboarding sample preserves existing Library entries and has two chapters', async () => {
