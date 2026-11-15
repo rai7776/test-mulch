@@ -1345,6 +1345,11 @@ function showInputArea() {
     document.getElementById('manual-chapter-mode').checked = false;
     document.getElementById('convert-to-chapter-btn').style.display = 'none';
     document.getElementById('input-area').style.display = 'block';
+    // Notify onboarding synchronously so its floating card cannot cover
+    // the article editor's native Cancel/Save actions even for one frame.
+    if (typeof CustomEvent === 'function') {
+        window.dispatchEvent?.(new CustomEvent('smartreader:article-editor-opened'));
+    }
     document.getElementById('file-input').value = ""; 
     setFileImportStatus('');
 }
