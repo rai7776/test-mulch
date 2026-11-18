@@ -1480,6 +1480,14 @@ function getGlobalSearchMatchInfo(item, options) {
     return { titleMatches, contentMatches, wordMatches, noteMatches, searchableContent };
 }
 
+function toggleLibrarySearchOptions() {
+    const options = document.getElementById('library-search-options');
+    const toggle = document.getElementById('library-search-options-toggle');
+    if (!options) return;
+    const open = options.classList.toggle('is-open');
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
 function clearGlobalSearch() {
     const input = document.getElementById('global-search-input');
     if (!input) return;
