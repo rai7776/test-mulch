@@ -312,3 +312,19 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
         font-size:1.55rem;
     }
 }
+
+/* Folder link: small open buttons on cards and in the folder breadcrumb. */
+.learning-ui #library-section .item-card h3 .folder-link-open {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; min-height:26px; margin-left:8px; padding:0;
+    border:1px solid var(--ui-border); border-radius:8px; background:#fffdfa;
+    color:#6f5a48; font-size:13px; line-height:1; cursor:pointer; vertical-align:middle;
+}
+.learning-ui #library-section .item-card h3 .folder-link-open:hover { background:#f3ede5; }
+.learning-ui #breadcrumbs .breadcrumb-folder-link {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:28px; height:28px; min-height:28px; margin-left:8px; padding:0;
+    border:1px solid var(--ui-border); border-radius:8px; background:#fffdfa;
+    color:#6f5a48; font-size:14px; line-height:1; cursor:pointer;
+}
+.learning-ui #breadcrumbs .breadcrumb-folder-link:hover { background:#f3ede5; }

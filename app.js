@@ -1273,6 +1273,7 @@ function showLibrary() {
                 actions.appendChild(vocabularyButton);
             }
         }
+        if (item.type === 'folder') addFolderLinkControls(card, item);
         list.appendChild(card);
     });
 }
@@ -1580,6 +1581,7 @@ function performGlobalSearch() {
         });
         actions.append(moveButton, deleteButton);
         card.appendChild(actions);
+        if (item.type === 'folder') addFolderLinkControls(card, item);
         list.appendChild(card);
     });
 }
@@ -3294,6 +3296,51 @@ function applySettings() {
 }
 function renderSettingsUI(c) { c.innerHTML = `<div class="settings-group"><p>文字: ${readerSettings.fontSize}px</p><input type="range" min="14" max="30" value="${readerSettings.fontSize}" oninput="updateSetting('font', this.value)"><p>行間: ${readerSettings.lineHeight}</p><input type="range" min="1.2" max="2.5" step="0.1" value="${readerSettings.lineHeight}" oninput="updateSetting('line', this.value)"></div>`; }
 function updateSetting(t, v) { if (t==='font') readerSettings.fontSize=v; else readerSettings.lineHeight=v; applySettings(); db.setItem('reader_settings', readerSettings); renderList('settings'); }
+function getFolderLinkUrl(item) {
+    return window.SmartReaderLearningUI?.folderLinkUrl(item) ?? null;
+}
+
+function openFolderLink(item) {
+    const url = getFolderLinkUrl(item);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function editFolderLink(id) {
+    const folder = libraryItems.find(item => String(item.id) === String(id));
+    if (!folder || folder.type !== 'folder') return;
+    const input = prompt("フォルダのリンクURL（空欄にすると解除されます）", folder.url || "");
+    if (input === null) return;
+    const result = window.SmartReaderLearningUI?.normalizeFolderLinkInput(input) || { ok: false, url: null };
+    if (!result.ok) { alert("URLが正しくありません。https:// で始まるURLを入力してください。"); return; }
+    if (result.url) folder.url = result.url; else delete folder.url;
+    saveToDB(); showLibrary();
+}
+
+function addFolderLinkControls(card, item) {
+    const heading = card.querySelector('h3');
+    const url = getFolderLinkUrl(item);
+    if (heading && url) {
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'folder-link-open';
+        openButton.textContent = '↗';
+        openButton.title = `${item.name || 'フォルダ'}のリンクを開く`;
+        openButton.setAttribute('aria-label', `${item.name || 'フォルダ'}のリンクを開く`);
+        openButton.addEventListener('click', event => { event.stopPropagation(); openFolderLink(item); });
+        heading.appendChild(openButton);
+    }
+    const actions = card.querySelector('.card-actions');
+    if (actions) {
+        const linkButton = document.createElement('button');
+        linkButton.type = 'button';
+        linkButton.className = 'small-btn folder-link-edit';
+        linkButton.textContent = 'リンク';
+        linkButton.title = url ? 'フォルダのリンクを編集' : 'フォルダにリンクを設定';
+        linkButton.addEventListener('click', event => { event.stopPropagation(); editFolderLink(item.id); });
+        actions.appendChild(linkButton);
+    }
+}
+
 function createNewFolder() { const n = prompt("フォルダ名"); if(n){ libraryItems.push({id:Date.now(), type:'folder', name:n, parentId:currentFolderId}); saveToDB(); showLibrary(); } }
 async function deleteLibraryItem(id) { if(confirm("削除しますか？")){ libraryItems = libraryItems.filter(i=>i.id!==id); await saveToDB(); showLibrary(); } }
 async function deleteListItem(id, type, sourceIndex = null) {
