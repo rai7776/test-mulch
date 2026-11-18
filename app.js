@@ -1322,6 +1322,72 @@ async function convertCurrentArticleToChapterMode() {
     openSavedBookEditor(currentArticle);
 }
 
+let inputDestinationFolderId = null;
+
+function updateInputDestination(folderId) {
+    inputDestinationFolderId = folderId ?? null;
+    const label = document.getElementById('input-destination-label');
+    const linkButton = document.getElementById('input-destination-link');
+    if (!label) return;
+    const folder = inputDestinationFolderId === null ? null
+        : libraryItems.find(item => item.type === 'folder' && String(item.id) === String(inputDestinationFolderId));
+    label.textContent = `保存先：${folder ? (folder.name || 'フォルダ') : '本棚'}`;
+    const url = folder ? getFolderLinkUrl(folder) : null;
+    if (linkButton) {
+        linkButton.style.display = url ? '' : 'none';
+        linkButton.onclick = url ? () => window.open(url, '_blank', 'noopener,noreferrer') : null;
+    }
+}
+
+function updateBodyCharCount() {
+    const count = document.getElementById('text-input-count');
+    const body = document.getElementById('text-input');
+    if (count && body) count.textContent = `${body.value.length.toLocaleString()}文字`;
+}
+
+function updateBodyEditorCount() {
+    const count = document.getElementById('body-editor-count');
+    const editor = document.getElementById('body-editor-text');
+    if (count && editor) count.textContent = `${editor.value.length.toLocaleString()}文字`;
+}
+
+async function pasteIntoField(id) {
+    const field = document.getElementById(id);
+    if (!field) return;
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text) return;
+        field.value = id === 'text-input' && field.value ? field.value + text : text;
+        if (id === 'text-input') updateBodyCharCount();
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (_) {
+        // Clipboard permission denied etc.: stay silent so manual paste still works.
+    }
+}
+
+function openBodyEditor() {
+    const overlay = document.getElementById('body-editor-overlay');
+    const editor = document.getElementById('body-editor-text');
+    const body = document.getElementById('text-input');
+    if (!overlay || !editor || !body) return;
+    editor.value = body.value;
+    updateBodyEditorCount();
+    overlay.style.display = 'flex';
+    editor.focus();
+}
+
+function closeBodyEditor(apply) {
+    const overlay = document.getElementById('body-editor-overlay');
+    const editor = document.getElementById('body-editor-text');
+    const body = document.getElementById('text-input');
+    if (!overlay) return;
+    if (apply && editor && body) {
+        body.value = editor.value;
+        updateBodyCharCount();
+    }
+    overlay.style.display = 'none';
+}
+
 function showInputArea() {
     flushReadingPositionSave();
     hideAllSections();
@@ -1329,6 +1395,8 @@ function showInputArea() {
     pendingImportedDocument = null;
     importReviewState = null;
     resetImportReviewSearch();
+    closeBodyEditor(false);
+    updateInputDestination(currentFolderId);
     document.getElementById('input-title-label').innerText = "記事を登録";
     document.getElementById('text-title').value = ""; 
     document.getElementById('text-url').value = ""; 
@@ -1339,6 +1407,7 @@ function showInputArea() {
     document.getElementById('input-area').style.display = 'block';
     document.getElementById('file-input').value = ""; 
     setFileImportStatus('');
+    updateBodyCharCount();
 }
 
 function editCurrentArticle() { 
@@ -1350,6 +1419,7 @@ function editCurrentArticle() {
     flushReadingPositionSave();
     editingId = currentArticle.id; 
     hideAllSections(); 
+    updateInputDestination(currentArticle.parentId ?? null);
     document.getElementById('input-title-label').innerText = "記事を編集";
     document.getElementById('text-title').value = currentArticle.name; 
     document.getElementById('text-url').value = currentArticle.url || ""; 
@@ -1360,6 +1430,7 @@ function editCurrentArticle() {
     document.getElementById('manual-chapter-mode').checked = false;
     document.getElementById('convert-to-chapter-btn').style.display = 'inline-block';
     document.getElementById('input-area').style.display = 'block'; 
+    updateBodyCharCount();
 }
 
 async function saveNewArticle() {
