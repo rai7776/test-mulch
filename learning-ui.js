@@ -22,6 +22,25 @@
             return items.find(item => item?.type === 'article' && String(item.id) === String(saved?.articleId)) || null;
         } catch (_) { return null; }
     }
+    function folderLinkUrl(item) {
+        if (!item || item.type !== 'folder') return null;
+        const raw = String(item.url || '').trim();
+        if (!raw) return null;
+        try {
+            const url = new URL(raw);
+            return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+        } catch (_) { return null; }
+    }
+    function normalizeFolderLinkInput(value) {
+        const raw = String(value ?? '').trim();
+        if (!raw) return { ok: true, url: null };
+        const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : 'https://' + raw;
+        try {
+            const url = new URL(withScheme);
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') return { ok: false, url: null };
+            return { ok: true, url: url.href };
+        } catch (_) { return { ok: false, url: null }; }
+    }
     function renderLibrary(doc, items, folderId, navigate, open, storage, state) {
         const section = doc.getElementById('library-section');
         const folder = items.find(item => item.type === 'folder' && String(item.id) === String(folderId));
@@ -41,6 +60,18 @@
                 else { label.type = 'button'; label.onclick = () => navigate(crumb.id); }
                 li.appendChild(label); list.appendChild(li);
             });
+            const linkUrl = folderLinkUrl(folder);
+            if (linkUrl) {
+                const linkButton = doc.createElement('button');
+                linkButton.type = 'button';
+                linkButton.className = 'breadcrumb-folder-link';
+                linkButton.textContent = '↗';
+                linkButton.title = `${folder.name || 'フォルダ'}のリンクを開く`;
+                linkButton.setAttribute('aria-label', `${folder.name || 'フォルダ'}のリンクを開く`);
+                linkButton.onclick = () => globalThis.open?.(linkUrl, '_blank', 'noopener,noreferrer');
+                const lastItem = list.lastElementChild;
+                if (lastItem) lastItem.appendChild(linkButton);
+            }
             nav.appendChild(list);
         }
         const card = doc.getElementById('recent-article');
@@ -57,5 +88,5 @@
             copy.append(hint,title); card.append(copy,button);
         }
     }
-    return Object.freeze({ recentKey, remember, recent, renderLibrary });
+    return Object.freeze({ recentKey, remember, recent, renderLibrary, folderLinkUrl, normalizeFolderLinkInput });
 });

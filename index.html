@@ -45,8 +45,9 @@
                     <div class="library-search-control">
                         <input type="text" id="global-search-input" placeholder="全データから検索..." oninput="performGlobalSearch()">
                         <button type="button" id="global-search-clear-btn" onclick="clearGlobalSearch()" aria-label="検索をクリア">×</button>
+                        <button type="button" id="library-search-options-toggle" aria-expanded="false" aria-controls="library-search-options" onclick="toggleLibrarySearchOptions()">条件</button>
                     </div>
-                    <div class="library-search-options" role="group" aria-label="Library検索条件">
+                    <div class="library-search-options" id="library-search-options" role="group" aria-label="Library検索条件">
                         <label class="library-search-option">
                             <input type="checkbox" id="global-search-whole-word" onchange="performGlobalSearch()">
                             <span>単語一致</span>
@@ -175,7 +176,13 @@
         </div>
 
         <div id="input-area" class="input-card" style="display:none;">
-            <h2 id="input-title-label">記事を登録</h2>
+            <div class="input-header-row">
+                <h2 id="input-title-label">記事を登録</h2>
+                <div class="input-destination">
+                    <span id="input-destination-label">保存先：本棚</span>
+                    <button type="button" id="input-destination-link" class="input-destination-link" style="display:none;" aria-label="保存先フォルダのリンクを開く" title="保存先フォルダのリンクを開く">↗</button>
+                </div>
+            </div>
             <div class="file-upload-zone">
                 <label for="file-input" class="file-label">
                     <span id="file-label-text">📄 EPUB / PDF / HTML / TXT ファイルを読み込む</span>
@@ -185,8 +192,20 @@
             <div id="file-import-message" class="file-import-message" role="status" aria-live="polite"></div>
             <div class="full-width-form">
                 <input type="text" id="text-title" placeholder="タイトルの名前">
+                <div class="input-label-row">
+                    <label for="text-url">出典URL</label>
+                    <button type="button" class="input-paste-btn" onclick="pasteIntoField('text-url')">貼り付け</button>
+                </div>
                 <input type="url" id="text-url" placeholder="出典URL（https://...）">
-                <textarea id="text-input" placeholder="本文を入力..."></textarea>
+                <div class="input-label-row">
+                    <label for="text-input">本文</label>
+                    <span class="input-label-actions">
+                        <span id="text-input-count" class="input-char-count">0文字</span>
+                        <button type="button" class="input-paste-btn" onclick="openBodyEditor()">拡大</button>
+                        <button type="button" class="input-paste-btn" onclick="pasteIntoField('text-input')">貼り付け</button>
+                    </span>
+                </div>
+                <textarea id="text-input" placeholder="本文を入力..." oninput="updateBodyCharCount()"></textarea>
                 <label class="chapter-mode-option" for="manual-chapter-mode">
                     <input type="checkbox" id="manual-chapter-mode">
                     章モードで作成
@@ -196,6 +215,17 @@
             <div class="input-actions">
                 <button onclick="showLibrary()" class="btn-cancel">キャンセル</button>
                 <button onclick="saveNewArticle()" class="start-btn">保存して読む</button>
+            </div>
+            <div id="body-editor-overlay" class="body-editor-overlay" style="display:none;">
+                <div class="body-editor-header">
+                    <strong>本文を編集</strong>
+                    <span id="body-editor-count" class="input-char-count">0文字</span>
+                    <span class="body-editor-header-actions">
+                        <button type="button" class="small-btn" onclick="closeBodyEditor(false)">キャンセル</button>
+                        <button type="button" class="small-btn" onclick="closeBodyEditor(true)">この内容で閉じる</button>
+                    </span>
+                </div>
+                <textarea id="body-editor-text" placeholder="本文を入力..." oninput="updateBodyEditorCount()"></textarea>
             </div>
         </div>
 

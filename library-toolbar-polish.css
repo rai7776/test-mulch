@@ -532,3 +532,48 @@
         background: #f9efed;
     }
 }
+
+/* Search options stay collapsed until the 条件 toggle opens them. */
+#library-section .library-search-options {
+    display: none;
+}
+
+#library-section .library-search-options.is-open {
+    display: flex;
+}
+
+#library-section #library-search-options-toggle {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-left: 1px solid #e2d9d0;
+    border-radius: 0;
+    background: transparent;
+    color: #74695f;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#library-section #library-search-options-toggle[aria-expanded="true"] {
+    background: #f1e7dc;
+    color: #654b35;
+}
+
+/* Compact creation row and resume bar: less vertical chrome above the grid. */
+#library-section .library-actions > button.btn-sub,
+#library-section .library-actions > button.start-btn {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: .82rem;
+}
+
+#library-section #recent-article {
+    margin: 0 0 8px;
+    padding: 4px 8px;
+    border-radius: 8px;
+}

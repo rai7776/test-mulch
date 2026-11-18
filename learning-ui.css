@@ -312,3 +312,87 @@ body.learning-ui:not(.reader-mode-active) #bulk-add-btn {
         font-size:1.55rem;
     }
 }
+
+/* Folder link: small open buttons on cards and in the folder breadcrumb. */
+.learning-ui #library-section .item-card h3 .folder-link-open {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; min-height:26px; margin-left:8px; padding:0;
+    border:1px solid var(--ui-border); border-radius:8px; background:#fffdfa;
+    color:#6f5a48; font-size:13px; line-height:1; cursor:pointer; vertical-align:middle;
+}
+.learning-ui #library-section .item-card h3 .folder-link-open:hover { background:#f3ede5; }
+.learning-ui #breadcrumbs .breadcrumb-folder-link {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:28px; height:28px; min-height:28px; margin-left:8px; padding:0;
+    border:1px solid var(--ui-border); border-radius:8px; background:#fffdfa;
+    color:#6f5a48; font-size:14px; line-height:1; cursor:pointer;
+}
+.learning-ui #breadcrumbs .breadcrumb-folder-link:hover { background:#f3ede5; }
+
+/* Article registration: one-screen layout on phones.
+   Header row shows the save destination (with its folder link), the action
+   bar sticks to the bottom of the card, and the body field is compact with
+   a full-screen editor for longer work. Input text stays at 16px so iOS
+   Safari does not auto-zoom on focus. */
+.learning-ui .input-card .input-header-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.learning-ui .input-card .input-header-row h2 { margin:0; font-size:1.12rem; }
+.learning-ui .input-card .input-destination { display:flex; align-items:center; gap:8px; flex:none; }
+.learning-ui .input-card #input-destination-label { font-size:.98rem; font-weight:800; color:#3f352d; white-space:nowrap; }
+.learning-ui .input-card .input-destination-link {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:36px; height:36px; min-height:36px; padding:0;
+    border:1px solid #d9c7b5; border-radius:10px; background:#fffdfa;
+    color:#654b35; font-size:16px; line-height:1; cursor:pointer;
+}
+.learning-ui .input-card .input-destination-link:hover { background:#f3ede5; }
+.learning-ui .input-card .file-upload-zone { padding:0; margin-bottom:10px; border-width:1px; }
+.learning-ui .input-card .file-label { display:flex; align-items:center; justify-content:center; min-height:60px; padding:8px 12px; font-size:14px; text-align:center; }
+.learning-ui .input-card .full-width-form { gap:8px; }
+.learning-ui .input-card .full-width-form input { height:40px; padding:6px 10px; font-size:16px; }
+.learning-ui .input-card .full-width-form textarea { height:188px; min-height:188px; padding:10px; font-size:16px; overflow-y:auto; resize:none; }
+.learning-ui .input-card .input-label-row { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:24px; font-size:12px; font-weight:700; color:#74695f; }
+.learning-ui .input-card .input-label-row label { font-weight:700; }
+.learning-ui .input-card .input-label-actions { display:inline-flex; align-items:center; gap:6px; }
+.learning-ui .input-card .input-char-count { font-size:11px; font-weight:500; color:#8b7d70; }
+.learning-ui .input-card .input-paste-btn {
+    min-height:24px; padding:2px 10px; border:1px solid var(--ui-border); border-radius:999px;
+    background:#fffdfa; color:#6f5a48; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;
+}
+.learning-ui .input-card .input-paste-btn:hover { background:#f3ede5; }
+.learning-ui .input-card .chapter-mode-option { margin-top:2px !important; min-height:32px; font-size:13px; }
+.learning-ui .input-card .chapter-mode-option input[type="checkbox"] {
+    -webkit-appearance:none; appearance:none;
+    width:40px !important; height:22px; min-width:40px; margin:0; padding:0;
+    border:0; border-radius:999px; background:#d8cfc4; position:relative; cursor:pointer; flex:none;
+    transition:background-color .16s ease;
+}
+.learning-ui .input-card .chapter-mode-option input[type="checkbox"]::after {
+    content:''; position:absolute; top:3px; left:3px; width:16px; height:16px;
+    border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(65,50,39,.25);
+    transition:left .16s ease;
+}
+.learning-ui .input-card .chapter-mode-option input[type="checkbox"]:checked { background:#6f5a48; }
+.learning-ui .input-card .chapter-mode-option input[type="checkbox"]:checked::after { left:21px; }
+.learning-ui .input-card .input-actions {
+    position:sticky; bottom:0; z-index:5;
+    display:flex; justify-content:flex-end; gap:10px;
+    margin-top:12px; padding:10px 0 calc(4px + env(safe-area-inset-bottom));
+    border-top:1px solid #eee5dc; background:inherit;
+}
+.learning-ui .input-card .input-actions button { min-height:44px; padding:10px 18px; font-size:14px; }
+.learning-ui .body-editor-overlay {
+    position:fixed; inset:0; z-index:12000;
+    display:flex; flex-direction:column; gap:10px;
+    padding:calc(10px + env(safe-area-inset-top)) 14px calc(10px + env(safe-area-inset-bottom));
+    background:#fffdfa;
+}
+.learning-ui .body-editor-header { display:flex; align-items:center; gap:10px; }
+.learning-ui .body-editor-header strong { font-size:1rem; }
+.learning-ui .body-editor-header-actions { margin-left:auto; display:inline-flex; gap:8px; }
+.learning-ui .body-editor-overlay textarea {
+    flex:1; width:100%; padding:12px; border:1px solid #ddd; border-radius:10px;
+    font-size:16px; background:#fafafa; resize:none;
+}
+@media(max-width:700px) {
+    .learning-ui .input-card { width:auto; margin:10px; padding:14px; max-height:calc(100dvh - 20px); }
+}

@@ -1273,6 +1273,7 @@ function showLibrary() {
                 actions.appendChild(vocabularyButton);
             }
         }
+        if (item.type === 'folder') addFolderLinkControls(card, item);
         list.appendChild(card);
     });
 }
@@ -1321,6 +1322,72 @@ async function convertCurrentArticleToChapterMode() {
     openSavedBookEditor(currentArticle);
 }
 
+let inputDestinationFolderId = null;
+
+function updateInputDestination(folderId) {
+    inputDestinationFolderId = folderId ?? null;
+    const label = document.getElementById('input-destination-label');
+    const linkButton = document.getElementById('input-destination-link');
+    if (!label) return;
+    const folder = inputDestinationFolderId === null ? null
+        : libraryItems.find(item => item.type === 'folder' && String(item.id) === String(inputDestinationFolderId));
+    label.textContent = `保存先：${folder ? (folder.name || 'フォルダ') : '本棚'}`;
+    const url = folder ? getFolderLinkUrl(folder) : null;
+    if (linkButton) {
+        linkButton.style.display = url ? '' : 'none';
+        linkButton.onclick = url ? () => window.open(url, '_blank', 'noopener,noreferrer') : null;
+    }
+}
+
+function updateBodyCharCount() {
+    const count = document.getElementById('text-input-count');
+    const body = document.getElementById('text-input');
+    if (count && body) count.textContent = `${body.value.length.toLocaleString()}文字`;
+}
+
+function updateBodyEditorCount() {
+    const count = document.getElementById('body-editor-count');
+    const editor = document.getElementById('body-editor-text');
+    if (count && editor) count.textContent = `${editor.value.length.toLocaleString()}文字`;
+}
+
+async function pasteIntoField(id) {
+    const field = document.getElementById(id);
+    if (!field) return;
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text) return;
+        field.value = id === 'text-input' && field.value ? field.value + text : text;
+        if (id === 'text-input') updateBodyCharCount();
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (_) {
+        // Clipboard permission denied etc.: stay silent so manual paste still works.
+    }
+}
+
+function openBodyEditor() {
+    const overlay = document.getElementById('body-editor-overlay');
+    const editor = document.getElementById('body-editor-text');
+    const body = document.getElementById('text-input');
+    if (!overlay || !editor || !body) return;
+    editor.value = body.value;
+    updateBodyEditorCount();
+    overlay.style.display = 'flex';
+    editor.focus();
+}
+
+function closeBodyEditor(apply) {
+    const overlay = document.getElementById('body-editor-overlay');
+    const editor = document.getElementById('body-editor-text');
+    const body = document.getElementById('text-input');
+    if (!overlay) return;
+    if (apply && editor && body) {
+        body.value = editor.value;
+        updateBodyCharCount();
+    }
+    overlay.style.display = 'none';
+}
+
 function showInputArea() {
     flushReadingPositionSave();
     hideAllSections();
@@ -1328,6 +1395,8 @@ function showInputArea() {
     pendingImportedDocument = null;
     importReviewState = null;
     resetImportReviewSearch();
+    closeBodyEditor(false);
+    updateInputDestination(currentFolderId);
     document.getElementById('input-title-label').innerText = "記事を登録";
     document.getElementById('text-title').value = ""; 
     document.getElementById('text-url').value = ""; 
@@ -1338,6 +1407,7 @@ function showInputArea() {
     document.getElementById('input-area').style.display = 'block';
     document.getElementById('file-input').value = ""; 
     setFileImportStatus('');
+    updateBodyCharCount();
 }
 
 function editCurrentArticle() { 
@@ -1349,6 +1419,7 @@ function editCurrentArticle() {
     flushReadingPositionSave();
     editingId = currentArticle.id; 
     hideAllSections(); 
+    updateInputDestination(currentArticle.parentId ?? null);
     document.getElementById('input-title-label').innerText = "記事を編集";
     document.getElementById('text-title').value = currentArticle.name; 
     document.getElementById('text-url').value = currentArticle.url || ""; 
@@ -1359,6 +1430,7 @@ function editCurrentArticle() {
     document.getElementById('manual-chapter-mode').checked = false;
     document.getElementById('convert-to-chapter-btn').style.display = 'inline-block';
     document.getElementById('input-area').style.display = 'block'; 
+    updateBodyCharCount();
 }
 
 async function saveNewArticle() {
@@ -1479,6 +1551,14 @@ function getGlobalSearchMatchInfo(item, options) {
     return { titleMatches, contentMatches, wordMatches, noteMatches, searchableContent };
 }
 
+function toggleLibrarySearchOptions() {
+    const options = document.getElementById('library-search-options');
+    const toggle = document.getElementById('library-search-options-toggle');
+    if (!options) return;
+    const open = options.classList.toggle('is-open');
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
 function clearGlobalSearch() {
     const input = document.getElementById('global-search-input');
     if (!input) return;
@@ -1580,6 +1660,7 @@ function performGlobalSearch() {
         });
         actions.append(moveButton, deleteButton);
         card.appendChild(actions);
+        if (item.type === 'folder') addFolderLinkControls(card, item);
         list.appendChild(card);
     });
 }
@@ -3294,6 +3375,51 @@ function applySettings() {
 }
 function renderSettingsUI(c) { c.innerHTML = `<div class="settings-group"><p>文字: ${readerSettings.fontSize}px</p><input type="range" min="14" max="30" value="${readerSettings.fontSize}" oninput="updateSetting('font', this.value)"><p>行間: ${readerSettings.lineHeight}</p><input type="range" min="1.2" max="2.5" step="0.1" value="${readerSettings.lineHeight}" oninput="updateSetting('line', this.value)"></div>`; }
 function updateSetting(t, v) { if (t==='font') readerSettings.fontSize=v; else readerSettings.lineHeight=v; applySettings(); db.setItem('reader_settings', readerSettings); renderList('settings'); }
+function getFolderLinkUrl(item) {
+    return window.SmartReaderLearningUI?.folderLinkUrl(item) ?? null;
+}
+
+function openFolderLink(item) {
+    const url = getFolderLinkUrl(item);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function editFolderLink(id) {
+    const folder = libraryItems.find(item => String(item.id) === String(id));
+    if (!folder || folder.type !== 'folder') return;
+    const input = prompt("フォルダのリンクURL（空欄にすると解除されます）", folder.url || "");
+    if (input === null) return;
+    const result = window.SmartReaderLearningUI?.normalizeFolderLinkInput(input) || { ok: false, url: null };
+    if (!result.ok) { alert("URLが正しくありません。https:// で始まるURLを入力してください。"); return; }
+    if (result.url) folder.url = result.url; else delete folder.url;
+    saveToDB(); showLibrary();
+}
+
+function addFolderLinkControls(card, item) {
+    const heading = card.querySelector('h3');
+    const url = getFolderLinkUrl(item);
+    if (heading && url) {
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'folder-link-open';
+        openButton.textContent = '↗';
+        openButton.title = `${item.name || 'フォルダ'}のリンクを開く`;
+        openButton.setAttribute('aria-label', `${item.name || 'フォルダ'}のリンクを開く`);
+        openButton.addEventListener('click', event => { event.stopPropagation(); openFolderLink(item); });
+        heading.appendChild(openButton);
+    }
+    const actions = card.querySelector('.card-actions');
+    if (actions) {
+        const linkButton = document.createElement('button');
+        linkButton.type = 'button';
+        linkButton.className = 'small-btn folder-link-edit';
+        linkButton.textContent = 'リンク';
+        linkButton.title = url ? 'フォルダのリンクを編集' : 'フォルダにリンクを設定';
+        linkButton.addEventListener('click', event => { event.stopPropagation(); editFolderLink(item.id); });
+        actions.appendChild(linkButton);
+    }
+}
+
 function createNewFolder() { const n = prompt("フォルダ名"); if(n){ libraryItems.push({id:Date.now(), type:'folder', name:n, parentId:currentFolderId}); saveToDB(); showLibrary(); } }
 async function deleteLibraryItem(id) { if(confirm("削除しますか？")){ libraryItems = libraryItems.filter(i=>i.id!==id); await saveToDB(); showLibrary(); } }
 async function deleteListItem(id, type, sourceIndex = null) {
